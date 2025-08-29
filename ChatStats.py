@@ -2,7 +2,7 @@ __version__ = (1,3,9) # Updated version
 
 
 # meta name ShatStats
-# meta developer: @nullmod
+# meta developer: @Androfon_AI
 
 import logging
 from telethon import events
