@@ -1,3 +1,7 @@
+# meta developer: @Androfon_AI
+# meta name: Управление папками
+# meta version: 1.0.1
+
 from telethon import TelegramClient, events
 from telethon.tl.functions.messages import UpdateDialogFilterRequest
 from telethon.tl.types import DialogFilter, InputDialogPeer
