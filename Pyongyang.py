@@ -1,6 +1,6 @@
 # meta developer: @Androfon_AI
 # meta name: Шашки
-# meta version: 1.3.0  # Обновляем версию после добавления поддержки множественных игр
+# meta version: 1.3.0
 
 import asyncio, html, random
 from .. import loader, utils
@@ -306,8 +306,11 @@ class Checkers(loader.Module):
             self.games[chat_id] = await self.default_game_state(chat_id)
         return self.games[chat_id]
 
-    @loader.inline_handler()
     async def inline_handler(self, query):
+        # Обработка inline-запросов
+        if not hasattr(query, "data") or not query.data:
+            return
+        
         data = query.data
         if not isinstance(data, str) or not data.startswith("checkers_"):
             return
@@ -328,7 +331,10 @@ class Checkers(loader.Module):
         if method is None:
             return
 
-        await method(query, chat_id, *args)
+        try:
+            await method(query, chat_id, *args)
+        except Exception as e:
+            await query.answer(f"Ошибка: {str(e)}")
 
     async def checkerscmd(self, message):
         """Запустить игру в шашки. Использование: .checkers [@оппонент]"""
@@ -377,13 +383,13 @@ class Checkers(loader.Module):
                  f"| - > • Обязательные взятия: {'Включены' if state['mandatory_captures_enabled'] else 'Отключены'}",
             reply_markup=[
                 [
-                    {"text":"Принять вызов","callback":self.accept_game,"args":[chat_id]}
+                    {"text": "Принять вызов", "data": f"checkers_accept_game_{chat_id}"}
                 ],
                 [
-                    {"text":"Настройки","callback":self.settings_menu,"args":[chat_id]}
+                    {"text": "Настройки", "data": f"checkers_settings_menu_{chat_id}"}
                 ],
                 [
-                    {"text":"Отклонить","callback":self.decline_game,"args":[chat_id]}
+                    {"text": "Отклонить", "data": f"checkers_decline_game_{chat_id}"}
                 ]
             ],
             ttl=60*60*24  # 24 часа
@@ -424,274 +430,3 @@ class Checkers(loader.Module):
 
         await self.display_board(call, chat_id)
 
-    async def decline_game(self, call, chat_id):
-        state = await self.get_game_state(chat_id)
-        if call.from_user.id not in state['players_ids']:
-            await call.answer("Вы не участник этой игры!")
-            return
-
-        await call.edit(
-            text=f"Игра отменена пользователем {html.escape(call.from_user.first_name)}.",
-            reply_markup=None
-        )
-        await self.purge_chat(chat_id)
-
-    async def purge_chat(self, chat_id):
-        if chat_id in self.games:
-            del self.games[chat_id]
-
-    async def settings_menu(self, call, chat_id):
-        state = await self.get_game_state(chat_id)
-        
-        if call.from_user.id != state['host_id']:
-            await call.answer("Только создатель игры может менять настройки!")
-            return
-
-        current_host_color_display = state['colorName']
-        if state['host_color'] == "white":
-            current_host_color_display = "белый"
-        elif state['host_color'] == "black":
-            current_host_color_display = "чёрный"
-
-        opponent_name_display_for_settings = state['opponent_name']
-        invite_text_prefix_for_settings = "Вас приглашают сыграть партию в шашки, примите?"
-        if state['opponent_id']:
-            invite_text_prefix_for_settings = f"<a href='tg://user?id={state['opponent_id']}'>{opponent_name_display_for_settings}</a>, вас пригласили сыграть партию в шашки, примите?"
-
-        await call.edit(
-            text=f"{invite_text_prefix_for_settings}\n-- --\n"
-                 f"Текущие настройки:\n"
-                 f"| - > • Хост играет за {current_host_color_display} цвет\n"
-                 f"| - > • Обязательные взятия: {'Включены' if state['mandatory_captures_enabled'] else 'Отключены'}",
-            reply_markup=[
-                [
-                    {"text":f"Цвет (хоста): {current_host_color_display}","data":f"checkers_set_color_{chat_id}"}
-                ],
-                [
-                    {"text":f"Обязательные взятия: {'Вкл' if state['mandatory_captures_enabled'] else 'Выкл'}","data":f"checkers_toggle_mandatory_captures_{chat_id}"}
-                ],
-                [
-                    {"text":"Вернуться","data":f"checkers_back_to_invite_{chat_id}"}
-                ]
-            ]
-        )
-
-    async def set_color(self, call, chat_id):
-        state = await self.get_game_state(chat_id)
-        
-        if call.from_user.id != state['host_id']:
-            await call.answer("Только создатель игры может менять настройки!")
-            return
-
-        if state['colorName'] == "рандом":
-            state['colorName'] = "белый"
-            state['host_color'] = "white"
-        elif state['colorName'] == "белый":
-            state['colorName'] = "чёрный"
-            state['host_color'] = "black"
-        else:
-            state['colorName'] = "рандом"
-            state['host_color'] = None
-
-        await self.settings_menu(call, chat_id)
-
-    async def toggle_mandatory_captures(self, call, chat_id):
-        state = await self.get_game_state(chat_id)
-        
-        if call.from_user.id != state['host_id']:
-            await call.answer("Только создатель игры может менять настройки!")
-            return
-
-        state['mandatory_captures_enabled'] = not state['mandatory_captures_enabled']
-        self.db.set("checkers_module", "mandatory_captures_enabled", state['mandatory_captures_enabled'])
-        await self.settings_menu(call, chat_id)
-
-    async def back_to_invite(self, call, chat_id):
-        state = await self.get_game_state(chat_id)
-        
-        if call.from_user.id != state['host_id']:
-            await call.answer("Это не для вас!")
-            return
-
-        opponent_name_display = state['opponent_name']
-        invite_text_prefix = "Вас приглашают сыграть партию в шашки, примите?"
-
-        if state['opponent_id']:
-            invite_text_prefix = f"<a href='tg://user?id={state['opponent_id']}'>{opponent_name_display}</a>, вас пригласили сыграть партию в шашки, примите?"
-
-        current_host_color_display = state['colorName']
-        if state['host_color'] == "white":
-            current_host_color_display = "белый"
-        elif state['host_color'] == "black":
-            current_host_color_display = "чёрный"
-
-        await call.edit(
-            text=f"{invite_text_prefix}\n-- --\n"
-                 f"Текущие настройки:\n"
-                 f"| - > • Хост играет за {current_host_color_display} цвет\n"
-                 f"| - > • Обязательные взятия: {'Включены' if state['mandatory_captures_enabled'] else 'Отключены'}",
-            reply_markup=[
-                [
-                    {"text":"Принять вызов","data":f"checkers_accept_game_{chat_id}"}
-                ],
-                [
-                    {"text":"Настройки","data":f"checkers_settings_menu_{chat_id}"}
-                ],
-                [
-                    {"text":"Отклонить","data":f"checkers_decline_game_{chat_id}"}
-                ]
-            ]
-        )
-
-    async def display_board(self, call, chat_id, selected_pos=None):
-        state = await self.get_game_state(chat_id)
-        
-        if not state['game_running']:
-            await call.answer("Игра не запущена!")
-            return
-
-        board = state['board_obj']
-        possible_moves = []
-
-        if selected_pos:
-            state['selected_piece_pos'] = selected_pos
-            state['possible_moves_for_selected'] = board.get_valid_moves_for_selection(selected_pos[0], selected_pos[1])
-            possible_moves = state['possible_moves_for_selected']
-
-        board_emojis = board.to_list_of_emojis(selected_pos, possible_moves)
-
-        board_text = "🔳◻️1️⃣2️⃣3️⃣4️⃣5️⃣6️⃣7️⃣8️⃣\n"
-        for r, row in enumerate(board_emojis):
-            board_text += f"{['🔲','🔳'][r%2]}{['a','b','c','d','e','f','g','h'][r]}"
-            for emoji in row:
-                board_text += emoji
-            board_text += "\n"
-
-        current_player_color_emoji = "⚪" if board.current_player == "white" else "⚫"
-        current_player_id = state['player_white_id'] if board.current_player == "white" else state['player_black_id']
-
-        try:
-            current_player_entity = await self.client.get_entity(current_player_id)
-            current_player_name = html.escape(current_player_entity.first_name)
-        except Exception:
-            current_player_name = "Игрок"
-
-        status_text = f"{current_player_color_emoji} Ход: {current_player_name}\n"
-
-        if state['game_reason_ended']:
-            status_text = f"🎮 Игра завершена: {state['game_reason_ended']}\n"
-
-        full_text = board_text + "\n" + status_text
-
-        markup = []
-        if not state['game_reason_ended']:
-            for r in range(8):
-                row_buttons = []
-                for c in range(8):
-                    if (r + c) % 2 != 0:  # Only dark squares
-                        row_buttons.append({"text": f"{['a','b','c','d','e','f','g','h'][r]}{c+1}", "data": f"checkers_select_piece_{chat_id}_{r}_{c}"})
-                if row_buttons:
-                    markup.append(row_buttons)
-
-            markup.append([{"text": "Сдаться", "data": f"checkers_surrender_{chat_id}"}])
-
-        await call.edit(
-            text=full_text,
-            reply_markup=markup
-        )
-
-    async def select_piece(self, call, chat_id, r, c):
-        state = await self.get_game_state(chat_id)
-        
-        if not state['game_running']:
-            await call.answer("Игра не запущена!")
-            return
-
-        r, c = int(r), int(c)
-        board = state['board_obj']
-
-        current_player_id = state['player_white_id'] if board.current_player == "white" else state['player_black_id']
-
-        if call.from_user.id != current_player_id:
-            await call.answer("Сейчас не ваш ход!")
-            return
-
-        if state['selected_piece_pos'] is None:
-            piece = board.get_piece_at(r, c)
-            piece_color = board._get_player_color(piece)
-
-            if piece_color != board.current_player:
-                await call.answer("Вы можете выбрать только свои фигуры!")
-                return
-
-            valid_moves = board.get_valid_moves_for_selection(r, c)
-            if not valid_moves:
-                await call.answer("У этой фигуры нет доступных ходов!")
-                return
-
-            await self.display_board(call, chat_id, (r, c))
-        else:
-            selected_r, selected_c = state['selected_piece_pos']
-            valid_moves = state['possible_moves_for_selected']
-
-            is_valid_move = False
-            is_capture_move = False
-
-            for move_r, move_c, move_is_capture in valid_moves:
-                if move_r == r and move_c == c:
-                    is_valid_move = True
-                    is_capture_move = move_is_capture
-                    break
-
-            if not is_valid_move:
-                await call.answer("Недопустимый ход!")
-                return
-
-            continue_captures = board.make_move(selected_r, selected_c, r, c, is_capture_move)
-
-            game_over_reason = board.is_game_over()
-            if game_over_reason:
-                state['game_reason_ended'] = game_over_reason
-                state['game_running'] = False
-
-            if not continue_captures or game_over_reason:
-                state['selected_piece_pos'] = None
-                state['possible_moves_for_selected'] = []
-
-            await self.display_board(call, chat_id)
-
-    async def surrender(self, call, chat_id):
-        state = await self.get_game_state(chat_id)
-        
-        if not state['game_running']:
-            await call.answer("Игра не запущена!")
-            return
-
-        if call.from_user.id not in state['players_ids']:
-            await call.answer("Вы не участник этой игры!")
-            return
-
-        surrendering_player_color = "белых" if call.from_user.id == state['player_white_id'] else "черных"
-        state['game_reason_ended'] = f"Победа {'черных' if surrendering_player_color == 'белых' else 'белых'} (сдача {surrendering_player_color})"
-        state['game_running'] = False
-
-        await self.display_board(call, chat_id)
-
-    async def stopcmd(self, message):
-        """Остановить текущую игру в шашки."""
-        chat_id = message.chat_id
-        state = await self.get_game_state(chat_id)
-        
-        if not state['game_running']:
-            await utils.answer(message, "В этом чате нет активной игры!")
-            return
-
-        if message.from_id not in state['players_ids']:
-            await utils.answer(message, "Вы не участник этой игры!")
-            return
-
-        state['game_reason_ended'] = "Игра остановлена"
-        state['game_running'] = False
-
-        await utils.answer(message, "Игра остановлена!")
-        await self.purge_chat(chat_id)
