@@ -1,24 +1,28 @@
 # checkers_module.py
 # Модуль шашек для юзербота (Telethon)
-# Автор: @YourName | Версия: 2.1
-# Исправлено: экспортируется register(client) — для корректной работы в Heroku/loader
+# Автор: @YourName | Версия: 2.2
+# Особенности:
+#  - Игра для 2 игроков через inline-кнопки
+#  - Можно включать/выключать обязательные взятия
+#  - Хост выбирает цвет
+#  - Поддержка множества игр одновременно
+#  - Сохранение и возобновление игры
+#  - Универсальная регистрация (работает и в Telethon-скриптах, и в Heroku-лоадерах)
 
 import copy
 from telethon import events, Button
 
-# Хранилище игр в памяти (можно заменить на БД)
+# Хранилище игр
 active_games = {}
 saved_games = {}
 
 MODULE_NAME = "CheckersGame"
-MODULE_VERSION = "2.1"
+MODULE_VERSION = "2.2"
 MODULE_AUTHOR = "@YourName"
 
-# --------------------
-# === Обработчики ===
-# --------------------
-# Важно: обработчики не декорированы — их регистрирует функция register(client)
-# --------------------
+# ==========================
+# ======= ОБРАБОТЧИКИ ======
+# ==========================
 
 async def start_game(event):
     chat_id = event.chat_id
@@ -59,7 +63,6 @@ async def resume_game(event):
 
 
 async def make_move_command(event):
-    # Этот хэндлер поддержан на случай, если кто-то ещё использует текстовую команду .move
     chat_id = event.chat_id
     if chat_id not in active_games:
         await event.respond("❌ Здесь нет активной игры.")
@@ -101,10 +104,6 @@ async def make_move_command(event):
 
 
 async def handle_callback(event):
-    """
-    Обработка нажатий inline-кнопок.
-    Данные формата: "cell:x:y" или "toggle_force" / "switch_color" / "save_game"
-    """
     data = event.data.decode("utf-8") if event.data is not None else ""
     chat_id = event.chat_id
 
@@ -114,7 +113,6 @@ async def handle_callback(event):
 
     game = active_games[chat_id]
 
-    # Настройки
     if data == "toggle_force":
         game["settings"]["force_take"] = not game["settings"]["force_take"]
         await event.edit(f"♟️ Обязательные взятия: {'✅' if game['settings']['force_take'] else '❌'}",
@@ -130,7 +128,6 @@ async def handle_callback(event):
         await event.answer("💾 Игра сохранена!", alert=True)
         return
 
-    # Игровая логика
     parts = data.split(":")
     if parts[0] != "cell":
         await event.answer("Неопознанная кнопка", alert=True)
@@ -142,7 +139,6 @@ async def handle_callback(event):
         await event.answer("Ошибка координат", alert=True)
         return
 
-    # Если шашка выбрана — пытаемся походить
     if game["selected"]:
         sx, sy = game["selected"]
         ok, new_board, msg, extra = try_move(game["board"], sx, sy, x, y, game["turn"], game["settings"]["force_take"], game["multi_jump"])
@@ -159,7 +155,6 @@ async def handle_callback(event):
                 return
 
             if extra:
-                # обязан продолжить той же шашкой
                 game["selected"] = (x, y)
                 await event.edit("⚔️ Продолжи бой той же шашкой!",
                                  buttons=render_inline_board(new_board, highlight=(x, y)))
@@ -169,12 +164,10 @@ async def handle_callback(event):
             await event.edit(f"✅ Ход выполнен: {msg}\nТеперь ходят: {'белые' if game['turn']=='w' else 'чёрные'}",
                              buttons=render_inline_board(new_board))
         else:
-            # неверный ход — сброс выбора
             game["selected"] = None
             await event.answer(msg, alert=True)
         return
 
-    # Иначе — выбираем шашку
     piece = game["board"][x][y]
     if piece != "." and piece.lower() == game["turn"]:
         game["selected"] = (x, y)
@@ -190,10 +183,9 @@ async def checkers_info(event):
         f"👨‍💻 Разработчик: {MODULE_AUTHOR}"
     )
 
-
-# --------------------
-# === Логика игры ===
-# --------------------
+# ==========================
+# ====== ЛОГИКА ИГРЫ ======
+# ==========================
 
 def render_inline_board(board, highlight=None):
     symbols = {
@@ -212,7 +204,6 @@ def render_inline_board(board, highlight=None):
                 label = "⭐"
             row.append(Button.inline(label, f"cell:{i}:{j}"))
         rows.append(row)
-    # кнопки настроек внизу
     rows.append([
         Button.inline("⚖️ Обяз. взятие", "toggle_force"),
         Button.inline("🔄 Цвет хоста", "switch_color"),
@@ -246,7 +237,6 @@ def render_board(board):
 
 
 def try_move(board, x1, y1, x2, y2, turn, force_take, multi_jump):
-    # валидность координат
     if not (0 <= x1 < 8 and 0 <= y1 < 8 and 0 <= x2 < 8 and 0 <= y2 < 8):
         return False, board, "Координаты вне доски", None
 
@@ -269,11 +259,9 @@ def try_move(board, x1, y1, x2, y2, turn, force_take, multi_jump):
     new_board = copy.deepcopy(board)
     captured = False
 
-    # дамки
     if piece in ("W", "B"):
         if abs(dx) != abs(dy):
             return False, board, "Дамка ходит по диагонали", None
-
         cx, cy = x1 + step_x, y1 + step_y
         beaten = []
         while cx != x2 and cy != y2:
@@ -281,20 +269,16 @@ def try_move(board, x1, y1, x2, y2, turn, force_take, multi_jump):
                 if new_board[cx][cy].lower() == turn:
                     return False, board, "Нельзя перепрыгивать свои", None
                 if beaten:
-                    return False, board, "Можно бить только одну шашку за раз", None
+                    return False, board, "Можно бить только одну шашку", None
                 beaten.append((cx, cy))
             cx += step_x
             cy += step_y
-
         if beaten:
             bx, by = beaten[0]
             new_board[bx][by] = "."
             captured = True
-
         new_board[x1][y1] = "."
         new_board[x2][y2] = piece
-
-    # обычные шашки
     else:
         if abs(dx) == 1 and abs(dy) == 1 and not force_take:
             if (turn == "w" and dx == -1) or (turn == "b" and dx == 1):
@@ -314,13 +298,11 @@ def try_move(board, x1, y1, x2, y2, turn, force_take, multi_jump):
         else:
             return False, board, "Неправильный ход", None
 
-    # превращение в дамку
     if x2 == 0 and piece == "w":
         new_board[x2][y2] = "W"
     if x2 == 7 and piece == "b":
         new_board[x2][y2] = "B"
 
-    # проверка на продолжение боя
     if captured and has_more_captures(new_board, x2, y2):
         return True, new_board, f"({x1},{y1}) → ({x2},{y2})", (x2, y2)
 
@@ -337,7 +319,7 @@ def has_more_captures(board, x, y):
             if 0 <= nx < 8 and 0 <= ny < 8:
                 if board[nx][ny] == "." and board[mx][my] != "." and board[mx][my].lower() != piece.lower():
                     return True
-    else:  # дамки
+    else:
         for dx, dy in dirs:
             cx, cy = x + dx, y + dy
             found_enemy = False
@@ -363,25 +345,36 @@ def check_winner(board):
         return "w"
     return None
 
+# ==========================
+# ====== РЕГИСТРАЦИЯ =======
+# ==========================
 
-# --------------------
-# === Функция регистрации (важно!) ===
-# --------------------
-def register(client):
+def register(client=None):
     """
-    Загрузчик должен вызвать register(client), где client — экземпляр TelegramClient.
-    После этого все обработчики будут зарегистрированы.
+    Универсальная регистрация:
+    - Если client передан → регистрируем обработчики на нём.
+    - Если client не передан → пытаемся найти глобальный client (Heroku loader).
     """
-    # Команды / сообщения
+    from telethon import events
+
+    if client is None:
+        try:
+            from .. import client as global_client
+            client = global_client
+        except Exception:
+            try:
+                import client as global_client
+                client = global_client
+            except Exception:
+                raise RuntimeError(
+                    "❌ Не удалось найти Telethon client. "
+                    "Передай client явно: register(client)."
+                )
+
     client.add_event_handler(start_game, events.NewMessage(pattern=r"\.checkers"))
     client.add_event_handler(resume_game, events.NewMessage(pattern=r"\.checkers_resume"))
     client.add_event_handler(make_move_command, events.NewMessage(pattern=r"\.move (\d) (\d) (\d) (\d)"))
     client.add_event_handler(checkers_info, events.NewMessage(pattern=r"\.checkers_info"))
-
-    # CallbackQuery для inline-кнопок
     client.add_event_handler(handle_callback, events.CallbackQuery)
 
-
-# Если кто-то импортирует модуль и хочет сам зарегистрировать handlers:
-# from checkers_module import register
-# register(client)
+    print(f"[{MODULE_NAME}] v{MODULE_VERSION} by {MODULE_AUTHOR} загружен ✅")
