@@ -1,22 +1,23 @@
 # checkers_module.py
 # Шашки для Telethon Userbot
-# Автор: @YourName | Версия: 2.2
+# Автор: @YourName | Версия: 2.3
 
 import copy
 from telethon import events, Button
+
+# Импортируем client из твоего юзербота
+# ⚠️ проверь точное имя — чаще всего "userbot" или "heroku"
+from userbot import client  
 
 active_games = {}
 saved_games = {}
 
 MODULE_NAME = "CheckersGame"
-MODULE_VERSION = "2.2"
+MODULE_VERSION = "2.3"
 MODULE_AUTHOR = "@YourName"
 
-# Глобальная переменная клиента
-client = None
 
-
-# ========== ОБРАБОТЧИКИ ==========
+# ================= ОБРАБОТЧИКИ =================
 async def start_game(event):
     chat_id = event.chat_id
     user_id = event.sender_id
@@ -49,11 +50,11 @@ async def checkers_info(event):
 
 
 async def handle_callback(event):
-    # логика inline-кнопок (сокращено для примера)
-    await event.answer("Нажата кнопка!")
+    data = event.data.decode("utf-8") if event.data else ""
+    await event.answer(f"Нажата кнопка: {data}")
 
 
-# ========== ДОСКА ==========
+# ================= ДОСКА =================
 def render_inline_board(board, highlight=None):
     symbols = {".": "⬜", "w": "⚪", "b": "⚫", "W": "🔵", "B": "🔴"}
     rows = []
@@ -79,20 +80,9 @@ def init_board():
     return board
 
 
-# ========== РЕГИСТРАЦИЯ ==========
-def register(c=None):
-    """
-    Если loader вызывает register() без аргументов — клиент ищем глобально.
-    Если передали объект TelegramClient — сохраняем в глобальную переменную.
-    """
-    global client
-    if c is not None:
-        client = c
-
-    if client is None or isinstance(client, str):
-        raise ValueError("❌ Ошибка: client не инициализирован. "
-                         "Передай сюда объект Telethon TelegramClient.")
-
+# ================= РЕГИСТРАЦИЯ =================
+def register():
+    """Регистрируем обработчики прямо в глобальном client"""
     client.add_event_handler(start_game, events.NewMessage(pattern=r"\.checkers"))
     client.add_event_handler(resume_game, events.NewMessage(pattern=r"\.checkers_resume"))
     client.add_event_handler(checkers_info, events.NewMessage(pattern=r"\.checkers_info"))
