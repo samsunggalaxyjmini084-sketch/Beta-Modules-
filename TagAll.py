@@ -1,4 +1,4 @@
-eta developer: @yourhandle
+# meta developer: @yourhandle
 # meta name: TagAll
 # meta version: 2.4.0
 
