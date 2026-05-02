@@ -1,4 +1,4 @@
-meta developer: @TecnoPova7Neo
+# meta developer: @TecnoPova7Neo
 # meta name: AutoMafiaTournamentsGame
 # meta version: 2.1.4 # Увеличена версия модуля
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
