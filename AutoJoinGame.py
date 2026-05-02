@@ -1,5 +1,3 @@
-
-```python
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
 # meta version: 2.3.9
