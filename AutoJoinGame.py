@@ -1,9 +1,9 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.3.9
+# meta version: 2.3.10
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 010000010101010001001111010010100100100101001110001000000100011101000001
-# 01001101010001010010000001001101010001000101010101001100010001011
+# 0100110101000101001000000100110101000100010101010100110001000101
 import logging
 import asyncio
 import random
@@ -970,3 +970,112 @@ Mafia Combat Premium <code>1634167847</code>""",
                         logger.info(self.strings("lynch_triggered_negative").format(marker=lynch_marker))
                     else:
                         logger.info(self.strings("lynch_triggered_positive"))
+
+                    lynch_button_found = False
+                    for row in message.buttons:
+                        for button in row:
+                            try:
+                                button_text = str(getattr(button, 'text', ''))
+                            except Exception as e:
+                                logger.warning(f"Error getting button text for lynch message {message.id}: {e}")
+                                button_text = ''
+
+                            if target_emoji in button_text: 
+                                logger.info(f"✅ AutoJoinGame: Найдена кноп '{target_emoji}' для линчевания/повешения: '{button_text}'")
+                                try:
+                                    await button.click()
+                                    logger.info(success_log_message)
+                                    lynch_button_found = True
+                                    break 
+                                except Exception as e:
+                                    logger.error(f"❌ AutoJoinGame: Ошибка при нажатии кнопки '{target_emoji}' для линчевания/повешения сообщения {message.id}: {e}")
+                        if lynch_button_found:
+                            break 
+                    
+                    if not lynch_button_found:
+                        logger.warning(not_found_log_message)
+                    
+                    return 
+
+                elif is_game_join: 
+                    logger.info(f"🎮 AutoJoinGame: Найдено сообщение с набором/регистрацией! (msg_id: {message.id}, chat_id: {message.chat_id})")
+
+                    if not getattr(message, 'buttons', None):
+                        logger.warning(f"⚠️ AutoJoinGame: Сообщение с набором/регистрацией найдено (msg_id: {message.id}), но кнопок нет. Пропускаю.")
+                        return
+
+                    delays = self.config["delays"]
+                    chosen_delay = random.choice(delays)
+
+                    logger.info(f"⏳ AutoJoinGame: Ожидание {chosen_delay} секунд перед обработкой сообщения {message.id} (выбрано из {delays})...")
+                    await asyncio.sleep(chosen_delay)
+
+                    configured_button_keywords_lower = [kw.lower() for kw in self.config["button_keywords"]]
+                    keywords_to_check = configured_button_keywords_lower
+
+                    deep_link_mode_active = '🌚' in configured_button_keywords_lower or '🌝' in configured_button_keywords_lower
+
+                    button_found = False
+                    for row in message.buttons:
+                        for button in row:
+                            try:
+                                button_text = str(getattr(button, 'text', ''))
+                            except Exception as e:
+                                logger.warning(f"Error getting button text for message {message.id}: {e}")
+                                button_text = ''
+
+                            logger.debug(f"🔍 AutoJoinGame: Проверка кнопки: '{button_text}'")
+
+                            if any(keyword in button_text.lower() for keyword in keywords_to_check):
+                                logger.info(f"✅ AutoJoinGame: Найдена кнопка присоединения: '{button_text}'")
+
+                                if getattr(button, 'url', None):
+                                    button_url = button.url
+                                    logger.info(f"🔗 AutoJoinGame: URL кнопки: {button_url}")
+
+                                    parsed_url = urllib.parse.urlparse(button_url)
+                                    
+                                    bot_username = None
+                                    if parsed_url.hostname in ['t.me', 'telegram.me'] and parsed_url.path:
+                                        path_parts = parsed_url.path.lstrip('/').split('/')
+                                        if path_parts and path_parts[0]:
+                                            bot_username = path_parts[0]
+                                    elif parsed_url.scheme == 'tg' and parsed_url.netloc == 'resolve':
+                                        query_params_tg = urllib.parse.parse_qs(parsed_url.query)
+                                        bot_username = query_params_tg.get('domain', [None])[0]
+
+                                    query_params = urllib.parse.parse_qs(parsed_url.query)
+                                    start_param = query_params.get('start', [None])[0]
+
+                                    if deep_link_mode_active and bot_username and start_param:
+                                        logger.info(f"📤 AutoJoinGame: Режим Deep-Link активен. Отправка /start {start_param} боту @{bot_username}")
+
+                                        try:
+                                            await self._client.send_message(
+                                                bot_username,
+                                                f'/start {start_param}'
+                                            )
+                                            logger.info("🎉 AutoJoinGame: Успешно отправлена команда /start (уведомление в чат не отправлено).")
+                                            button_found = True
+                                            break 
+                                        except Exception as e:
+                                            logger.error(f"❌ AutoJoinGame: Ошибка при отправке Deep-Link команды /start для сообщения {message.id}: {e}")
+                                    else:
+                                        logger.warning(f"⚠️ AutoJoinGame: Найдена кнопка '{button_text}' с URL '{button_url}', но она не является Deep-Link или режим Deep-Link неактивен. Пропускаю.")
+                                else: 
+                                    logger.info(f"📤 AutoJoinGame: Найдена кнопка '{button_text}' (CallbackQuery). Нажимаю.")
+                                    try:
+                                        await button.click()
+                                        logger.info(f"🎉 AutoJoinGame: Успешно нажата кноп '{button_text}' для присоединения к игре.")
+                                        button_found = True
+                                        break 
+                                    except Exception as e:
+                                        logger.error(f"❌ AutoJoinGame: Ошибка при нажатии кнопки '{button_text}' для присоединения к игре: {e}")
+                        if button_found:
+                            break 
+
+                    if not button_found:
+                        logger.warning(f"⚠️ AutoJoinGame: Кнопка присоединения не найдена под сообщением {message.id} после задержки.")
+            
+        except Exception as e:
+            logger.exception(f"❌ AutoJoinGame: Критическая ошибка в watcher для сообщения {getattr(message, 'id', 'N/A')} в чате {getattr(message, 'chat_id', 'N/A')}: {e}")
