@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: TagAll
-# meta version: 2.4.1
+# meta version: 2.5.0
 
 import asyncio
 import contextlib
@@ -135,16 +135,9 @@ class TagAllMod(loader.Module):
 
         # Затем старт-триггер
         if start_trigger_lower and start_trigger_lower in message_text_lower:
-            # Удаляем все вхождения слова-триггера из сообщения для формирования префикса.
-            # Используем re.sub с \b для поиска по границам слова и игнорированием регистра.
-            # Заменяем найденные триггеры и возможные окружающие пробелы на один пробел,
-            # затем обрезаем лишние пробелы в начале и конце.
-            prefix = message.text
-            start_trigger_escaped = re.escape(self.config["start_trigger"])
-            # Паттерн для поиска триггера, окруженного опциональными пробелами,
-            # с заменой на один пробел.
-            pattern = re.compile(r'\s*' + start_trigger_escaped + r'\s*', re.IGNORECASE)
-            prefix = pattern.sub(' ', prefix).strip()
+            # Если триггер для запуска найден, весь остальной текст игнорируется.
+            # Поэтому prefix устанавливается в пустую строку.
+            prefix = "" 
             
             await self._start_logic(message, prefix)
 
