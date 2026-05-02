@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.3.9
+# meta version: 2.3.10
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 010000010101010001001111010010100100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000101
@@ -18,11 +18,11 @@ logger = logging.getLogger(__name__)
 
 @loader.tds
 class AutoJoinGameMod(loader.Module):
-    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию отслеживания ролей по ключевым словам."""
+    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам."""
 
     strings = {
         "name": "AutoJoinGame",
-        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию отслеживания ролей по ключевым словам.",
+        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам.",
         "enabled": "✅ Автовход в игру и автолинчевание включены.",
         "disabled": "❌ Автовход в игру и автолинчевание выключены.",
         "status": "<emoji document_id=5875291072225087249>📊</emoji> Статус автовхода и автолинчевания:\n"
@@ -54,7 +54,9 @@ class AutoJoinGameMod(loader.Module):
                   "Чат для отправки списка отслеживаемых ролей: {}\n"
                   "Задержка отправки списка отслеживаемых ролей (секунды): {}\n"
                   "Автоматическое включение отслеживания ролей (фразы): {}\n"
-                  "Автоматическое включение отслеживания ролей (боты): {}",
+                  "Автоматическое включение отслеживания ролей (боты): {}\n"
+                  "Автоматическое выключение отслеживания ролей (фразы): {}\n"
+                  "Автоматическое выключение отслеживания ролей (боты): {}",
         "error": "❌ Ошибка при нажатии кнопки: {}",
         "no_button": "⚠️ Кнопка не найдена под сообщением",
         "help_text": """<emoji document_id=5931415565955503486>🤖</emoji> AutoJoinGame - Помощь
@@ -67,7 +69,6 @@ class AutoJoinGameMod(loader.Module):
 <code>.ajgtest</code> - Проверить последнее сообщение с набором в текущем чате
 <code>.ajgid</code> - Показать список ID ботов для мафии
 <code>.ajgtournaments</code> - Показать информацию о регистрации на турниры
-<code>.ajgtrackroles</code> - Включить/выключить отслеживание ролей
 <code>.ajgshowtrackedroles</code> - Показать список найденных отслеживаемых ролей
 
 <emoji document_id=5877260593903177342>⚙</emoji> Как работает:
@@ -79,9 +80,10 @@ class AutoJoinGameMod(loader.Module):
 Дополнительно, если настроен <code>player_to_lynch_user_id</code>, модуль будет ожидать сообщение с ником игрока от этого пользователя. Как только ник получен, модуль будет искать сообщение о голосовании от <code>lynch_voting_bot_id</code>, содержащее <code>lynch_player_voting_trigger_phrases</code>, и затем автоматически нажмет кнопку с соответствующим ником игрока.
 <b>Важное обновление:</b> Если сообщение от <code>player_to_lynch_user_id</code> начинается с символа <code>!</code>, этот символ будет автоматически удален из ника игрока перед использованием.
 <b>Новая функция:</b> Модуль может автоматически пересылать сообщения с вашей ролью в мафии в указанный чат. Это работает, когда бот отправляет вам роль в приватном чате, и сообщение содержит одну из настроенных фраз-триггеров.
-<b>Улучшенная функция:</b> Модуль может отслеживать сообщения пользователей, объявляющих свою роль, и сохранять их ники и <b>конкретную объявленную роль</b> в список, если эта роль соответствует одной из настроенных фраз. Отслеживание можно включить/выключить и настроить его длительность.
+<b>Улучшенная функция:</b> Модуль может отслеживать сообщения пользователей, объявляющих свою роль, и сохранять их ники и <b>конкретную объявленную роль</b> в список, если эта роль соответствует одной из настроенных фраз.
 <b>Новая функция:</b> Модуль может автоматически отправлять список отслеживаемых ролей в указанный чат через заданное время после активации отслеживания ролей.
 <b>Новая функция:</b> Модуль может автоматически включать отслеживание ролей при получении сообщения, содержащего определенные фразы, от указанных ботов.
+<b>Новая функция:</b> Модуль может автоматически <b>выключать</b> отслеживание ролей при получении сообщения, содержащего определенные фразы, от указанных ботов.
 
 <emoji document_id=5843843420468024653>⭐️</emoji> Настройки:
 В конфиге модуля можно изменить задержку(и) перед нажатием. Если указано несколько значений, будет выбрано случайное.
@@ -105,6 +107,8 @@ class AutoJoinGameMod(loader.Module):
 <b>Новая настройка:</b> <code>send_tracked_roles_delay</code> - Задержка в секундах, через которую будет отправлен список отслеживаемых ролей после активации отслеживания.
 <b>Новая настройка:</b> <code>auto_track_roles_trigger_phrases</code> - Список фраз, которые модуль будет искать в сообщениях для автоматического включения отслеживания ролей. По умолчанию: <code>[]</code>.
 <b>Новая настройка:</b> <code>auto_track_roles_bot_ids</code> - Список ID ботов, от которых ожидается сообщение с фразами для автоматического включения отслеживания ролей. Если список пуст, сообщения будут отслеживаться от любого бота. По умолчанию: <code>[]</code>.
+<b>Новая настройка:</b> <code>auto_disable_track_roles_trigger_phrases</code> - Список фраз, которые модуль будет искать в сообщениях для автоматического выключения отслеживания ролей. По умолчанию: <code>[]</code>.
+<b>Новая настройка:</b> <code>auto_disable_track_roles_bot_ids</code> - Список ID ботов, от которых ожидается сообщение с фразами для автоматического выключения отслеживания ролей. Если список пуст, сообщения будут отслеживаться от любого бота. По умолчанию: <code>[]</code>.
 """,
         "ajgid_bots_list": """<emoji document_id=5771887475421090729>👤</emoji> Список ID ботов для мафии:
 
@@ -174,6 +178,9 @@ Mafia Combat Premium <code>1634167847</code>""",
         "auto_track_roles_bot_ids_display": "Не указаны (любой бот)",
         "auto_role_tracking_activated": "<emoji document_id=5776375003280838798>✅</emoji> Автоматическое отслеживание ролей включено на {duration} секунд.",
         "auto_role_tracking_activated_with_send": "<emoji document_id=5776375003280838798>✅</emoji> Автоматическое отслеживание ролей включено на {duration} секунд. Список будет отправлен в чат <code>{chat_id}</code> через {delay} секунд.",
+        "auto_disable_track_roles_trigger_phrases_display": "(пусто)",
+        "auto_disable_track_roles_bot_ids_display": "Не указаны (любой бот)",
+        "auto_role_tracking_deactivated": "<emoji document_id=5944122171441618396>❌</emoji> Автоматическое отслеживание ролей выключено.",
     }
 
     def __init__(self):
@@ -316,6 +323,18 @@ Mafia Combat Premium <code>1634167847</code>""",
                 lambda: "Список ID ботов, от которых ожидается сообщение с фразами для автоматического включения отслеживания ролей. Если список пуст, сообщения будут отслеживаться от любого бота.",
                 validator=loader.validators.Series(loader.validators.Integer())
             ),
+            loader.ConfigValue(
+                "auto_disable_track_roles_trigger_phrases",
+                [],
+                lambda: "Список фраз, которые модуль будет искать в сообщениях для автоматического выключения отслеживания ролей.",
+                validator=loader.validators.Series(loader.validators.String())
+            ),
+            loader.ConfigValue(
+                "auto_disable_track_roles_bot_ids",
+                [],
+                lambda: "Список ID ботов, от которых ожидается сообщение с фразами для автоматического выключения отслеживания ролей. Если список пуст, сообщения будут отслеживаться от любого бота.",
+                validator=loader.validators.Series(loader.validators.Integer())
+            ),
         )
 
         self._player_nickname_to_lynch = None 
@@ -372,7 +391,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         """Задача для отправки списка отслеживаемых ролей через заданное время."""
         try:
             await asyncio.sleep(delay)
-            if not self._role_tracking_active: 
+            if not self.config["role_tracking_enabled"] or not self._role_tracking_active: 
                 logger.debug("AutoJoinGame: Отправка списка отслеживаемых ролей отменена, так как отслеживание неактивно.")
                 return
 
@@ -400,6 +419,7 @@ Mafia Combat Premium <code>1634167847</code>""",
     async def ajgoff(self, message: Message):
         """Выключить автовход в игру и автолинчевание"""
         self.config["enabled"] = False
+        self.config["role_tracking_enabled"] = False # Explicitly disable role tracking in config
         self._player_nickname_to_lynch = None 
         self._role_tracking_active = False 
         self._role_tracking_start_time = None
@@ -409,42 +429,6 @@ Mafia Combat Premium <code>1634167847</code>""",
             self._send_tracked_roles_task.cancel()
             self._send_tracked_roles_task = None
         await utils.answer(message, self.strings("disabled"))
-
-    @loader.command(ru_doc="Включить/выключить отслеживание ролей")
-    async def ajgtrackroles(self, message: Message):
-        """Включить/выключить отслеживание ролей"""
-        if self.config["role_tracking_enabled"]:
-            self.config["role_tracking_enabled"] = False
-            self._role_tracking_active = False
-            self._role_tracking_start_time = None
-            self._tracked_roles_list = []
-            if self._send_tracked_roles_task:
-                self._send_tracked_roles_task.cancel()
-                self._send_tracked_roles_task = None
-            await utils.answer(message, self.strings("role_tracking_stopped"))
-        else:
-            self.config["role_tracking_enabled"] = True
-            self._role_tracking_active = True
-            self._role_tracking_start_time = datetime.now()
-            self._tracked_roles_list = [] 
-            
-            send_chat_id = self.config["send_tracked_roles_chat_id"]
-            send_delay = self.config["send_tracked_roles_delay"]
-
-            if send_chat_id != 0 and send_delay > 0:
-                if self._send_tracked_roles_task:
-                    self._send_tracked_roles_task.cancel()
-                    self._send_tracked_roles_task = None
-                self._send_tracked_roles_task = asyncio.create_task(
-                    self._send_tracked_roles_list_scheduled(send_delay, send_chat_id)
-                )
-                await utils.answer(message, self.strings("role_tracking_started_with_send").format(
-                    duration=self.config["role_tracking_duration"],
-                    delay=send_delay,
-                    chat_id=send_chat_id
-                ))
-            else:
-                await utils.answer(message, self.strings("role_tracking_started").format(duration=self.config["role_tracking_duration"]))
 
     @loader.command(ru_doc="Показать список найденных отслеживаемых ролей")
     async def ajgshowtrackedroles(self, message: Message):
@@ -469,7 +453,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         bot_ids_display = ", ".join(map(str, self.config["bot_ids"])) if self.config["bot_ids"] else "Не указаны (любой бот)"
 
-        allowed_chats_display = ", ". присоединитесь(map(str, self.config["allowed_chats"])) if self.config["allowed_chats"] else "Все чаты"
+        allowed_chats_display = ", ".join(map(str, self.config["allowed_chats"])) if self.config["allowed_chats"] else "Все чаты"
 
         configured_button_keywords_lower = [kw.lower() for kw in self.config["button_keywords"]]
         deep_link_mode_active = '🌚' in configured_button_keywords_lower or '🌝' in configured_button_keywords_lower
@@ -515,6 +499,9 @@ Mafia Combat Premium <code>1634167847</code>""",
         
         auto_track_roles_trigger_phrases_display = ", ".join(self.config["auto_track_roles_trigger_phrases"]) if self.config["auto_track_roles_trigger_phrases"] else self.strings("auto_track_roles_trigger_phrases_display")
         auto_track_roles_bot_ids_display = ", ".join(map(str, self.config["auto_track_roles_bot_ids"])) if self.config["auto_track_roles_bot_ids"] else self.strings("auto_track_roles_bot_ids_display")
+        
+        auto_disable_track_roles_trigger_phrases_display = ", ".join(self.config["auto_disable_track_roles_trigger_phrases"]) if self.config["auto_disable_track_roles_trigger_phrases"] else self.strings("auto_disable_track_roles_trigger_phrases_display")
+        auto_disable_track_roles_bot_ids_display = ", ".join(map(str, self.config["auto_disable_track_roles_bot_ids"])) if self.config["auto_disable_track_roles_bot_ids"] else self.strings("auto_disable_track_roles_bot_ids_display")
 
         await utils.answer(message, self.strings("status").format(
             status, 
@@ -543,7 +530,9 @@ Mafia Combat Premium <code>1634167847</code>""",
             send_tracked_roles_chat_id_display,
             send_tracked_roles_delay_display,
             auto_track_roles_trigger_phrases_display,
-            auto_track_roles_bot_ids_display
+            auto_track_roles_bot_ids_display,
+            auto_disable_track_roles_trigger_phrases_display,
+            auto_disable_track_roles_bot_ids_display
         ))
 
     @loader.command(ru_doc="Показать справку")
@@ -803,21 +792,41 @@ Mafia Combat Premium <code>1634167847</code>""",
                             self._send_tracked_roles_list_scheduled(send_delay, send_chat_id)
                         )
                         logger.info(f"AutoJoinGame: Автоматическое отслеживание ролей включено на {self.config['role_tracking_duration']} секунд. Список будет отправлен в чат {send_chat_id} через {send_delay} секунд.")
-                        await self._client.send_message(message.chat_id, self.strings("auto_role_tracking_activated_with_send").format(
-                            duration=self.config["role_tracking_duration"],
-                            delay=send_delay,
-                            chat_id=send_chat_id
-                        ))
+                        # Removed: await self._client.send_message(message.chat_id, self.strings("auto_role_tracking_activated_with_send").format(...))
                     else:
                         logger.info(f"AutoJoinGame: Автоматическое отслеживание ролей включено на {self.config['role_tracking_duration']} секунд.")
-                        await self._client.send_message(message.chat_id, self.strings("auto_role_tracking_activated").format(
-                            duration=self.config["role_tracking_duration"]
-                        ))
+                        # Removed: await self._client.send_message(message.chat_id, self.strings("auto_role_tracking_activated").format(...))
+                    return # Останавливаем дальнейшую обработку, чтобы избежать конфликтов состояния
+
+            # --- Автоматическое выключение отслеживания ролей ---
+            auto_disable_phrases = self.config["auto_disable_track_roles_trigger_phrases"]
+            auto_disable_bot_ids = self.config["auto_disable_track_roles_bot_ids"]
+
+            if auto_disable_phrases and self.config["role_tracking_enabled"]: # Только если отслеживание ролей в данный момент включено
+                is_auto_disable_trigger_bot = (
+                    getattr(sender, 'bot', False) and
+                    (not auto_disable_bot_ids or sender_id in auto_disable_bot_ids)
+                )
+                if is_auto_disable_trigger_bot and any(p.lower() in msg_text_lower for p in auto_disable_phrases):
+                    logger.info(f"AutoJoinGame: Обнаружен триггер для автоматического выключения отслеживания ролей в сообщении {message.id} от бота {sender_id}.")
+                    
+                    self.config["role_tracking_enabled"] = False
+                    self._role_tracking_active = False
+                    self._role_tracking_start_time = None
+                    self._tracked_roles_list = [] # Очищаем отслеживаемые роли при выключении
+                    if self._send_tracked_roles_task:
+                        self._send_tracked_roles_task.cancel()
+                        self._send_tracked_roles_task = None
+                    
+                    logger.info("AutoJoinGame: Автоматическое отслеживание ролей выключено.")
+                    await self._client.send_message(message.chat_id, self.strings("auto_role_tracking_deactivated"))
+                    return # Останавливаем дальнейшую обработку, так как состояние отслеживания изменилось
             
             # --- Логика отслеживания ролей ---
             if self.config["role_tracking_enabled"] and self._role_tracking_active:
                 if self._role_tracking_start_time and (datetime.now() - self._role_tracking_start_time).total_seconds() > self.config["role_tracking_duration"]:
                     logger.info(self.strings("role_tracking_expired"))
+                    self.config["role_tracking_enabled"] = False # Update config to reflect expiration
                     self._role_tracking_active = False
                     self._role_tracking_start_time = None
                     if self._send_tracked_roles_task: # <--- Исправлено: отмена задачи при истечении времени
