@@ -1,4 +1,3 @@
-```python
 # meta developer: @yourhandle
 # meta name: TagAll
 # meta version: 2.6.0
