@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: TagAll
-# meta version: 2.2.0
+# meta version: 2.3.0
 
 import asyncio
 import contextlib
@@ -18,6 +18,11 @@ logger = logging.getLogger(__name__)
 
 
 class StopEvent:
+    """
+    Event class to signal stopping the TagAll process.
+    Stores the chat_id to ensure the trigger message comes from the correct chat.
+    """
+
     def __init__(self, chat_id: int):
         self.state = True
         self.chat_id = chat_id
@@ -29,7 +34,8 @@ class StopEvent:
 
 @loader.tds
 class TagAllMod(loader.Module):
-    """Отмечает всех участников чата через команды или триггеры в тексте"""
+    """Отмечает всех участников чата через команды или триггеры в тексте.
+    Включает/выключает работу триггеров командой .autotagall."""
 
     strings = {
         "name": "TagAll",
@@ -50,12 +56,18 @@ class TagAllMod(loader.Module):
             "ID пользователей, которые могут использовать триггеры (через текст сообщения). "
             "Разделяйте запятыми. Если пусто, любой может использовать триггеры."
         ),
+        "_cfg_doc_enable_watcher": "Включить/выключить работу триггеров (команда .autotagall)",
         "tagall_not_running": "🚫 <b>TagAll не запущен в чате {chat_id}.</b>",
         "tagall_already_running": "🚫 <b>TagAll уже запущен в чате {chat_id}.</b>",
         "no_eligible_participants": "🚫 <b>Нет подходящих участников.</b>",
         "cmd_redirected": "➡️ <b>Перенаправлено в чат</b> <code>{target_chat_id}</code>.",
         "cmd_not_allowed_multiple": "🚫 <b>Чат не в белом списке. Разрешенные:</b> {allowed_chats}.",
         "trigger_not_allowed": "🚫 <b>Вам не разрешено использовать триггеры для TagAll.</b>",
+        "autotagall_enabled": "✅ <b>Работа триггеров TagAll включена.</b>",
+        "autotagall_disabled": "❌ <b>Работа триггеров TagAll выключена.</b>",
+        "_cmd_tagall_doc": "[<номер чата>] [текст] - Отметить всех участников чата. [текст] будет отправлен вместе с тегами. Если текст не указан, будут отправлены только теги.",
+        "_cmd_stoptagall_doc": "[<номер чата>] - Остановить запущенный процесс TagAll в <b>указанном или текущем чате</b>.",
+        "_cmd_autotagall_doc": "Включить/выключить работу триггеров TagAll (установленных в .cfg)",
     }
 
     def __init__(self):
@@ -78,6 +90,12 @@ class TagAllMod(loader.Module):
                 lambda: self.strings("_cfg_doc_allowed_trigger_user_ids"),
                 validator=loader.validators.String(),
             ),
+            loader.ConfigValue(
+                "enable_watcher",
+                True,
+                lambda: self.strings("_cfg_doc_enable_watcher"),
+                validator=loader.validators.Boolean(),
+            ),
         )
         self._tagall_events: dict[int, StopEvent] = {}
 
@@ -92,6 +110,9 @@ class TagAllMod(loader.Module):
 
     @loader.watcher()
     async def watcher(self, message: Message):
+        if not self.config["enable_watcher"]: # Проверка нового параметра
+            return
+
         if not isinstance(message, Message) or not message.text:
             return
 
@@ -109,11 +130,6 @@ class TagAllMod(loader.Module):
 
         # Сначала проверяем стоп-триггер
         if stop_trigger_lower and stop_trigger_lower in message_text_lower:
-            # Если сообщение исходящее и содержит только триггер, не удаляем его сразу,
-            # чтобы сообщение об остановке было видно.
-            # Если есть другой текст, то удаляем только триггер из args для _stop_logic, но не из original message.
-            # Нам не нужно удалять сообщение, если оно не наше или содержит полезный текст.
-            # _stop_logic сам удалит исходящее сообщение, если оно было командой.
             await self._stop_logic(message, "")
             return
 
@@ -122,6 +138,7 @@ class TagAllMod(loader.Module):
             # Удаляем только первое вхождение триггера из оригинального текста сообщения (регистронезависимо)
             # для формирования префикса, чтобы сам триггер не попадал в теги.
             prefix = message.text
+            # Используем re.escape, чтобы спецсимволы в триггере (если они есть) не ломали regex
             match = re.search(re.escape(self.config["start_trigger"]), message.text, re.IGNORECASE)
             if match:
                 prefix = message.text[:match.start()] + message.text[match.end():]
@@ -139,6 +156,13 @@ class TagAllMod(loader.Module):
                     allowed_chats_map[i + 1] = int(chat_id_str)
         return allowed_chats_map
 
+    def _format_allowed_chats_list(self, allowed_chats_map: dict[int, int]) -> str:
+        """Форматирует список разрешенных чатов для вывода."""
+        if not allowed_chats_map:
+            return "<i>нет</i>"
+        return ", ".join([f"<code>{idx}</code>: <code>{chat_id}</code>" for idx, chat_id in sorted(allowed_chats_map.items())])
+
+
     async def _resolve_target_chat(self, message: Message, raw_args: str) -> tuple[int | None, str | None]:
         original_chat_id = message.chat_id
         remaining_args = raw_args.strip()
@@ -147,12 +171,18 @@ class TagAllMod(loader.Module):
 
         chat_index_match = re.match(r"^\s*(\d+)\s*(.*)$", remaining_args)
         if chat_index_match:
-            index = int(chat_index_match.group(1))
-            if index in allowed_chats_map:
-                target_id = allowed_chats_map[index]
-                if target_id != original_chat_id:
-                    await utils.answer(message, f"➡️ Перенаправлено в {target_id}")
-                return target_id, chat_index_match.group(2).strip()
+            try:
+                index = int(chat_index_match.group(1))
+                if index in allowed_chats_map:
+                    target_id = allowed_chats_map[index]
+                    if target_id != original_chat_id:
+                        await utils.answer(message, f"➡️ Перенаправлено в {target_id}")
+                    return target_id, chat_index_match.group(2).strip()
+                else:
+                    await utils.answer(message, self.strings("invalid_chat_index").format(index=index, allowed_chats=self._format_allowed_chats_list(allowed_chats_map)))
+                    return None, None
+            except ValueError:
+                pass # Невалидный индекс, продолжаем с обычным парсингом
 
         if not allowed_chat_ids_set or original_chat_id in allowed_chat_ids_set:
             return original_chat_id, remaining_args
@@ -163,7 +193,7 @@ class TagAllMod(loader.Module):
             return target_id, remaining_args
 
         await utils.answer(message, self.strings("cmd_not_allowed_multiple").format(
-            allowed_chats=", ".join(map(str, allowed_chat_ids_set))
+            allowed_chats=self._format_allowed_chats_list(allowed_chats_map)
         ))
         return None, None
 
@@ -176,7 +206,6 @@ class TagAllMod(loader.Module):
             return # Уже запущен
 
         # Удаляем исходное сообщение, если это исходящая команда или триггер
-        # Мы удаляем его здесь, чтобы не мешать другим сообщениям в чате.
         if message.out:
             with contextlib.suppress(Exception): await message.delete()
 
@@ -197,24 +226,39 @@ class TagAllMod(loader.Module):
             await utils.answer(message, self.strings("tagall_not_running").format(chat_id=target_chat_id))
 
     @loader.command(
+        groups=True,
         ru_doc=lambda self: self.strings("_cmd_tagall_doc"),
-        de_doc=lambda self: self.strings("_cmd_tagall_doc"),
-        tr_doc=lambda self: self.strings("_cmd_tagall_doc"),
-        uz_doc=lambda self: self.strings("_cmd_tagall_doc"),
+        # de_doc=lambda self: self.strings("_cmd_tagall_doc"), # Добавить, если нужно
+        # tr_doc=lambda self: self.strings("_cmd_tagall_doc"), # Добавить, если нужно
+        # uz_doc=lambda self: self.strings("_cmd_tagall_doc"), # Добавить, если нужно
     )
     async def tagall(self, message: Message):
-        """[текст] - Запустить тег всех"""
+        """[<номер чата>] [текст] - Отметить всех участников чата. [текст] будет отправлен вместе с тегами. Если текст не указан, будут отправлены только теги."""
         await self._start_logic(message, utils.get_args_raw(message))
 
     @loader.command(
         ru_doc=lambda self: self.strings("_cmd_stoptagall_doc"),
-        de_doc=lambda self: self.strings("_cmd_stoptagall_doc"),
-        tr_doc=lambda self: self.strings("_cmd_stoptagall_doc"),
-        uz_doc=lambda self: self.strings("_cmd_stoptagall_doc"),
+        # de_doc=lambda self: self.strings("_cmd_stoptagall_doc"), # Добавить, если нужно
+        # tr_doc=lambda self: self.strings("_cmd_stoptagall_doc"), # Добавить, если нужно
+        # uz_doc=lambda self: self.strings("_cmd_stoptagall_doc"), # Добавить, если нужно
     )
     async def stoptagall(self, message: Message):
-        """Остановить тег всех"""
+        """[<номер чата>] - Остановить запущенный процесс TagAll в <b>указанном или текущем чате</b>."""
         await self._stop_logic(message, utils.get_args_raw(message))
+
+    @loader.command(
+        ru_doc=lambda self: self.strings("_cmd_autotagall_doc"),
+    )
+    async def autotagall(self, message: Message):
+        """Включить/выключить работу триггеров TagAll (установленных в .cfg)"""
+        self.config["enable_watcher"] = not self.config["enable_watcher"]
+        if self.config["enable_watcher"]:
+            await utils.answer(message, self.strings("autotagall_enabled"))
+        else:
+            await utils.answer(message, self.strings("autotagall_disabled"))
+        if message.out:
+            with contextlib.suppress(Exception): await message.delete()
+
 
     def _get_random_timeout(self, event: StopEvent) -> float:
         timeout_str = str(self.config["timeout"])
@@ -228,94 +272,189 @@ class TagAllMod(loader.Module):
                 return random.uniform(min_val, max_val)
             if "," in cleaned:
                 vals = [float(x) for x in cleaned.split(",") if x and float(x) >= 0.0]
-                return random.choice(vals) if vals else 0.1
+                # Избегаем повторения того же таймаута, если есть несколько значений
+                if len(vals) > 1 and event.last_timeout is not None and event.last_timeout in vals:
+                    available_values = [v for v in vals if v != event.last_timeout]
+                    if available_values:
+                        new_timeout = random.choice(available_values)
+                    else: # Если все значения совпадают с last_timeout, повтор допустим
+                        new_timeout = random.choice(vals)
+                else:
+                    new_timeout = random.choice(vals)
+                event.last_timeout = new_timeout
+                return new_timeout
             single_val = float(cleaned)
-            return max(0.0, single_val)
+            event.last_timeout = max(0.0, single_val)
+            return event.last_timeout
         except (ValueError, TypeError):
             logger.warning(f"Не удалось разобрать таймаут '{timeout_str}'. Используется значение по умолчанию 0.1.")
+            event.last_timeout = 0.1
             return 0.1
 
     async def _run_tagall_process(self, chat_id: int, message_prefix: str, event: StopEvent):
-        del_ids_user = []
-        del_ids_bot = []
-        is_bot = self.config["use_bot"]
+        """Внутренняя функция для обработки основной логики TagAll."""
+        deleted_message_ids_hikkatl = []
+        deleted_message_ids_bot_client = []
+
+        is_bot_sender = self.config["use_bot"]
 
         try:
             chat_entity = await self._client.get_input_entity(chat_id)
-            if is_bot:
-                # Проверяем, существует ли self.inline и bot_client до попытки использования
-                if not hasattr(self, 'inline') or not hasattr(self.inline, 'bot_client') or not self.inline.bot_client:
-                    logger.error("Inline bot client is not available for use_bot=True.")
-                    await self._client.send_message(chat_id, self.strings("bot_error"))
-                    event.stop()
-                    return
-
-                bot_username = self.inline.bot_username
-                bot_entity = await self._client.get_input_entity(bot_username)
-                with contextlib.suppress(Exception):
-                    await self._client(InviteToChannelRequest(chat_entity, [bot_entity]))
         except Exception as e:
-            logger.error(f"Не удалось получить сущность чата или пригласить бота: {e}")
-            if is_bot: await self._client.send_message(chat_id, self.strings("bot_error"))
+            logger.error(f"Не удалось получить сущность чата для ID {chat_id}: {e}")
+            await self._client.send_message(chat_id, f"🚫 <b>Не удалось найти чат с ID:</b> <code>{chat_id}</code>")
             event.stop()
+            if chat_id in self._tagall_events:
+                del self._tagall_events[chat_id]
             return
 
-        excluded = {int(x.strip()) for x in self.config["exclude_user_ids"].split(",") if x.strip().isdigit()}
-        owner_id = self._client.tg_id
+        excluded_user_ids = set()
+        exclude_ids_raw = self.config["exclude_user_ids"]
+        for uid_str in exclude_ids_raw.split(','):
+            uid_str = uid_str.strip()
+            if uid_str:
+                try:
+                    excluded_user_ids.add(int(uid_str))
+                except ValueError:
+                    logger.warning(f"Неверный ID пользователя в конфигурации 'exclude_user_ids': '{uid_str}'. Должен быть целым числом.")
+
+        if is_bot_sender:
+            try:
+                # Добавлена проверка на наличие self.inline.bot_client
+                if not hasattr(self, 'inline') or not hasattr(self.inline, 'bot_username') or not getattr(self.inline, 'bot_client', None):
+                    raise RuntimeError("Инлайн-бот не настроен или недоступен.")
+
+                bot_entity = await self._client.get_input_entity(self.inline.bot_username)
+                with contextlib.suppress(Exception):  # Подавляем ошибки, если бот уже в чате или не может быть приглашен
+                    await self._client(InviteToChannelRequest(chat_entity, [bot_entity]))
+            except Exception as e:
+                logger.error(f"Не удалось получить сущность бота или пригласить бота: {e}")
+                await self._client.send_message(chat_id, self.strings("bot_error"))
+                event.stop()
+                if chat_id in self._tagall_events:
+                    del self._tagall_events[chat_id]
+                return
 
         participants = []
+        owner_id = self._client.tg_id
         async for user in self._client.iter_participants(chat_id):
-            if not user.bot and not user.deleted and user.id != owner_id and user.id not in excluded:
+            if not user.bot and not user.deleted and user.id != owner_id and user.id not in excluded_user_ids:
                 participants.append(user)
 
         if not participants:
+            logger.warning(f"В чате {chat_id} не найдено подходящих участников для TagAll, останавливаем.")
             await self._client.send_message(chat_id, self.strings("no_eligible_participants"))
             event.stop()
-            if chat_id in self._tagall_events: del self._tagall_events[chat_id]
+            if chat_id in self._tagall_events:
+                del self._tagall_events[chat_id]
             return
 
+        random.shuffle(participants)
+
         start_time = time.time()
+
         try:
-            while event.state:
-                random.shuffle(participants)
-                current_cycle_participants = []
-                if self.config["cycle_tagging"] and (not start_time == time.time()): # Re-fetch participants if cycling
-                     async for user in self._client.iter_participants(chat_id):
-                        if not user.bot and not user.deleted and user.id != owner_id and user.id not in excluded:
-                            current_cycle_participants.append(user)
-                     random.shuffle(current_cycle_participants)
-                     participants = current_cycle_participants
-                     if not participants:
-                         logger.warning(f"No participants found for next cycle in chat {chat_id}, stopping.")
-                         break
+            first_pass = True
+            while self.config["cycle_tagging"] or first_pass:
+                if not event.state:
+                    break
+
+                if self.config["duration"] > 0 and (time.time() - start_time) > self.config["duration"]:
+                    event.stop()
+                    break
+
+                current_participants_for_cycle = []
+                if self.config["cycle_tagging"] and not first_pass: # Re-fetch participants if cycling
+                    logger.debug(f"Повторный запрос участников для цикла в чате {chat_id}.")
+                    async for user in self._client.iter_participants(chat_id):
+                        if not user.bot and not user.deleted and user.id != owner_id and user.id not in excluded_user_ids:
+                            current_participants_for_cycle.append(user)
+                    random.shuffle(current_participants_for_cycle)
+                    participants = current_cycle_participants
+                    if not participants:
+                        logger.warning(f"В чате {chat_id} не найдено участников для TagAll для следующего цикла, останавливаем.")
+                        break
 
                 for chunk in utils.chunks(participants, self.config["chunk_size"]):
-                    if not event.state: break
+                    if not event.state:
+                        break
+
                     if self.config["duration"] > 0 and (time.time() - start_time) > self.config["duration"]:
-                        event.stop(); break
+                        event.stop()
+                        break
 
                     tags = []
-                    for u in chunk:
-                        name = utils.escape_html(u.first_name or "Пользователь")
-                        tags.append(f'<a href="tg://user?id={u.id}">{name}</a>')
+                    for user in chunk:
+                        if user.username:
+                            user_display_name = f"@{user.username}"
+                        else:
+                            display_name_parts = []
+                            if user.first_name:
+                                display_name_parts.append(user.first_name)
+                            if user.last_name:
+                                display_name_parts.append(user.last_name)
 
-                    text = f"{message_prefix}\n{' '.join(tags)}" if message_prefix else " ".join(tags)
+                            display_name = " ".join(display_name_parts)
+                            user_display_name = utils.escape_html(display_name or "Пользователь")
 
-                    if is_bot and getattr(self.inline, "bot_client", None):
-                        m = await self.inline.bot_client.send_message(chat_id, text, parse_mode="HTML")
-                        if self.config["delete"]: del_ids_bot.append(m.id)
+                        tags.append(f'<a href="tg://user?id={user.id}">{user_display_name}</a>')
+
+                    if message_prefix:
+                        full_message_text = f"{message_prefix}\n{' '.join(tags)}"
                     else:
-                        m = await self._client.send_message(chat_entity, text, parse_mode="HTML")
-                        if self.config["delete"]: del_ids_user.append(m.id)
+                        full_message_text = " ".join(tags)
+
+                    if is_bot_sender:
+                        if hasattr(self, 'inline') and hasattr(self.inline, 'bot_client') and self.inline.bot_client:
+                            m = await self.inline.bot_client.send_message(
+                                chat_id,
+                                full_message_text,
+                                parse_mode="HTML",
+                            )
+                            if self.config["delete"]:
+                                deleted_message_ids_bot_client.append(m.id)
+                        else:
+                            logger.error("Клиент инлайн-бота недоступен или не настроен, переключаемся на юзербота для отправки сообщений.")
+                            m = await self._client.send_message(
+                                chat_entity,
+                                full_message_text,
+                                parse_mode="HTML",
+                            )
+                            if self.config["delete"]:
+                                deleted_message_ids_hikkatl.append(m.id)
+                    else:
+                        m = await self._client.send_message(
+                            chat_entity,
+                            full_message_text,
+                            parse_mode="HTML",
+                        )
+                        if self.config["delete"]:
+                            deleted_message_ids_hikkatl.append(m.id)
 
                     await asyncio.sleep(self._get_random_timeout(event))
 
-                if not self.config["cycle_tagging"] or not event.state: break
-                await asyncio.sleep(self.config["cycle_delay"])
+                first_pass = False
+                if self.config["cycle_tagging"] and event.state:
+                    await asyncio.sleep(self.config["cycle_delay"])
+                elif not self.config["cycle_tagging"]:
+                    break
+
         finally:
             if self.config["delete"]:
                 with contextlib.suppress(Exception):
-                    for cid in utils.chunks(del_ids_user, 100): await self._client.delete_messages(chat_entity, cid)
-                    if is_bot and getattr(self.inline, "bot_client", None):
-                        for cid in utils.chunks(del_ids_bot, 100): await self.inline.bot_client.delete_messages(chat_entity, cid)
-            if chat_id in self._tagall_events: del self._tagall_events[chat_id]
+                    if deleted_message_ids_hikkatl:
+                        for chunk_ids in utils.chunks(deleted_message_ids_hikkatl, 100):
+                            await self._client.delete_messages(chat_entity, chunk_ids)
+
+                    if deleted_message_ids_bot_client:
+                        if hasattr(self, 'inline') and hasattr(self.inline, 'bot_client') and self.inline.bot_client:
+                            for chunk_ids in utils.chunks(deleted_message_ids_bot_client, 100):
+                                await self.inline.bot_client.delete_messages(chat_entity, chunk_ids)
+                        else:
+                            logger.warning("Клиент инлайн-бота недоступен для удаления своих сообщений.")
+
+            if event.state:
+                logger.info(f"Процесс TagAll завершен естественным образом в чате {chat_id}.")
+
+            if chat_id in self._tagall_events:
+                del self._tagall_events[chat_id]
