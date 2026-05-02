@@ -1,6 +1,6 @@
-# meta developer: @TecnoPova7Neo
+meta developer: @TecnoPova7Neo
 # meta name: AutoMafiaTournamentsGame
-# meta version: 2.1.3 # Увеличена версия модуля
+# meta version: 2.1.4 # Увеличена версия модуля
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 010000010101010001001111010010100100100101001110001000000100011101000001
 # 010011010100010100100000010011010100111101000100010101010100110001000101
@@ -48,7 +48,8 @@ class AutoMafiaTournamentsGame(loader.Module):
                   "Фразы-триггеры роли: {}\n"
                   "\n<emoji document_id=5862215160000851457>🎭</emoji> Статус отслеживания ролей:\n" # New section for role tracking
                   "Отслеживание ролей в чатах: {}\n"
-                  "Ключевые слова ролей для отслеживания: {}",
+                  "Ключевые слова ролей для отслеживания: {}\n"
+                  "Чаты для отслеживания ролей: {}", # New string for role_tracking_allowed_chats
         "error": "❌ Ошибка при нажатии кнопки: {}",
         "no_button": "⚠️ Кнопка не найдена под сообщением",
         "help_text": """<emoji document_id=5931415565955503486>🤖</emoji> AutoMafiaTournamentsGame - Помощь
@@ -89,7 +90,8 @@ class AutoMafiaTournamentsGame(loader.Module):
 <b>Новая настройка:</b> <code>role_forward_chat_id</code> - ID чата, куда будет пересылаться полученная роль в мафии. Если <code>0</code>, функция отключена.
 <b>Новая настройка:</b> <code>role_trigger_phrases</code> - список фраз, которые модуль будет искать в сообщениях от бота в ЛС для определения роли. По умолчанию: <code>[\"Ваша роль:\", \"Ты - \", \"Твоя роль:\", \"Ты стал(а) \"]</code>.
 <b>Новая настройка:</b> <code>track_roles_in_all_chats</code> - если <code>True</code>, модуль будет отслеживать ключевые слова ролей в сообщениях от ботов во всех активных чатах и сохранять информацию. По умолчанию: <code>False</code>.
-<b>Новая настройка:</b> <code>roles_to_track_keywords</code> - список ключевых слов (названий ролей), которые модуль будет искать в сообщениях при активном <code>track_roles_in_all_chats</code>. Например: <code>[\"Мирный житель\", \"Мафия\"]</code>. Регистр не учитывается.""",
+<b>Новая настройка:</b> <code>roles_to_track_keywords</code> - список ключевых слов (названий ролей), которые модуль будет искать в сообщениях при активном <code>track_roles_in_all_chats</code>. Например: <code>[\"Мирный житель\", \"Мафия\"]</code>. Регистр не учитывается.
+<b>Новая настройка:</b> <code>role_tracking_allowed_chats</code> - список ID чатов, в которых будет активно отслеживание ролей. Если список пуст, отслеживание ролей будет работать во всех чатах (где активен сам модуль).""",
         "ajgid_bots_list": """<emoji document_id=5771887475421090729>👤</emoji> Список ID ботов для мафии:
 
 🤵🏻 True Mafia <code>468253535</code>
@@ -146,12 +148,12 @@ Mafia Combat Premium <code>1634167847</code>""",
         "ajglistroles_mentions_none": "Нет",
         "ajglistroles_status_enabled": "🟢 Включено",
         "ajglistroles_status_disabled": "🔴 Выключено",
-        "ajgtest_roles_tracking_enabled": "<emoji document_id=5843843420468024653>⭐️</emoji> Отслеживание ролей включено. Ищу ключевые слова: {}.\n",
+        "ajgtest_roles_tracking_enabled": "<emoji document_id=5843843420468024653>⭐️</emoji> Отслеживание ролей включено. Ищу ключевые слова: {}. Чаты для отслеживания: {}.\n", # Updated string
         "ajgtest_roles_tracking_match": "✅ Сообщение ID <code>{msg_id}</code> от <code>{sender_id}</code> *содержало бы* отслеживаемые роли: {}.\n"
                                         "  💬 Текст: <code>{}</code>\n"
                                         "  👤 Упоминания: {}\n",
         "ajgtest_roles_no_matches": "ℹ️ Сообщений с отслеживаемыми ключевыми словами ролей от ботов не найдено.",
-        "ajgtest_roles_disabled_or_not_configured": "ℹ️ Отслеживание ролей или ключевые слова ролей не настроены.",
+        "ajgtest_roles_disabled_or_not_configured": "ℹ️ Отслеживание ролей, ключевые слова ролей или чаты для отслеживания не настроены.", # Updated string
     }
 
     def __init__(self):
@@ -258,6 +260,12 @@ Mafia Combat Premium <code>1634167847</code>""",
                 lambda: "Список ключевых слов (названий ролей), которые модуль будет искать в сообщениях при активном track_roles_in_all_chats. Например: [\"Мирный житель\", \"Мафия\"]. Регистр не учитывается.",
                 validator=loader.validators.Series(loader.validators.String())
             ),
+            loader.ConfigValue( # NEW config for specific role tracking chats
+                "role_tracking_allowed_chats",
+                [],
+                lambda: "Список ID чатов, в которых будет активно отслеживание ролей. Если список пуст, отслеживание ролей будет работать во всех чатах (где активен сам модуль).",
+                validator=loader.validators.Series(loader.validators.Integer())
+            ),
         )
 
         self.last_processed_msg = None
@@ -324,6 +332,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         # New configs for role tracking
         track_roles_in_all_chats_status_display = self.strings("ajglistroles_status_enabled") if self.config["track_roles_in_all_chats"] else self.strings("ajglistroles_status_disabled")
         roles_to_track_keywords_display_value = ", ".join(self.config["roles_to_track_keywords"]) if self.config["roles_to_track_keywords"] else self.strings("role_forward_trigger_phrases_display")
+        role_tracking_allowed_chats_display_value = ", ".join(map(str, self.config["role_tracking_allowed_chats"])) if self.config["role_tracking_allowed_chats"] else "Все чаты (где активен модуль)" # NEW
 
         await utils.answer(message, self.strings("status").format(
             status, 
@@ -343,8 +352,9 @@ Mafia Combat Premium <code>1634167847</code>""",
             current_player_nickname_display,
             role_forward_chat_id_display,
             role_trigger_phrases_display,
-            track_roles_in_all_chats_status_display, # New param
-            roles_to_track_keywords_display_value # New param
+            track_roles_in_all_chats_status_display, 
+            roles_to_track_keywords_display_value,
+            role_tracking_allowed_chats_display_value # NEW param
         ))
 
     @loader.command(ru_doc="Показать справку")
@@ -530,14 +540,17 @@ Mafia Combat Premium <code>1634167847</code>""",
             if self.config["track_roles_in_all_chats"] and self.config["roles_to_track_keywords"]:
                 role_keywords_for_test = self.config["roles_to_track_keywords"]
                 role_keywords_str = ", ".join(role_keywords_for_test) if role_keywords_for_test else "Не указаны"
-                results.append(f"\n--- Тест отслеживания ролей ---\n" + self.strings("ajgtest_roles_tracking_enabled").format(role_keywords_str))
+                
+                role_tracking_allowed_chats_for_test = self.config["role_tracking_allowed_chats"]
+                role_tracking_chats_str = ", ".join(map(str, role_tracking_allowed_chats_for_test)) if role_tracking_allowed_chats_for_test else "Все чаты"
+
+                results.append(f"\n--- Тест отслеживания ролей ---\n" + self.strings("ajgtest_roles_tracking_enabled").format(role_keywords_str, role_tracking_chats_str))
 
                 found_role_test_matches = False
-                # We need to re-iterate or use a stored list of messages to prevent iterating multiple times.
-                # For simplicity in testing, we'll re-iterate for roles (not ideal for perf but fine for test cmd)
-                # Or even better, iterate from original 'msg' loop
                 
-                # We re-process past messages in the current loop for role testing logic.
+                # Check if current chat is allowed for role tracking
+                is_current_chat_allowed_for_role_tracking = not role_tracking_allowed_chats_for_test or current_chat_id in role_tracking_allowed_chats_for_test
+
                 # This block is inside the main 'async for msg' loop, so 'msg' is the current message.
                 msg_text_test_lower = msg.text.lower()
                 matched_roles_in_test_msg = []
@@ -545,7 +558,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                     if role_kw_test.lower() in msg_text_test_lower:
                         matched_roles_in_test_msg.append(role_kw_test)
 
-                if matched_roles_in_test_msg and getattr(sender, 'bot', False): # Only consider bot messages for roles
+                if matched_roles_in_test_msg and getattr(sender, 'bot', False) and is_current_chat_allowed_for_role_tracking: # Only consider bot messages for roles AND if chat is allowed
                     found_role_test_matches = True
                     test_mentions = []
                     for entity, entity_text in msg.iter_entities():
@@ -571,9 +584,13 @@ Mafia Combat Premium <code>1634167847</code>""",
                         text_preview=text_preview_for_test,
                         mentions=", ".join(test_mentions) if test_mentions else self.strings("ajglistroles_mentions_none")
                     ))
-            elif self.config["track_roles_in_all_chats"] and self.config["roles_to_track_keywords"] and not found_role_test_matches and count == 500: # Only if at the end of loop and no matches
-                 results.append(self.strings("ajgtest_roles_no_matches"))
-            elif not self.config["track_roles_in_all_chats"] or not self.config["roles_to_track_keywords"]:
+                elif self.config["track_roles_in_all_chats"] and self.config["roles_to_track_keywords"] and not found_role_test_matches and count == 500: # Only if at the end of loop and no matches
+                    # Only append 'no matches' if it actually *should* have been looking in this chat
+                    if is_current_chat_allowed_for_role_tracking:
+                        results.append(self.strings("ajgtest_roles_no_matches"))
+                    else:
+                        results.append(f"ℹ️ Отслеживание ролей активно, но текущий чат (ID: <code>{current_chat_id}</code>) не находится в списке разрешенных чатов для отслеживания ролей: {role_tracking_chats_str}.")
+            elif not self.config["track_roles_in_all_chats"] or not self.config["roles_to_track_keywords"] or not self.config["role_tracking_allowed_chats"]: # Combined condition
                 if count == 500: # Only display if the loop has finished and it's still not enabled/configured
                      results.append(self.strings("ajgtest_roles_disabled_or_not_configured"))
 
@@ -676,39 +693,47 @@ Mafia Combat Premium <code>1634167847</code>""",
                 return 
             
             # --- Обработка отслеживания ролей (НОВОЕ) ---
-            if self.config["track_roles_in_all_chats"] and self.config["roles_to_track_keywords"] and getattr(sender, 'bot', False):
-                matched_roles = []
-                for role_kw in self.config["roles_to_track_keywords"]:
-                    if role_kw.lower() in msg_text_lower:
-                        matched_roles.append(role_kw)
-
-                if matched_roles:
-                    mentions = []
-                    for entity, entity_text in message.iter_entities():
-                        if isinstance(entity, (MessageEntityMention, MessageEntityMentionName)):
-                            try:
-                                user = await self._client.get_entity(entity.user_id)
-                                if user:
-                                    mentions.append(get_display_name(user))
-                            except Exception as e:
-                                logger.debug(f"Error resolving mentioned user from entity in watcher (role tracking): {e}")
-                    
-                    # If it's a private message and a role trigger, and no other mentions, assume it's for the current user.
-                    if message.is_private and not mentions and any(p.lower() in msg_text_lower for p in self.config["role_trigger_phrases"]):
-                        self_user = await self._client.get_me()
-                        if self_user:
-                            mentions.append(get_display_name(self_user) + " (self)")
-
-                    for role_kw_matched in matched_roles:
-                        self._detected_roles_info[role_kw_matched].append({
-                            "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            "chat_id": message.chat_id,
-                            "message_id": message.id,
-                            "mentions": mentions, # List of names/display names
-                            "text_preview": msg_text[:100] + ("..." if len(msg_text) > 100 else "")
-                        })
-                        logger.info(f"Detected role keyword '{role_kw_matched}' in message {message.id} (chat {message.chat_id}). Mentions: {mentions}")
+            if (self.config["track_roles_in_all_chats"] and 
+                self.config["roles_to_track_keywords"] and 
+                getattr(sender, 'bot', False)):
                 
+                # Check if current chat is allowed for role tracking
+                role_tracking_allowed_chats = self.config["role_tracking_allowed_chats"]
+                if role_tracking_allowed_chats and message.chat_id not in role_tracking_allowed_chats:
+                    logger.debug(f"AutoMafiaTournamentsGame: Чат {message.chat_id} не в списке разрешенных чатов для отслеживания ролей. Пропускаю отслеживание ролей для сообщения {message.id}.")
+                else:
+                    matched_roles = []
+                    for role_kw in self.config["roles_to_track_keywords"]:
+                        if role_kw.lower() in msg_text_lower:
+                            matched_roles.append(role_kw)
+
+                    if matched_roles:
+                        mentions = []
+                        for entity, entity_text in message.iter_entities():
+                            if isinstance(entity, (MessageEntityMention, MessageEntityMentionName)):
+                                try:
+                                    user = await self._client.get_entity(entity.user_id)
+                                    if user:
+                                        mentions.append(get_display_name(user))
+                                except Exception as e:
+                                    logger.debug(f"Error resolving mentioned user from entity in watcher (role tracking): {e}")
+                        
+                        # If it's a private message and a role trigger, and no other mentions, assume it's for the current user.
+                        if message.is_private and not mentions and any(p.lower() in msg_text_lower for p in self.config["role_trigger_phrases"]):
+                            self_user = await self._client.get_me()
+                            if self_user:
+                                mentions.append(get_display_name(self_user) + " (self)")
+
+                        for role_kw_matched in matched_roles:
+                            self._detected_roles_info[role_kw_matched].append({
+                                "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                "chat_id": message.chat_id,
+                                "message_id": message.id,
+                                "mentions": mentions, # List of names/display names
+                                "text_preview": msg_text[:100] + ("..." if len(msg_text) > 100 else "")
+                            })
+                            logger.info(f"Detected role keyword '{role_kw_matched}' in message {message.id} (chat {message.chat_id}). Mentions: {mentions}")
+                    
                 # Role tracking is passive and doesn't stop further processing for game actions.
 
             # --- Обработка пересылки роли ---
