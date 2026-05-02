@@ -1,6 +1,7 @@
+`python
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.4.0
+# meta version: 2.4.1
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 010000010101010001001111010010100100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000101
@@ -1094,7 +1095,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                                                 bot_username,
                                                 f'/start {start_param}'
                                             )
-                                logger.info("🎉 AutoJoinGame: Успешно отправлена команда /start (уведомление в чат не отправлено).")
+                                            logger.info("🎉 AutoJoinGame: Успешно отправлена команда /start (уведомление в чат не отправлено).") # <-- Исправленный отступ
                                             button_found = True
                                             break 
                                         except Exception as e:
