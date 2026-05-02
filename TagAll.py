@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: TagAll
-# meta version: 2.5.0
+# meta version: 2.5.1
 
 import asyncio
 import contextlib
@@ -60,7 +60,7 @@ class TagAllMod(loader.Module):
         "tagall_not_running": "🚫 <b>TagAll не запущен в чате {chat_id}.</b>",
         "tagall_already_running": "🚫 <b>TagAll уже запущен в чате {chat_id}.</b>",
         "no_eligible_participants": "🚫 <b>Нет подходящих участников.</b>",
-        "cmd_redirected": "➡️ <b>Перенаправлено в чат</b> <code>{target_chat_id}</code>.",
+        "cmd_redirected": "➡️ <b>Команда перенаправлена в чат</b> <code>{target_chat_id}</code>, так как он единственный разрешенный.",
         "cmd_not_allowed_multiple": "🚫 <b>Чат не в белом списке. Разрешенные:</b> {allowed_chats}.",
         "trigger_not_allowed": "🚫 <b>Вам не разрешено использовать триггеры для TagAll.</b>",
         "autotagall_enabled": "✅ <b>Работа триггеров TagAll включена.</b>",
@@ -171,8 +171,7 @@ class TagAllMod(loader.Module):
                 index = int(chat_index_match.group(1))
                 if index in allowed_chats_map:
                     target_id = allowed_chats_map[index]
-                    if target_id != original_chat_id:
-                        await utils.answer(message, f"➡️ Перенаправлено в {target_id}")
+                    # Убрано сообщение о перенаправлении по индексу
                     return target_id, chat_index_match.group(2).strip()
                 else:
                     await utils.answer(message, self.strings("invalid_chat_index").format(index=index, allowed_chats=self._format_allowed_chats_list(allowed_chats_map)))
@@ -185,7 +184,7 @@ class TagAllMod(loader.Module):
         
         if len(allowed_chat_ids_set) == 1:
             target_id = next(iter(allowed_chat_ids_set))
-            await utils.answer(message, self.strings("cmd_redirected").format(target_chat_id=target_id))
+            # Убрано сообщение о перенаправлении, если только один чат
             return target_id, remaining_args
 
         await utils.answer(message, self.strings("cmd_not_allowed_multiple").format(
@@ -395,6 +394,7 @@ class TagAllMod(loader.Module):
 
                         tags.append(f'<a href="tg://user?id={user.id}">{user_display_name}</a>')
 
+                    # message_prefix уже пустой, если сработал триггер, так что здесь все ок
                     if message_prefix:
                         full_message_text = f"{message_prefix}\n{' '.join(tags)}"
                     else:
