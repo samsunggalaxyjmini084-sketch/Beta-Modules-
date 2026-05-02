@@ -1,6 +1,6 @@
 # meta developer: @Androfon_AI
 # meta name: PollStats
-# meta version: 2.8
+# meta version: 2.7
 import html
 
 from telethon import events
@@ -21,11 +21,7 @@ class PollStatsModule(loader.Module):
                   "Используйте: <code>.voters</code> (ответив на опрос) или <code>.voters [текст варианта]</code> (ответив на опрос).",
         "en_doc": "Shows poll statistics and a list of non-voters. "
                   "You can also specify an answer option to get a list of users who voted for it.\n"
-                  "Usage: <code>.voters</code> (replying to a poll) or <code>.voters [option text]</code> (replying to a poll).",
-        "poll_editable_status": "\n<emoji document_id=5828453479133800627>🔄</emoji> Изменение голоса: {status}",
-        "poll_add_option_status": "\n➕ Добавление вариантов: {status}",
-        "poll_setting_enabled": "Включено <emoji document_id=5832546462478635761>✅</emoji>",
-        "poll_setting_disabled": "Выключено <emoji document_id=5879813604068298387>❌</emoji>",
+                  "Usage: <code>.voters</code> (replying to a poll) or <code>.voters [option text]</code> (replying to a poll)."
     }
 
     async def client_ready(self, client, db):
@@ -61,6 +57,8 @@ class PollStatsModule(loader.Module):
         option_text_arg = args[1] if len(args) > 1 else ""
 
         if reply.media and isinstance(reply.media, MessageMediaPoll):
+            # Объект MessageMediaPoll охватывает все нативные опросы Telegram,
+            # включая те, которые позволяют пользователям добавлять собственные варианты ответов.
             poll_question_text = reply.media.poll.question.text
             is_public_poll = reply.media.poll.public_voters
 
@@ -174,27 +172,8 @@ class PollStatsModule(loader.Module):
                     else:
                         non_voters_list_text = "\n<emoji document_id=5825794181183836432>✔️</emoji> Все активные участники чата проголосовали."
 
-                    # Добавление информации о настройках опроса
-                    poll_settings_info = ""
-                    
-                    # Статус "Изменение голоса"
-                    editable_status_text = (
-                        self.strings("poll_setting_enabled") if reply.media.poll.can_be_edited
-                        else self.strings("poll_setting_disabled")
-                    )
-                    poll_settings_info += self.strings("poll_editable_status").format(status=editable_status_text)
-
-                    # Статус "Добавление вариантов"
-                    add_option_status_text = (
-                        self.strings("poll_setting_enabled") if reply.media.poll.can_add_option
-                        else self.strings("poll_setting_disabled")
-                    )
-                    poll_settings_info += self.strings("poll_add_option_status").format(status=add_option_status_text)
-
-
                     final_message = (
                         f"<emoji document_id=5877485980901971030>📊</emoji> В опросе \"<b>{html.escape(poll_question_text)}</b>\" проголосовало: <b>{voters_count}</b> человек(а)."
-                        f"{poll_settings_info}"
                         f"{non_voters_list_text}"
                     )
                     await message.edit(final_message, parse_mode="HTML")
