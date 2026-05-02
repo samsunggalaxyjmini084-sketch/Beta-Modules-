@@ -1,6 +1,6 @@
-# meta developer: @yourhandle
+ meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.3.9
+# meta version: 2.3.10
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 010000010101010001001111010010100100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000101
@@ -80,7 +80,7 @@ class AutoJoinGameMod(loader.Module):
 Дополнительно, если настроен <code>player_to_lynch_user_id</code>, модуль будет ожидать сообщение с ником игрока от этого пользователя. Как только ник получен, модуль будет искать сообщение о голосовании от <code>lynch_voting_bot_id</code>, содержащее <code>lynch_player_voting_trigger_phrases</code>, и затем автоматически нажмет кнопку с соответствующим ником игрока.
 <b>Важное обновление:</b> Если сообщение от <code>player_to_lynch_user_id</code> начинается с символа <code>!</code>, этот символ будет автоматически удален из ника игрока перед использованием.
 <b>Новая функция:</b> Модуль может автоматически пересылать сообщения с вашей ролью в мафии в указанный чат. Это работает, когда бот отправляет вам роль в приватном чате, и сообщение содержит одну из настроенных фраз-триггеров.
-<b>Улучшенная функция:</b> Модуль может отслеживать сообщения пользователей, объявляющих свою роль, и сохранять их ники и <b>конкретную объявленную роль</b> в список, если эта роль соответствует одной из настроенных фраз. Отслеживание можно включить/выключить и настроить его длительность.
+<b>Улучшенная функция:</b> Модуль может отслеживать сообщения пользователей, объявляющих свою роль, и сохранять их ники и <b>конкретную объявленную роль</b> в список, если эта роль соответствует одной из настроенных фраз.
 <b>Новая функция:</b> Модуль может автоматически отправлять список отслеживаемых ролей в указанный чат через заданное время после активации отслеживания ролей.
 <b>Новая функция:</b> Модуль может автоматически включать отслеживание ролей при получении сообщения, содержащего определенные фразы, от указанных ботов.
 <b>Новая функция:</b> Модуль может автоматически <b>выключать</b> отслеживание ролей при получении сообщения, содержащего определенные фразы, от указанных ботов.
@@ -792,16 +792,10 @@ Mafia Combat Premium <code>1634167847</code>""",
                             self._send_tracked_roles_list_scheduled(send_delay, send_chat_id)
                         )
                         logger.info(f"AutoJoinGame: Автоматическое отслеживание ролей включено на {self.config['role_tracking_duration']} секунд. Список будет отправлен в чат {send_chat_id} через {send_delay} секунд.")
-                        await self._client.send_message(message.chat_id, self.strings("auto_role_tracking_activated_with_send").format(
-                            duration=self.config["role_tracking_duration"],
-                            delay=send_delay,
-                            chat_id=send_chat_id
-                        ))
+                        # Removed: await self._client.send_message(message.chat_id, self.strings("auto_role_tracking_activated_with_send").format(...))
                     else:
                         logger.info(f"AutoJoinGame: Автоматическое отслеживание ролей включено на {self.config['role_tracking_duration']} секунд.")
-                        await self._client.send_message(message.chat_id, self.strings("auto_role_tracking_activated").format(
-                            duration=self.config["role_tracking_duration"]
-                        ))
+                        # Removed: await self._client.send_message(message.chat_id, self.strings("auto_role_tracking_activated").format(...))
                     return # Останавливаем дальнейшую обработку, чтобы избежать конфликтов состояния
 
             # --- Автоматическое выключение отслеживания ролей ---
