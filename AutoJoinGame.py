@@ -218,7 +218,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                 "lynch_target_marker",
                 "", 
                 lambda: "Маркер (строка), который, если присутствует в сообщении-триггере для голосования, заставит модуль нажать кнопку '👎'. Если отсутствует или маркер не указан (пустая строка), нажимается '👍'.",
-                validator=loader.validators.Series(loader.validators.String()) # Changed to Series to match config
+                validator=loader.validators.String()
             ),
             loader.ConfigValue(
                 "game_join_trigger_phrases",
@@ -404,7 +404,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         self._role_tracking_active = False 
         self._role_tracking_start_time = None
         self._tracked_roles_list = [] # Clear tracked roles on disable
-        self._processed_messages.clear() # Очищаем processed_messages при выключении модуля
+        self._processed_messages.clear() 
         if self._send_tracked_roles_task:
             self._send_tracked_roles_task.cancel()
             self._send_tracked_roles_task = None
@@ -421,14 +421,12 @@ Mafia Combat Premium <code>1634167847</code>""",
             if self._send_tracked_roles_task:
                 self._send_tracked_roles_task.cancel()
                 self._send_tracked_roles_task = None
-            self._processed_messages.clear() # Очищаем processed_messages при выключении отслеживания
             await utils.answer(message, self.strings("role_tracking_stopped"))
         else:
             self.config["role_tracking_enabled"] = True
             self._role_tracking_active = True
             self._role_tracking_start_time = datetime.now()
             self._tracked_roles_list = [] 
-            self._processed_messages.clear() # Очищаем processed_messages при включении отслеживания
             
             send_chat_id = self.config["send_tracked_roles_chat_id"]
             send_delay = self.config["send_tracked_roles_delay"]
@@ -757,7 +755,11 @@ Mafia Combat Premium <code>1634167847</code>""",
                 return
             
             message_identifier = (message.chat_id, message.id)
-            # Отсрочиваем проверку processed_messages до обработки логики автоотслеживания ролей
+            if message_identifier in self._processed_messages:
+                logger.debug(f"AutoJoinGame: Сообщение {message.id} в чате {message.chat_id} уже было обработано. Пропускаю.")
+                return
+            
+            self._processed_messages.add(message_identifier)
 
             sender = await message.get_sender()
             sender_id = getattr(sender, 'id', None)
@@ -789,7 +791,6 @@ Mafia Combat Premium <code>1634167847</code>""",
                     self._role_tracking_active = True
                     self._role_tracking_start_time = datetime.now()
                     self._tracked_roles_list = [] # Очищаем предыдущие отслеживаемые роли
-                    self._processed_messages.clear() # Очищаем processed_messages при автоматическом включении отслеживания
 
                     send_chat_id = self.config["send_tracked_roles_chat_id"]
                     send_delay = self.config["send_tracked_roles_delay"]
@@ -814,8 +815,6 @@ Mafia Combat Premium <code>1634167847</code>""",
                         ))
             
             # --- Логика отслеживания ролей ---
-            # Эта часть должна выполняться до проверки _processed_messages,
-            # чтобы новые роли отслеживались даже из уже обработанных сообщений.
             if self.config["role_tracking_enabled"] and self._role_tracking_active:
                 if self._role_tracking_start_time and (datetime.now() - self._role_tracking_start_time).total_seconds() > self.config["role_tracking_duration"]:
                     logger.info(self.strings("role_tracking_expired"))
@@ -824,7 +823,8 @@ Mafia Combat Premium <code>1634167847</code>""",
                     if self._send_tracked_roles_task: # <--- Исправлено: отмена задачи при истечении времени
                         self._send_tracked_roles_task.cancel()
                         self._send_tracked_roles_task = None
-                elif not getattr(sender, 'bot', False) and sender_id != self._self_id: 
+                # Изменено: Убрано исключение self._self_id, чтобы сообщения владельца модуля также отслеживались
+                elif not getattr(sender, 'bot', False): 
                     role_announcement_phrases_lower = [p.lower() for p in self.config["role_announcement_phrases"]]
                     
                     is_role_announcement = any(phrase in msg_text_lower for phrase in role_announcement_phrases_lower)
@@ -842,18 +842,10 @@ Mafia Combat Premium <code>1634167847</code>""",
                         
                         if found_tracked_role:
                             nickname = self._get_user_nickname(sender)
-                            # Проверяем, был ли уже этот пользователь добавлен в текущей сессии отслеживания
                             if not any(entry[0] == sender_id for entry in self._tracked_roles_list): 
                                 self._tracked_roles_list.append((sender_id, nickname, found_tracked_role)) 
                                 logger.info(self.strings("role_tracked_success").format(nickname=nickname, role=found_tracked_role))
             
-            # Теперь проверяем processed_messages для остальных функций модуля
-            if message_identifier in self._processed_messages:
-                logger.debug(f"AutoJoinGame: Сообщение {message.id} в чате {message.chat_id} уже было обработано. Пропускаю.")
-                return
-            
-            self._processed_messages.add(message_identifier)
-
             # --- Обработка сообщения, устанавливающего ник игрока ---
             player_to_lynch_user_id = self.config["player_to_lynch_user_id"]
             if player_to_lynch_user_id != 0 and sender_id == player_to_lynch_user_id:
