@@ -174,6 +174,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         "auto_track_roles_bot_ids_display": "Не указаны (любой бот)",
         "auto_role_tracking_activated": "<emoji document_id=5776375003280838798>✅</emoji> Автоматическое отслеживание ролей включено на {duration} секунд.",
         "auto_role_tracking_activated_with_send": "<emoji document_id=5776375003280838798>✅</emoji> Автоматическое отслеживание ролей включено на {duration} секунд. Список будет отправлен в чат <code>{chat_id}</code> через {delay} секунд.",
+        "owner_role_display_prefix": "[ВЫ] ", # Новая строка для обозначения роли владельца
     }
 
     def __init__(self):
@@ -322,14 +323,15 @@ Mafia Combat Premium <code>1634167847</code>""",
         self._role_tracking_active = False
         self._role_tracking_start_time = None
         self._tracked_roles_list = [] # Stores (user_id, nickname, role_text)
-        self._self_id = None 
+        self._self_id = None # Добавлено: ID владельца модуля
         self._processed_messages = set() 
         self._processed_messages_cleanup_task = None 
         self._send_tracked_roles_task = None # Task for sending tracked roles list
 
     async def client_ready(self, client, _):
         self._client = client
-        self._self_id = (await self._client.get_me()).id 
+        me = await self._client.get_me()
+        self._self_id = me.id # Сохраняем ID владельца модуля
         if self._processed_messages_cleanup_task is None:
             self._processed_messages_cleanup_task = asyncio.create_task(self._cleanup_processed_messages_loop())
 
@@ -379,8 +381,18 @@ Mafia Combat Premium <code>1634167847</code>""",
             if not self._tracked_roles_list:
                 message_text = self.strings("no_tracked_roles")
             else:
-                list_items = "\n".join([f"• <code>{nickname}</code> (Роль: {role_text})" for _, nickname, role_text in self._tracked_roles_list])
-                message_text = self.strings("tracked_roles_list").format(count=len(self._tracked_roles_list), list_items=list_items)
+                owner_id = self._self_id # Используем сохраненный ID владельца
+                owner_nickname_prefix = self.strings("owner_role_display_prefix")
+
+                list_items = []
+                for user_id, nickname, role_text in self._tracked_roles_list:
+                    display_nickname = nickname
+                    if user_id == owner_id:
+                        display_nickname = f"{owner_nickname_prefix}{nickname}"
+                    list_items.append(f"• <code>{display_nickname}</code> (Роль: {role_text})")
+                
+                list_items_str = "\n".join(list_items)
+                message_text = self.strings("tracked_roles_list").format(count=len(self._tracked_roles_list), list_items=list_items_str)
             
             await self._client.send_message(chat_id, message_text)
             logger.info(self.strings("tracked_roles_send_success").format(chat_id=chat_id))
@@ -453,8 +465,18 @@ Mafia Combat Premium <code>1634167847</code>""",
             await utils.answer(message, self.strings("no_tracked_roles"))
             return
 
-        list_items = "\n".join([f"• <code>{nickname}</code> (Роль: {role_text})" for _, nickname, role_text in self._tracked_roles_list])
-        await utils.answer(message, self.strings("tracked_roles_list").format(count=len(self._tracked_roles_list), list_items=list_items))
+        owner_id = self._self_id # Используем сохраненный ID владельца
+        owner_nickname_prefix = self.strings("owner_role_display_prefix")
+
+        list_items = []
+        for user_id, nickname, role_text in self._tracked_roles_list:
+            display_nickname = nickname
+            if user_id == owner_id:
+                display_nickname = f"{owner_nickname_prefix}{nickname}"
+            list_items.append(f"• <code>{display_nickname}</code> (Роль: {role_text})")
+        
+        list_items_str = "\n".join(list_items)
+        await utils.answer(message, self.strings("tracked_roles_list").format(count=len(self._tracked_roles_list), list_items=list_items_str))
 
     @loader.command(ru_doc="Показать статус автовхода и автолинчевания")
     async def ajgstatus(self, message: Message):
@@ -469,7 +491,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         bot_ids_display = ", ".join(map(str, self.config["bot_ids"])) if self.config["bot_ids"] else "Не указаны (любой бот)"
 
-        allowed_chats_display = ", ". присоединитесь(map(str, self.config["allowed_chats"])) if self.config["allowed_chats"] else "Все чаты"
+        allowed_chats_display = ", ".join(map(str, self.config["allowed_chats"])) if self.config["allowed_chats"] else "Все чаты"
 
         configured_button_keywords_lower = [kw.lower() for kw in self.config["button_keywords"]]
         deep_link_mode_active = '🌚' in configured_button_keywords_lower or '🌝' in configured_button_keywords_lower
