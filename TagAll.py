@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: TagAll
-# meta version: 2.6.0
+# meta version: 2.5.2
 
 import asyncio
 import contextlib
@@ -50,8 +50,8 @@ class TagAllMod(loader.Module):
         "_cfg_doc_duration": "Длительность работы (0 = бесконечно)",
         "_cfg_doc_exclude_user_ids": "ID пользователей-исключений",
         "_cfg_doc_allowed_chat_ids": "ID разрешенных чатов для выполнения команд",
-        "_cfg_start_trigger": "Триггер(ы) для запуска (разделяйте запятыми)", # Updated doc
-        "_cfg_stop_trigger": "Триггер(ы) для остановки (разделяйте запятыми)",  # Updated doc
+        "_cfg_start_trigger": "Триггер(ы) для запуска (если есть в тексте сообщения). Разделяйте запятыми.",
+        "_cfg_stop_trigger": "Триггер(ы) для остановки (если есть в тексте сообщения). Разделяйте запятыми.",
         "_cfg_doc_allowed_trigger_user_ids": (
             "ID пользователей, которые могут использовать триггеры (через текст сообщения). "
             "Разделяйте запятыми. Если пусто, любой может использовать триггеры."
@@ -110,38 +110,44 @@ class TagAllMod(loader.Module):
 
     @loader.watcher()
     async def watcher(self, message: Message):
-        if not self.config["enable_watcher"]:
+        if not self.config["enable_watcher"]: # Проверка нового параметра
             return
 
         if not isinstance(message, Message) or not message.text:
             return
 
+        # Проверяем, разрешено ли отправителю использовать триггеры
         allowed_trigger_ids_raw = self.config["allowed_trigger_user_ids"]
         allowed_trigger_ids = {int(x.strip()) for x in allowed_trigger_ids_raw.split(",") if x.strip().isdigit()}
 
         if allowed_trigger_ids and message.sender_id not in allowed_trigger_ids:
+            # Если allowed_trigger_user_ids настроен и отправитель не в списке, игнорируем триггер
             return
 
         message_text_lower = message.text.lower()
         
-        # Parse multiple triggers
-        # Split by comma, strip whitespace, convert to lowercase, filter out empty strings
-        start_triggers = [t.strip().lower() for t in self.config["start_trigger"].split(',') if t.strip()]
-        stop_triggers = [t.strip().lower() for t in self.config["stop_trigger"].split(',') if t.strip()]
+        # Разбираем множественные стоп-триггеры
+        stop_triggers_raw = self.config["stop_trigger"]
+        stop_triggers = [t.strip().lower() for t in stop_triggers_raw.split(',') if t.strip()]
 
-        # Check for stop triggers first
+        # Разбираем множественные старт-триггеры
+        start_triggers_raw = self.config["start_trigger"]
+        start_triggers = [t.strip().lower() for t in start_triggers_raw.split(',') if t.strip()]
+
+        # Сначала проверяем стоп-триггер
         for trigger in stop_triggers:
-            if trigger and trigger in message_text_lower: # Ensure trigger is not empty string
+            if trigger and trigger in message_text_lower:
                 await self._stop_logic(message, "")
-                return # Stop processing after handling a stop trigger
+                return
 
-        # Then check for start triggers
+        # Затем старт-триггер
         for trigger in start_triggers:
-            if trigger and trigger in message_text_lower: # Ensure trigger is not empty string
-                # As per previous request, if any start trigger is found, the entire message text is ignored as prefix.
+            if trigger and trigger in message_text_lower:
+                # Если триггер для запуска найден, весь остальной текст игнорируется.
+                # Поэтому prefix устанавливается в пустую строку.
                 prefix = "" 
                 await self._start_logic(message, prefix)
-                return # Stop processing after handling a start trigger
+                return # Выходим после первого сработавшего старт-триггера
 
     def _get_allowed_chat_ids_map(self) -> dict[int, int]:
         allowed_ids_raw = self.config["allowed_chat_ids"]
@@ -360,13 +366,13 @@ class TagAllMod(loader.Module):
                     event.stop()
                     break
 
-                current_participants_for_cycle = []
+                current_cycle_participants = []
                 if self.config["cycle_tagging"] and not first_pass: # Re-fetch participants if cycling
                     logger.debug(f"Повторный запрос участников для цикла в чате {chat_id}.")
                     async for user in self._client.iter_participants(chat_id):
                         if not user.bot and not user.deleted and user.id != owner_id and user.id not in excluded_user_ids:
-                            current_participants_for_cycle.append(user)
-                    random.shuffle(current_participants_for_cycle)
+                            current_cycle_participants.append(user)
+                    random.shuffle(current_cycle_participants)
                     participants = current_cycle_participants
                     if not participants:
                         logger.warning(f"В чате {chat_id} не найдено участников для TagAll для следующего цикла, останавливаем.")
