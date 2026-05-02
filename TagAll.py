@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: TagAll
-# meta version: 2.4.0
+# meta version: 2.4.1
 
 import asyncio
 import contextlib
@@ -324,7 +324,7 @@ class TagAllMod(loader.Module):
         if is_bot_sender:
             try:
                 # Добавлена проверка на наличие self.inline.bot_client
-                if not hasattr(self, 'inline') or not hasattr(self.inline, 'bot_username') or not getattr(self.inline, 'bot_client', None):
+                if not hasattr(self, 'inline') or not hasattr(self.inline, 'bot_client') or not getattr(self.inline, 'bot_client', None):
                     raise RuntimeError("Инлайн-бот не настроен или недоступен.")
 
                 bot_entity = await self._client.get_input_entity(self.inline.bot_username)
