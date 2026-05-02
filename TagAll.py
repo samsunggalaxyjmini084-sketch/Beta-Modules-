@@ -1,6 +1,6 @@
-# meta developer: @yourhandle
+eta developer: @yourhandle
 # meta name: TagAll
-# meta version: 2.3.0
+# meta version: 2.4.0
 
 import asyncio
 import contextlib
@@ -135,15 +135,18 @@ class TagAllMod(loader.Module):
 
         # Затем старт-триггер
         if start_trigger_lower and start_trigger_lower in message_text_lower:
-            # Удаляем только первое вхождение триггера из оригинального текста сообщения (регистронезависимо)
-            # для формирования префикса, чтобы сам триггер не попадал в теги.
+            # Удаляем все вхождения слова-триггера из сообщения для формирования префикса.
+            # Используем re.sub с \b для поиска по границам слова и игнорированием регистра.
+            # Заменяем найденные триггеры и возможные окружающие пробелы на один пробел,
+            # затем обрезаем лишние пробелы в начале и конце.
             prefix = message.text
-            # Используем re.escape, чтобы спецсимволы в триггере (если они есть) не ломали regex
-            match = re.search(re.escape(self.config["start_trigger"]), message.text, re.IGNORECASE)
-            if match:
-                prefix = message.text[:match.start()] + message.text[match.end():]
+            start_trigger_escaped = re.escape(self.config["start_trigger"])
+            # Паттерн для поиска триггера, окруженного опциональными пробелами,
+            # с заменой на один пробел.
+            pattern = re.compile(r'\s*' + start_trigger_escaped + r'\s*', re.IGNORECASE)
+            prefix = pattern.sub(' ', prefix).strip()
             
-            await self._start_logic(message, prefix.strip())
+            await self._start_logic(message, prefix)
 
     def _get_allowed_chat_ids_map(self) -> dict[int, int]:
         allowed_ids_raw = self.config["allowed_chat_ids"]
