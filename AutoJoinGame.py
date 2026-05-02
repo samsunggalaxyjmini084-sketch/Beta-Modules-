@@ -469,7 +469,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         bot_ids_display = ", ".join(map(str, self.config["bot_ids"])) if self.config["bot_ids"] else "Не указаны (любой бот)"
 
-        allowed_chats_display = ", ".join(map(str, self.config["allowed_chats"])) if self.config["allowed_chats"] else "Все чаты"
+        allowed_chats_display = ", ". присоединитесь(map(str, self.config["allowed_chats"])) if self.config["allowed_chats"] else "Все чаты"
 
         configured_button_keywords_lower = [kw.lower() for kw in self.config["button_keywords"]]
         deep_link_mode_active = '🌚' in configured_button_keywords_lower or '🌝' in configured_button_keywords_lower
@@ -823,8 +823,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                     if self._send_tracked_roles_task: # <--- Исправлено: отмена задачи при истечении времени
                         self._send_tracked_roles_task.cancel()
                         self._send_tracked_roles_task = None
-                # Изменено: Убрано исключение self._self_id, чтобы сообщения владельца модуля также отслеживались
-                elif not getattr(sender, 'bot', False): 
+                else: # Role tracking is active and not expired. Process role announcements from any sender.
                     role_announcement_phrases_lower = [p.lower() for p in self.config["role_announcement_phrases"]]
                     
                     is_role_announcement = any(phrase in msg_text_lower for phrase in role_announcement_phrases_lower)
@@ -833,15 +832,17 @@ Mafia Combat Premium <code>1634167847</code>""",
                         found_tracked_role = None
                         for tracked_role_phrase_orig in self.config["tracked_roles_to_monitor"]:
                             # Check if the role phrase is present as a whole word or at the start/end
+                            # Using word boundaries for more precise matching
                             if (f" {tracked_role_phrase_orig.lower()}" in msg_text_lower or 
-                                msg_text_lower.startswith(tracked_role_phrase_orig.lower() + " ") or # "Я - мирный житель"
-                                msg_text_lower.endswith(" " + tracked_role_phrase_orig.lower()) or # "Моя роль: мирный житель"
-                                msg_text_lower == tracked_role_phrase_orig.lower()): # "мирный житель"
+                                msg_text_lower.startswith(tracked_role_phrase_orig.lower() + " ") or 
+                                msg_text_lower.endswith(" " + tracked_role_phrase_orig.lower()) or 
+                                msg_text_lower == tracked_role_phrase_orig.lower()):
                                 found_tracked_role = tracked_role_phrase_orig 
                                 break
                         
                         if found_tracked_role:
                             nickname = self._get_user_nickname(sender)
+                            # Add to tracked list only if not already present for this sender_id
                             if not any(entry[0] == sender_id for entry in self._tracked_roles_list): 
                                 self._tracked_roles_list.append((sender_id, nickname, found_tracked_role)) 
                                 logger.info(self.strings("role_tracked_success").format(nickname=nickname, role=found_tracked_role))
