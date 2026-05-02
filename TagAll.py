@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: TagAll
-# meta version: 2.6.0
+# meta version: 2.6.1
 
 import asyncio
 import contextlib
