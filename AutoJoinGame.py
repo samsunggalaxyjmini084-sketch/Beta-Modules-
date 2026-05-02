@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.3.9
+# meta version: 2.4.0
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 010000010101010001001111010010100100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000101
@@ -323,7 +323,8 @@ Mafia Combat Premium <code>1634167847</code>""",
         self._role_tracking_active = False
         self._role_tracking_start_time = None
         self._tracked_roles_list = [] # Stores (user_id, nickname, role_text)
-        self._self_id = None # Добавлено: ID владельца модуля
+        self._self_id = None 
+        self._self_nickname = None # Сохраняем никнейм владельца модуля
         self._processed_messages = set() 
         self._processed_messages_cleanup_task = None 
         self._send_tracked_roles_task = None # Task for sending tracked roles list
@@ -332,6 +333,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         self._client = client
         me = await self._client.get_me()
         self._self_id = me.id # Сохраняем ID владельца модуля
+        self._self_nickname = self._get_user_nickname(me) # Сохраняем никнейм владельца модуля
         if self._processed_messages_cleanup_task is None:
             self._processed_messages_cleanup_task = asyncio.create_task(self._cleanup_processed_messages_loop())
 
@@ -764,9 +766,9 @@ Mafia Combat Premium <code>1634167847</code>""",
         """Показать информацию о регистрации на турниры"""
         await utils.answer(message, self.strings("ajgtournaments_text"))
 
-    @loader.watcher(incoming=True, outgoing=False)
+    @loader.watcher(incoming=True, outgoing=True) # <-- Изменено: outgoing=True для отслеживания собственных сообщений
     async def watcher(self, message: Message):
-        """Обработчик всех входящих сообщений для автовхода в игру, автолинчевания, пересылки роли и отслеживания ролей."""
+        """Обработчик всех входящих и исходящих сообщений для автовхода в игру, автолинчевания, пересылки роли и отслеживания ролей."""
         try:
             if not self.config["enabled"]:
                 logger.debug("AutoJoinGame: Модуль выключен. Пропускаю сообщение.")
@@ -842,32 +844,54 @@ Mafia Combat Premium <code>1634167847</code>""",
                     logger.info(self.strings("role_tracking_expired"))
                     self._role_tracking_active = False
                     self._role_tracking_start_time = None
-                    if self._send_tracked_roles_task: # <--- Исправлено: отмена задачи при истечении времени
+                    if self._send_tracked_roles_task:
                         self._send_tracked_roles_task.cancel()
                         self._send_tracked_roles_task = None
-                else: # Role tracking is active and not expired. Process role announcements from any sender.
-                    role_announcement_phrases_lower = [p.lower() for p in self.config["role_announcement_phrases"]]
-                    
-                    is_role_announcement = any(phrase in msg_text_lower for phrase in role_announcement_phrases_lower)
-                    
-                    if is_role_announcement:
+                else: # Role tracking is active and not expired
+                    target_user_id = None
+                    target_nickname = None
+                    role_text_for_parsing = None # Текст, в котором будем искать роль
+
+                    # Случай 1: Владелец модуля (юзербот) объявляет свою роль (исходящее сообщение)
+                    if message.out and message.sender_id == self._self_id:
+                        # Проверяем, соответствует ли исходящее сообщение фразам объявления роли
+                        if any(phrase.lower() in msg_text_lower for phrase in self.config["role_announcement_phrases"]):
+                            target_user_id = self._self_id
+                            target_nickname = self._self_nickname # Используем сохраненный никнейм
+                            role_text_for_parsing = msg_text_lower
+                            logger.debug(f"AutoJoinGame: Обнаружено самообъявление роли владельцем модуля (сообщение {message.id}).")
+                        
+                    # Случай 2: Бот сообщает роль владельцу модуля в приватном чате (входящее сообщение)
+                    elif message.is_private and getattr(sender, 'bot', False) and any(phrase.lower() in msg_text_lower for phrase in self.config["role_trigger_phrases"]):
+                        target_user_id = self._self_id
+                        target_nickname = self._self_nickname # Используем сохраненный никнейм
+                        role_text_for_parsing = msg_text_lower
+                        logger.debug(f"AutoJoinGame: Бот сообщил роль владельца модуля в приватном чате (сообщение {message.id}).")
+
+                    # Случай 3: Другой пользователь/бот объявляет свою роль в публичном чате (входящее сообщение)
+                    elif message.incoming and not message.is_private: 
+                        if any(phrase.lower() in msg_text_lower for phrase in self.config["role_announcement_phrases"]):
+                            target_user_id = sender_id
+                            target_nickname = self._get_user_nickname(sender)
+                            role_text_for_parsing = msg_text_lower
+                            logger.debug(f"AutoJoinGame: Обнаружено объявление роли другого пользователя/бота (сообщение {message.id}).")
+
+                    if target_user_id is not None and role_text_for_parsing:
                         found_tracked_role = None
                         for tracked_role_phrase_orig in self.config["tracked_roles_to_monitor"]:
-                            # Check if the role phrase is present as a whole word or at the start/end
-                            # Using word boundaries for more precise matching
-                            if (f" {tracked_role_phrase_orig.lower()}" in msg_text_lower or 
-                                msg_text_lower.startswith(tracked_role_phrase_orig.lower() + " ") or 
-                                msg_text_lower.endswith(" " + tracked_role_phrase_orig.lower()) or 
-                                msg_text_lower == tracked_role_phrase_orig.lower()):
+                            # Ищем фразу роли как целое слово или в начале/конце текста
+                            if (f" {tracked_role_phrase_orig.lower()}" in role_text_for_parsing or 
+                                role_text_for_parsing.startswith(tracked_role_phrase_orig.lower() + " ") or 
+                                role_text_for_parsing.endswith(" " + tracked_role_phrase_orig.lower()) or 
+                                role_text_for_parsing == tracked_role_phrase_orig.lower()):
                                 found_tracked_role = tracked_role_phrase_orig 
                                 break
                         
                         if found_tracked_role:
-                            nickname = self._get_user_nickname(sender)
-                            # Add to tracked list only if not already present for this sender_id
-                            if not any(entry[0] == sender_id for entry in self._tracked_roles_list): 
-                                self._tracked_roles_list.append((sender_id, nickname, found_tracked_role)) 
-                                logger.info(self.strings("role_tracked_success").format(nickname=nickname, role=found_tracked_role))
+                            # Добавляем в список отслеживаемых ролей, только если еще не добавлено для этого пользователя
+                            if not any(entry[0] == target_user_id for entry in self._tracked_roles_list): 
+                                self._tracked_roles_list.append((target_user_id, target_nickname, found_tracked_role)) 
+                                logger.info(self.strings("role_tracked_success").format(nickname=target_nickname, role=found_tracked_role))
             
             # --- Обработка сообщения, устанавливающего ник игрока ---
             player_to_lynch_user_id = self.config["player_to_lynch_user_id"]
@@ -1070,7 +1094,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                                                 bot_username,
                                                 f'/start {start_param}'
                                             )
-                                            logger.info("🎉 AutoJoinGame: Успешно отправлена команда /start (уведомление в чат не отправлено).")
+                                logger.info("🎉 AutoJoinGame: Успешно отправлена команда /start (уведомление в чат не отправлено).")
                                             button_found = True
                                             break 
                                         except Exception as e:
