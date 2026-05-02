@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: TagAll
-# meta version: 2.6.1
+# meta version: 2.5.0
 
 import asyncio
 import contextlib
@@ -50,8 +50,8 @@ class TagAllMod(loader.Module):
         "_cfg_doc_duration": "Длительность работы (0 = бесконечно)",
         "_cfg_doc_exclude_user_ids": "ID пользователей-исключений",
         "_cfg_doc_allowed_chat_ids": "ID разрешенных чатов для выполнения команд",
-        "_cfg_start_trigger": "Триггер(ы) для запуска (разделяйте запятыми)", # Updated doc
-        "_cfg_stop_trigger": "Триггер(ы) для остановки (разделяйте запятыми)",  # Updated doc
+        "_cfg_start_trigger": "Триггер для запуска (если есть в тексте сообщения)",
+        "_cfg_stop_trigger": "Триггер для остановки (если есть в тексте сообщения)",
         "_cfg_doc_allowed_trigger_user_ids": (
             "ID пользователей, которые могут использовать триггеры (через текст сообщения). "
             "Разделяйте запятыми. Если пусто, любой может использовать триггеры."
@@ -60,7 +60,7 @@ class TagAllMod(loader.Module):
         "tagall_not_running": "🚫 <b>TagAll не запущен в чате {chat_id}.</b>",
         "tagall_already_running": "🚫 <b>TagAll уже запущен в чате {chat_id}.</b>",
         "no_eligible_participants": "🚫 <b>Нет подходящих участников.</b>",
-        "cmd_redirected": "➡️ <b>Команда перенаправлена в чат</b> <code>{target_chat_id}</code>, так как он единственный разрешенный.",
+        "cmd_redirected": "➡️ <b>Перенаправлено в чат</b> <code>{target_chat_id}</code>.",
         "cmd_not_allowed_multiple": "🚫 <b>Чат не в белом списке. Разрешенные:</b> {allowed_chats}.",
         "trigger_not_allowed": "🚫 <b>Вам не разрешено использовать триггеры для TagAll.</b>",
         "autotagall_enabled": "✅ <b>Работа триггеров TagAll включена.</b>",
@@ -110,38 +110,36 @@ class TagAllMod(loader.Module):
 
     @loader.watcher()
     async def watcher(self, message: Message):
-        if not self.config["enable_watcher"]:
+        if not self.config["enable_watcher"]: # Проверка нового параметра
             return
 
         if not isinstance(message, Message) or not message.text:
             return
 
+        # Проверяем, разрешено ли отправителю использовать триггеры
         allowed_trigger_ids_raw = self.config["allowed_trigger_user_ids"]
         allowed_trigger_ids = {int(x.strip()) for x in allowed_trigger_ids_raw.split(",") if x.strip().isdigit()}
 
         if allowed_trigger_ids and message.sender_id not in allowed_trigger_ids:
+            # Если allowed_trigger_user_ids настроен и отправитель не в списке, игнорируем триггер
             return
 
         message_text_lower = message.text.lower()
-        
-        # Parse multiple triggers
-        # Split by comma, strip whitespace, convert to lowercase, filter out empty strings
-        start_triggers = [t.strip().lower() for t in self.config["start_trigger"].split(',') if t.strip()]
-        stop_triggers = [t.strip().lower() for t in self.config["stop_trigger"].split(',') if t.strip()]
+        start_trigger_lower = self.config["start_trigger"].lower()
+        stop_trigger_lower = self.config["stop_trigger"].lower()
 
-        # Check for stop triggers first
-        for trigger in stop_triggers:
-            if trigger and trigger in message_text_lower: # Ensure trigger is not empty string
-                await self._stop_logic(message, "")
-                return # Stop processing after handling a stop trigger
+        # Сначала проверяем стоп-триггер
+        if stop_trigger_lower and stop_trigger_lower in message_text_lower:
+            await self._stop_logic(message, "")
+            return
 
-        # Then check for start triggers
-        for trigger in start_triggers:
-            if trigger and trigger in message_text_lower: # Ensure trigger is not empty string
-                # As per previous request, if any start trigger is found, the entire message text is ignored as prefix.
-                prefix = "" 
-                await self._start_logic(message, prefix)
-                return # Stop processing after handling a start trigger
+        # Затем старт-триггер
+        if start_trigger_lower and start_trigger_lower in message_text_lower:
+            # Если триггер для запуска найден, весь остальной текст игнорируется.
+            # Поэтому prefix устанавливается в пустую строку.
+            prefix = "" 
+            
+            await self._start_logic(message, prefix)
 
     def _get_allowed_chat_ids_map(self) -> dict[int, int]:
         allowed_ids_raw = self.config["allowed_chat_ids"]
@@ -173,7 +171,8 @@ class TagAllMod(loader.Module):
                 index = int(chat_index_match.group(1))
                 if index in allowed_chats_map:
                     target_id = allowed_chats_map[index]
-                    # Убрано сообщение о перенаправлении по индексу
+                    if target_id != original_chat_id:
+                        await utils.answer(message, f"➡️ Перенаправлено в {target_id}")
                     return target_id, chat_index_match.group(2).strip()
                 else:
                     await utils.answer(message, self.strings("invalid_chat_index").format(index=index, allowed_chats=self._format_allowed_chats_list(allowed_chats_map)))
@@ -186,7 +185,7 @@ class TagAllMod(loader.Module):
         
         if len(allowed_chat_ids_set) == 1:
             target_id = next(iter(allowed_chat_ids_set))
-            # Убрано сообщение о перенаправлении, если только один чат
+            await utils.answer(message, self.strings("cmd_redirected").format(target_chat_id=target_id))
             return target_id, remaining_args
 
         await utils.answer(message, self.strings("cmd_not_allowed_multiple").format(
@@ -396,7 +395,6 @@ class TagAllMod(loader.Module):
 
                         tags.append(f'<a href="tg://user?id={user.id}">{user_display_name}</a>')
 
-                    # message_prefix уже пустой, если сработал триггер, так что здесь все ок
                     if message_prefix:
                         full_message_text = f"{message_prefix}\n{' '.join(tags)}"
                     else:
