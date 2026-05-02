@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.3.10
+# meta version: 2.4.0
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 010000010101010001001111010010100100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000101
@@ -11,6 +11,7 @@ import urllib.parse
 from datetime import datetime, timedelta
 from telethon.tl.types import Message, User
 from telethon import events
+import re # Добавлен импорт для регулярных выражений
 from .. import loader, utils
 
 logger = logging.getLogger(__name__)
@@ -85,6 +86,7 @@ class AutoJoinGameMod(loader.Module):
 <b>Новая функция:</b> Модуль может автоматически отправлять список отслеживаемых ролей в указанный чат через заданное время после активации отслеживания ролей.
 <b>Новая функция:</b> Модуль может автоматически включать отслеживание ролей при получении сообщения, содержащего определенные фразы, от указанных ботов.
 <b>Новая функция:</b> Модуль может автоматически <b>выключать</b> отслеживание ролей при получении сообщения, содержащего определенные фразы, от указанных ботов.
+<b>Улучшение:</b> Теперь модуль более точно определяет роли, включая составные фразы, и позволяет помечать роли как 'неактивные' с помощью суффикса <code>(н)</code> для раздельного отображения.
 
 <emoji document_id=5843843420468024653>⭐️</emoji> Настройки:
 В конфиге модуля можно изменить задержку(и) перед нажатием. Если указано несколько значений, будет выбрано случайное.
@@ -892,10 +894,14 @@ Mafia Combat Premium <code>1634167847</code>""",
                                 current_is_active = False
                                 role_to_match_lower = role_to_match_lower[:-3].strip() # Remove "(н)" and strip whitespace
                             
-                            # Check if the clean role phrase is present as a whole word or at the start/end
-                            # Using word boundaries for more precise matching
-                            # Ensure full word match to prevent "мафия" matching "многомафия"
-                            pattern = r"(?<!\w)" + re.escape(role_to_match_lower) + r"(?!\w)"
+                            # NEW: Construct a more robust regex pattern for whole-word/phrase matching
+                            # Split by whitespace, escape each word, then join with \s+ for flexible whitespace matching
+                            # And wrap the whole pattern with \b for word boundaries.
+                            parts = role_to_match_lower.split()
+                            escaped_parts = [re.escape(p) for p in parts]
+                            internal_pattern = r"\s+".join(escaped_parts)
+                            pattern = r"\b" + internal_pattern + r"\b"
+
                             if re.search(pattern, msg_text_lower):
                                 found_tracked_role_clean = role_to_match_lower
                                 is_role_active = current_is_active
@@ -903,8 +909,8 @@ Mafia Combat Premium <code>1634167847</code>""",
                         
                         if found_tracked_role_clean:
                             nickname = self._get_user_nickname(sender)
-                            # Add to tracked list only if not already present for this sender_id
-                            if not any(entry[0] == sender_id for entry in self._tracked_roles_list): 
+                            # Add to tracked list only if not already present for this sender_id AND this specific role
+                            if not any(entry[0] == sender_id and entry[2] == found_tracked_role_clean for entry in self._tracked_roles_list): 
                                 self._tracked_roles_list.append((sender_id, nickname, found_tracked_role_clean, is_role_active)) 
                                 status_text = "Активная" if is_role_active else "Неактивная"
                                 logger.info(self.strings("role_tracked_success_with_status").format(nickname=nickname, role=found_tracked_role_clean, status=status_text))
