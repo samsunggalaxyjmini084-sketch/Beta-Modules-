@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.4.0
+# meta version: 2.5.0 # Увеличена версия модуля
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 0100000101010100010011110100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000101
@@ -11,7 +11,7 @@ import urllib.parse
 from datetime import datetime, timedelta
 from telethon.tl.types import Message, User
 from telethon import events
-import re # Добавлен импорт для регулярных выражений
+import re
 from .. import loader, utils
 
 logger = logging.getLogger(__name__)
@@ -19,11 +19,11 @@ logger = logging.getLogger(__name__)
 
 @loader.tds
 class AutoJoinGameMod(loader.Module):
-    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам."""
+    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Новое: автоматические действия в ночном ходе мафии."""
 
     strings = {
         "name": "AutoJoinGame",
-        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам.",
+        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Новое: автоматические действия в ночном ходе мафии.",
         "enabled": "✅ Автовход в игру и автолинчевание включены.",
         "disabled": "❌ Автовход в игру и автолинчевание выключены.",
         "status": "<emoji document_id=5875291072225087249>📊</emoji> Статус автовхода и автолинчевания:\n"
@@ -42,6 +42,13 @@ class AutoJoinGameMod(loader.Module):
                   "ID бота для голосования за игрока: {}\n"
                   "Фразы-триггеры голосования за игрока: {}\n"
                   "Последний ник игрока для линчевания: {}\n"
+                  "\n<emoji document_id=5877485980901971030>📊</emoji> Статус ночного хода:\n"
+                  "Ночной ход: {}\n"
+                  "Фразы-триггеры ночного хода: {}\n"
+                  "ID пользователя для команд ночного хода: {}\n"
+                  "Префикс команды ночного хода: {}\n"
+                  "ID бота для кнопок ночного хода: {}\n"
+                  "Последний ник игрока для ночного хода: {}\n"
                   "\n<emoji document_id=5877485980901971030>📊</emoji> Статус пересылки роли:\n"
                   "Чат для пересылки роли: {}\n"
                   "Фразы-триггеры роли: {}\n"
@@ -81,6 +88,7 @@ class AutoJoinGameMod(loader.Module):
 Дополнительно, если настроен <code>player_to_lynch_user_id</code>, модуль будет ожидать сообщение с ником игрока от этого пользователя. Как только ник получен, модуль будет искать сообщение о голосовании от <code>lynch_voting_bot_id</code>, содержащее <code>lynch_player_voting_trigger_phrases</code>, и затем автоматически нажмет кнопку с соответствующим ником игрока.
 <b>Важное обновление:</b> Если сообщение от <code>player_to_lynch_user_id</code> начинается с символа <code>!</code>, этот символ будет автоматически удален из ника игрока перед использованием.
 <b>Обновление 2.4.0:</b> При линчевании конкретного игрока, модуль теперь будет искать ник игрока как <b>подстроку</b> в тексте кнопки (регистронезависимо), а не только как точное совпадение. Это позволяет корректно обрабатывать кнопки, содержащие никнейм игрока вместе с дополнительными символами.
+<b>Обновление 2.5.0:</b> Добавлены автоматические действия в ночном ходе. Модуль будет реагировать на сообщения, сигнализирующие о начале ночи. Если указанный пользователь отправит команду с ником игрока (например, "сходи PlayerName"), модуль найдет и нажмет соответствующую кнопку в сообщении от бота.
 <b>Новая функция:</b> Модуль может автоматически пересылать сообщения с вашей ролью в мафии в указанный чат. Это работает, когда бот отправляет вам роль в приватном чате, и сообщение содержит одну из настроенных фраз-триггеров.
 <b>Улучшенная функция:</b> Модуль может отслеживать сообщения пользователей, объявляющих свою роль, и сохранять их ники и <b>конкретную объявленную роль</b> в список, если эта роль соответствует одной из настроенных фраз.
 Отслеживание включается/выключается автоматически по настроенным фразам-триггерам от ботов, а его длительность настраивается в конфиге.
@@ -101,6 +109,10 @@ class AutoJoinGameMod(loader.Module):
 <b>Настройка:</b> <code>player_to_lynch_user_id</code> - ID пользователя, чье сообщение будет использоваться как ник игрока для линчевания. Если <code>0</code>, то функция отключена.
 <b>Настройка:</b> <code>lynch_voting_bot_id</code> - ID бота, который отправляет сообщение с кнопками для голосования за конкретного игрока. Если <code>0</code>, то функция отключена.
 <b>Настройка:</b> <code>lynch_player_voting_trigger_phrases</code> - список фраз, которые модуль будет искать в сообщениях от <code>lynch_voting_bot_id</code> для активации голосования за конкретного игрока. По умолчанию: <code>[\"Пришло время искать виноватых!\", \"Кого ты хочешь повесить?\", \"Пришло время определить и наказать виновных\", \"Пришло время искать виноватых! Кого ты хочешь линчевать?\"]</code>.
+<b>Новая настройка:</b> <code>night_phase_trigger_phrases</code> - Список фраз, которые указывают на начало ночного хода. По умолчанию: <code>[\"Наступила ночь\", \"Ночь.\"]</code>.
+<b>Новая настройка:</b> <code>night_action_user_id</code> - ID пользователя, чье сообщение будет использоваться для команды ночного хода (например, "сходи PlayerName"). Если <code>0</code>, то функция отключена.
+<b>Новая настройка:</b> <code>night_action_command_prefix</code> - Префикс команды ночного хода (например, "сходи"). Регистр не учитывается. По умолчанию: <code>\"сходи\"</code>.
+<b>Новая настройка:</b> <code>night_action_bot_ids</code> - Список ID ботов, от которых ожидаются кнопки для ночного хода. Если <code>0</code>, будет использовать <code>bot_ids</code>. Если список пуст, сообщения будут отслеживаться от любого бота. По умолчанию: <code>[]</code>.
 <b>Настройка:</b> <code>role_forward_chat_id</code> - ID чата, куда будет пересылаться полученная роль в мафии. Если <code>0</code>, функция отключена.
 <b>Настройка:</b> <code>role_trigger_phrases</code> - список фраз, которые модуль будет искать в сообщениях от бота в ЛС для определения роли. По умолчанию: <code>[\"Ваша роль:\", \"Ты - \", \"Твоя роль:\", \"Ты стал(а) \"]</code>.
 <b>Настройка:</b> <code>role_tracking_enabled</code> - Включено ли отслеживание ролей. По умолчанию: <code>False</code>.
@@ -151,18 +163,30 @@ Mafia Combat Premium <code>1634167847</code>""",
         "player_lynch_button_not_found": "⚠️ AutoJoinGame: Запрос на голосование за игрока найден, но кнопка с ником <code>{nickname}</code> не найдена.",
         "player_lynch_success": "🎉 AutoJoinGame: Успешно нажата кнопка с ником <code>{nickname}</code>. Ник сброшен.",
         "player_lynch_error": "❌ AutoJoinGame: Ошибка при нажатии кнопки с ником <code>{nickname}</code>: {error}",
+        "night_phase_activated": "<emoji document_id=5776375003280838798>🌙</emoji> Ночной ход активирован.",
+        "night_phase_deactivated": "<emoji document_id=5944122171441618396>☀️</emoji> Ночной ход деактивирован.",
+        "night_action_target_set": "<emoji document_id=5839380580080293813>🎯</emoji> Цель для ночного хода установлена: <code>{nickname}</code>. Ожидаю кнопки.",
+        "night_action_triggered": "<emoji document_id=5935968647901089910>⚔️</emoji> Обнаружен запрос на ночное действие. Ищу кнопку с ником <code>{nickname}</code>.",
+        "night_action_button_found": "✅ AutoJoinGame: Найдена кнопка с ником <code>{nickname}</code> для ночного хода. Нажимаю.",
+        "night_action_button_not_found": "⚠️ AutoJoinGame: Запрос на ночное действие найден, но кнопка с ником <code>{nickname}</code> не найдена.",
+        "night_action_success": "🎉 AutoJoinGame: Успешно нажата кнопка с ником <code>{nickname}</code> для ночного хода. Цель сброшена.",
+        "night_action_error": "❌ AutoJoinGame: Ошибка при нажатии кнопки с ником <code>{nickname}</code> для ночного хода: {error}",
         "ajgtest_player_nickname_would_be_set": "🔔 Сообщение ID <code>{msg_id}</code> от <code>{sender_id}</code> *установило бы* ник: <code>{nickname}</code>.",
         "ajgtest_player_nickname_not_set_yet": "ℹ️ Ник игрока для голосования не установлен в конфиге или не найден в последних 500 сообщениях.",
         "ajgtest_player_nickname_used": "ℹ️ Для последующих тестов используется ник: <code>{nickname}</code>.",
         "ajgtest_player_lynch_disabled": "ℹ️ ID пользователя для линчевания игрока не установлен в конфиге. Эта часть теста неактивна.",
-        "ajgtest_no_matches": "❌ Сообщения с набором, запросом на линчевание или голосование за игрока от настроенных ботов/пользователя не найдено в текущем чате ID <code>{chat_id}</code>\n📊 Проверено сообщений: {count}",
+        "ajgtest_night_action_target_would_be_set": "🔔 Сообщение ID <code>{msg_id}</code> от <code>{sender_id}</code> *установило бы* цель ночного хода: <code>{nickname}</code>.",
+        "ajgtest_night_action_target_not_set_yet": "ℹ️ Цель для ночного хода не установлена в конфиге или не найдена в последних 500 сообщениях.",
+        "ajgtest_night_action_target_used": "ℹ️ Для последующих тестов используется цель ночного хода: <code>{nickname}</code>.",
+        "ajgtest_night_action_disabled": "ℹ️ ID пользователя для команд ночного хода не установлен в конфиге. Эта часть теста неактивна.",
+        "ajgtest_no_matches": "❌ Сообщения с набором, запросом на линчевание, голосование за игрока или ночное действие от настроенных ботов/пользователя не найдено в текущем чате ID <code>{chat_id}</code>\n📊 Проверено сообщений: {count}",
         "ajgtest_error": "❌ Ошибка: <code>{error}</code>",
         "role_forward_chat_id_display": "Отключено (0)",
         "role_forward_trigger_phrases_display": "(пусто)",
         "role_forward_success": "🎉 AutoJoinGame: Роль успешно переслана в чат <code>{chat_id}</code>.",
         "role_forward_error": "❌ AutoJoinGame: Ошибка при пересылке роли в чат <code>{chat_id}</code>: {error}",
-        "role_tracking_started": "✅ Отслеживание ролей включено на {duration} секунд.", # Kept for internal logging, not used for chat messages
-        "role_tracking_started_with_send": "✅ Отслеживание ролей включено на {duration} секунд. Список будет отправлен в чат <code>{chat_id}</code> через {delay} секунд.", # Kept for internal logging, not used for chat messages
+        "role_tracking_started": "✅ Отслеживание ролей включено на {duration} секунд.",
+        "role_tracking_started_with_send": "✅ Отслеживание ролей включено на {duration} секунд. Список будет отправлен в чат <code>{chat_id}</code> через {delay} секунд.",
         "role_tracking_stopped": "❌ Отслеживание ролей выключено.",
         "role_tracking_already_active": "⚠️ Отслеживание ролей уже активно. Чтобы начать заново, сначала выключите его.",
         "role_tracking_inactive": "⚠️ Отслеживание ролей неактивно.",
@@ -175,6 +199,8 @@ Mafia Combat Premium <code>1634167847</code>""",
         "role_tracking_expired": "⚠️ Время отслеживания ролей истекло. Отслеживание остановлено.",
         "role_tracking_status_active": "🟢 Активно",
         "role_tracking_status_inactive": "🔴 Неактивно",
+        "night_phase_status_active": "🟢 Активен",
+        "night_phase_status_inactive": "🔴 Неактивен",
         "time_remaining_format": "{minutes}м {seconds}с",
         "no_time_remaining": "N/A",
         "tracked_roles_send_success": "🎉 AutoJoinGame: Список отслеживаемых ролей успешно отправлен в чат <code>{chat_id}</code>.",
@@ -183,8 +209,8 @@ Mafia Combat Premium <code>1634167847</code>""",
         "send_tracked_roles_delay_display": "Отключено (0)",
         "auto_track_roles_trigger_phrases_display": "(пусто)",
         "auto_track_roles_bot_ids_display": "Не указаны (любой бот)",
-        "auto_role_tracking_activated": "<emoji document_id=5776375003280838798>✅</emoji> Автоматическое отслеживание ролей включено на {duration} секунд.", # Kept for internal logging, not used for chat messages
-        "auto_role_tracking_activated_with_send": "<emoji document_id=5776375003280838798>✅</emoji> Автоматическое отслеживание ролей включено на {duration} секунд. Список будет отправлен в чат <code>{chat_id}</code> через {delay} секунд.", # Kept for internal logging, not used for chat messages
+        "auto_role_tracking_activated": "<emoji document_id=5776375003280838798>✅</emoji> Автоматическое отслеживание ролей включено на {duration} секунд.",
+        "auto_role_tracking_activated_with_send": "<emoji document_id=5776375003280838798>✅</emoji> Автоматическое отслеживание ролей включено на {duration} секунд. Список будет отправлен в чат <code>{chat_id}</code> через {delay} секунд.",
         "auto_disable_track_roles_trigger_phrases_display": "(пусто)",
         "auto_disable_track_roles_bot_ids_display": "Не указаны (любой бот)",
         "auto_role_tracking_deactivated": "<emoji document_id=5944122171441618396>❌</emoji> Автоматическое отслеживание ролей выключено.",
@@ -270,6 +296,31 @@ Mafia Combat Premium <code>1634167847</code>""",
                 lambda: "Список фраз, которые модуль будет искать в сообщениях от lynch_voting_bot_id для активации голосования за конкретного игрока.",
                 validator=loader.validators.Series(loader.validators.String())
             ),
+            # Новые настройки для ночного хода
+            loader.ConfigValue(
+                "night_phase_trigger_phrases",
+                ["Наступила ночь", "Ночь."],
+                lambda: "Список фраз, которые указывают на начало ночного хода.",
+                validator=loader.validators.Series(loader.validators.String())
+            ),
+            loader.ConfigValue(
+                "night_action_user_id",
+                0,
+                lambda: "ID пользователя, чье сообщение будет использоваться для команды ночного хода (например, 'сходи PlayerName'). Если 0, то функция отключена.",
+                validator=loader.validators.Integer(minimum=0)
+            ),
+            loader.ConfigValue(
+                "night_action_command_prefix",
+                "сходи",
+                lambda: "Префикс команды ночного хода (например, 'сходи'). Регистр не учитывается.",
+                validator=loader.validators.String()
+            ),
+            loader.ConfigValue(
+                "night_action_bot_ids",
+                [],
+                lambda: "Список ID ботов, от которых ожидаются кнопки для ночного хода. Если 0, будет использовать bot_ids. Если список пуст, сообщения будут отслеживаться от любого бота.",
+                validator=loader.validators.Series(loader.validators.Integer())
+            ),
             loader.ConfigValue(
                 "role_forward_chat_id",
                 0,
@@ -344,7 +395,7 @@ Mafia Combat Premium <code>1634167847</code>""",
             ),
         )
 
-        self._player_nickname_to_lynch = None 
+        self._player_to_lynch_target_nickname = None  # Переименовано для ясности
         self._role_tracking_active = False
         self._role_tracking_start_time = None
         self._tracked_roles_list = [] # Stores (user_id, nickname, clean_role_text, is_active_status)
@@ -352,6 +403,10 @@ Mafia Combat Premium <code>1634167847</code>""",
         self._processed_messages = set() 
         self._processed_messages_cleanup_task = None 
         self._send_tracked_roles_task = None # Task for sending tracked roles list
+
+        # Новые переменные состояния для ночного хода
+        self._night_phase_active = False
+        self._night_action_target_nickname = None
 
     async def client_ready(self, client, _):
         self._client = client
@@ -444,7 +499,9 @@ Mafia Combat Premium <code>1634167847</code>""",
         """Выключить автовход в игру и автолинчевание"""
         self.config["enabled"] = False
         self.config["role_tracking_enabled"] = False # Explicitly disable role tracking in config
-        self._player_nickname_to_lynch = None 
+        self._player_to_lynch_target_nickname = None 
+        self._night_action_target_nickname = None # Сброс цели ночного хода
+        self._night_phase_active = False # Сброс ночного хода
         self._role_tracking_active = False 
         self._role_tracking_start_time = None
         self._tracked_roles_list = [] # Clear tracked roles on disable
@@ -515,7 +572,15 @@ Mafia Combat Premium <code>1634167847</code>""",
         player_to_lynch_user_id_display = str(self.config["player_to_lynch_user_id"]) if self.config["player_to_lynch_user_id"] else "Отключено (0)"
         lynch_voting_bot_id_display = str(self.config["lynch_voting_bot_id"]) if self.config["lynch_voting_bot_id"] else "Отключено (0)"
         lynch_player_voting_trigger_phrases_display = ", ".join(self.config["lynch_player_voting_trigger_phrases"]) if self.config["lynch_player_voting_trigger_phrases"] else "(пусто)"
-        current_player_nickname_display = self._player_nickname_to_lynch if self._player_nickname_to_lynch else "(нет)"
+        current_player_nickname_display = self._player_to_lynch_target_nickname if self._player_to_lynch_target_nickname else "(нет)"
+
+        # Новые статусы для ночного хода
+        night_phase_status = self.strings("night_phase_status_active") if self._night_phase_active else self.strings("night_phase_status_inactive")
+        night_phase_trigger_phrases_display = ", ".join(self.config["night_phase_trigger_phrases"]) if self.config["night_phase_trigger_phrases"] else "(пусто)"
+        night_action_user_id_display = str(self.config["night_action_user_id"]) if self.config["night_action_user_id"] else "Отключено (0)"
+        night_action_command_prefix_display = self.config["night_action_command_prefix"] if self.config["night_action_command_prefix"] else "(пусто)"
+        night_action_bot_ids_display = ", ".join(map(str, self.config["night_action_bot_ids"])) if self.config["night_action_bot_ids"] else "Не указаны (любой бот)"
+        current_night_action_target_nickname_display = self._night_action_target_nickname if self._night_action_target_nickname else "(нет)"
 
         role_forward_chat_id_display = str(self.config["role_forward_chat_id"]) if self.config["role_forward_chat_id"] else self.strings("role_forward_chat_id_display")
         role_trigger_phrases_display = ", ".join(self.config["role_trigger_phrases"]) if self.config["role_trigger_phrases"] else self.strings("role_forward_trigger_phrases_display")
@@ -561,6 +626,14 @@ Mafia Combat Premium <code>1634167847</code>""",
             lynch_voting_bot_id_display,
             lynch_player_voting_trigger_phrases_display,
             current_player_nickname_display,
+            # Night phase status
+            night_phase_status,
+            night_phase_trigger_phrases_display,
+            night_action_user_id_display,
+            night_action_command_prefix_display,
+            night_action_bot_ids_display,
+            current_night_action_target_nickname_display,
+            # End night phase status
             role_forward_chat_id_display,
             role_trigger_phrases_display,
             role_tracking_status,
@@ -596,8 +669,9 @@ Mafia Combat Premium <code>1634167847</code>""",
         game_join_phrases_for_test = self.config["game_join_trigger_phrases"]
         lynch_phrases_for_test = self.config["lynch_trigger_phrases"] + self.config["lynch_hang_trigger_phrases"]
         player_lynch_phrases_for_test = self.config["lynch_player_voting_trigger_phrases"]
-        
-        all_trigger_phrases_for_test = game_join_phrases_for_test + lynch_phrases_for_test + player_lynch_phrases_for_test
+        night_phase_phrases_for_test = self.config["night_phase_trigger_phrases"] # Для определения начала ночи
+
+        all_trigger_phrases_for_test = game_join_phrases_for_test + lynch_phrases_for_test + player_lynch_phrases_for_test + night_phase_phrases_for_test
 
         trigger_phrases_str = ", ".join(all_trigger_phrases_for_test) if all_trigger_phrases_for_test else "Не указаны"
 
@@ -608,7 +682,9 @@ Mafia Combat Premium <code>1634167847</code>""",
             count = 0
             
             temp_player_nickname_for_test = None 
-            
+            temp_night_action_target_for_test = None
+
+            # Поиск ника игрока для линчевания
             if self.config["player_to_lynch_user_id"] != 0:
                 async for msg_check_nickname in self._client.iter_messages(current_chat_id, limit=500):
                     sender_check_nickname = await msg_check_nickname.get_sender()
@@ -632,6 +708,32 @@ Mafia Combat Premium <code>1634167847</code>""",
             else:
                 results.append(self.strings("ajgtest_player_lynch_disabled"))
 
+            # Поиск цели для ночного хода
+            if self.config["night_action_user_id"] != 0 and self.config["night_action_command_prefix"]:
+                night_command_prefix_lower = self.config["night_action_command_prefix"].lower()
+                async for msg_check_night_action in self._client.iter_messages(current_chat_id, limit=500):
+                    sender_check_night_action = await msg_check_night_action.get_sender()
+                    sender_id_check_night_action = getattr(sender_check_night_action, 'id', None)
+                    if (sender_id_check_night_action == self.config["night_action_user_id"] and 
+                            getattr(msg_check_night_action, 'text', None) and 
+                            msg_check_night_action.text.lower().startswith(night_command_prefix_lower)):
+                        target_raw = msg_check_night_action.text[len(self.config["night_action_command_prefix"]):].strip()
+                        if target_raw:
+                            temp_night_action_target_for_test = target_raw
+                            results.append(self.strings("ajgtest_night_action_target_would_be_set").format(
+                                msg_id=msg_check_night_action.id,
+                                sender_id=sender_id_check_night_action,
+                                nickname=temp_night_action_target_for_test
+                            ))
+                            break
+                if temp_night_action_target_for_test:
+                    results.append(self.strings("ajgtest_night_action_target_used").format(nickname=temp_night_action_target_for_test))
+                else:
+                    results.append(self.strings("ajgtest_night_action_target_not_set_yet"))
+            else:
+                results.append(self.strings("ajgtest_night_action_disabled"))
+
+            # --- Основной цикл поиска сообщений ---
             async for msg in self._client.iter_messages(current_chat_id, limit=500):
                 count += 1
 
@@ -647,7 +749,12 @@ Mafia Combat Premium <code>1634167847</code>""",
 
                 is_player_voting_bot_message = getattr(sender, 'bot', False) and sender_id == self.config["lynch_voting_bot_id"]
 
-                if not is_general_bot_message and not is_player_voting_bot_message:
+                is_night_action_bot_message = getattr(sender, 'bot', False) and (
+                    (self.config["night_action_bot_ids"] and sender_id in self.config["night_action_bot_ids"]) or
+                    (not self.config["night_action_bot_ids"] and is_general_bot_message)
+                )
+
+                if not is_general_bot_message and not is_player_voting_bot_message and not is_night_action_bot_message:
                     continue
                 
                 msg_text_lower = msg.text.lower() 
@@ -655,11 +762,15 @@ Mafia Combat Premium <code>1634167847</code>""",
                 is_game_join_test_message = any(phrase.lower() in msg_text_lower for phrase in game_join_phrases_for_test)
                 is_general_lynch_test_message = any(phrase.lower() in msg_text_lower for phrase in lynch_phrases_for_test)
                 is_player_voting_test_message = any(phrase.lower() in msg_text_lower for phrase in player_lynch_phrases_for_test)
+                is_night_phase_trigger_test_message = any(phrase.lower() in msg_text_lower for phrase in night_phase_phrases_for_test) # Добавлено
 
-                if is_game_join_test_message or is_general_lynch_test_message or is_player_voting_test_message:
+                if is_game_join_test_message or is_general_lynch_test_message or is_player_voting_test_message or is_night_phase_trigger_test_message:
                     info_msg = f"✅ Найдено сообщение ID <code>{msg.id}</code> от <code>{sender_id if sender_id is not None else 'Неизвестно'}</code>:\n"
                     text_preview = msg.text[:100] + "..." if len(msg.text) > 100 else msg.text
                     info_msg += f"💬 Текст: <code>{text_preview}</code>\n"
+
+                    if is_night_phase_trigger_test_message:
+                        info_msg += "  <emoji document_id=5776375003280838798>🌙</emoji> (Режим ночного хода: *был бы* активирован)\n"
 
                     if getattr(msg, 'buttons', None):
                         info_msg += "🔘 Есть кнопки: Да\n"
@@ -675,7 +786,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                                 for row_idx, row in enumerate(msg.buttons):
                                     for btn_idx, btn in enumerate(row):
                                         btn_text = str(getattr(btn, 'text', f'Кнопка {btn_idx}'))
-                                        if temp_player_nickname_for_test.lower() in btn_text.lower(): # MODIFIED LINE
+                                        if temp_player_nickname_for_test.lower() in btn_text.lower():
                                             info_msg += f"  • <code>{btn_text}</code> (✅ ПОДХОДИТ! Действие: *была бы* нажата кнопка с ником <code>{temp_player_nickname_for_test}</code>)\n"
                                             button_matched_in_test = True
                                         else:
@@ -684,7 +795,20 @@ Mafia Combat Premium <code>1634167847</code>""",
                                     info_msg += f"\n⚠️ Кнопка с ником <code>{temp_player_nickname_for_test}</code> не найдена.\n"
                             else:
                                 info_msg += self.strings("ajgtest_player_nickname_not_set_yet") + "\n"
-
+                        
+                        elif is_night_action_bot_message and temp_night_action_target_for_test: # Новый блок для ночного хода
+                            info_msg += f"  <emoji document_id=5935968647901089910>⚔️</emoji> (Режим ночного действия: ищу ник <code>{temp_night_action_target_for_test}</code>)\n"
+                            for row_idx, row in enumerate(msg.buttons):
+                                for btn_idx, btn in enumerate(row):
+                                    btn_text = str(getattr(btn, 'text', f'Кнопка {btn_idx}'))
+                                    if temp_night_action_target_for_test.lower() in btn_text.lower():
+                                        info_msg += f"  • <code>{btn_text}</code> (✅ ПОДХОДИТ! Действие: *была бы* нажата кнопка с ником <code>{temp_night_action_target_for_test}</code>)\n"
+                                        button_matched_in_test = True
+                                    else:
+                                        info_msg += f"  • <code>{btn_text}</code>\n"
+                            if not button_matched_in_test:
+                                info_msg += f"\n⚠️ Кнопка с ником <code>{temp_night_action_target_for_test}</code> не найдена для ночного действия.\n"
+                        
                         elif is_general_lynch_test_message:
                             lynch_marker = self.config["lynch_target_marker"]
                             target_emoji = "👎" if lynch_marker and lynch_marker in msg.text else "👍"
@@ -775,7 +899,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
     @loader.watcher(incoming=True, outgoing=False)
     async def watcher(self, message: Message):
-        """Обработчик всех входящих сообщений для автовхода в игру, автолинчевания, пересылки роли и отслеживания ролей."""
+        """Обработчик всех входящих сообщений для автовхода в игру, автолинчевания, пересылки роли, отслеживания ролей и ночного хода."""
         try:
             if not self.config["enabled"]:
                 logger.debug("AutoJoinGame: Модуль выключен. Пропускаю сообщение.")
@@ -822,6 +946,8 @@ Mafia Combat Premium <code>1634167847</code>""",
                     self._role_tracking_active = True
                     self._role_tracking_start_time = datetime.now()
                     self._tracked_roles_list = [] # Очищаем предыдущие отслеживаемые роли
+                    self._night_phase_active = False # Сброс ночного хода при новом цикле игры
+                    self._night_action_target_nickname = None
 
                     send_chat_id = self.config["send_tracked_roles_chat_id"]
                     send_delay = self.config["send_tracked_roles_delay"]
@@ -842,13 +968,13 @@ Mafia Combat Premium <code>1634167847</code>""",
                         logger.info(self.strings("auto_role_tracking_activated").format(
                             duration=self.config["role_tracking_duration"]
                         ))
-                    return # Останавливаем дальнейшую обработку, чтобы избежать конфликтов состояния
+                    return 
 
             # --- Автоматическое выключение отслеживания ролей ---
             auto_disable_phrases = self.config["auto_disable_track_roles_trigger_phrases"]
             auto_disable_bot_ids = self.config["auto_disable_track_roles_bot_ids"]
 
-            if auto_disable_phrases and self.config["role_tracking_enabled"]: # Только если отслеживание ролей в данный момент включено
+            if auto_disable_phrases and self.config["role_tracking_enabled"]:
                 is_auto_disable_trigger_bot = (
                     getattr(sender, 'bot', False) and
                     (not auto_disable_bot_ids or sender_id in auto_disable_bot_ids)
@@ -860,32 +986,34 @@ Mafia Combat Premium <code>1634167847</code>""",
                     self._role_tracking_active = False
                     self._role_tracking_start_time = None
                     self._tracked_roles_list = [] # Очищаем отслеживаемые роли при выключении
+                    self._night_phase_active = False # Сброс ночного хода при окончании игры
+                    self._night_action_target_nickname = None
                     if self._send_tracked_roles_task:
                         self._send_tracked_roles_task.cancel()
                         self._send_tracked_roles_task = None
                     
                     logger.info("AutoJoinGame: Автоматическое отслеживание ролей выключено.")
                     await self._client.send_message(message.chat_id, self.strings("auto_role_tracking_deactivated"))
-                    return # Останавливаем дальнейшую обработку, так как состояние отслеживания изменилось
+                    return
             
             # --- Логика отслеживания ролей ---
             if self.config["role_tracking_enabled"] and self._role_tracking_active:
                 if self._role_tracking_start_time and (datetime.now() - self._role_tracking_start_time).total_seconds() > self.config["role_tracking_duration"]:
                     logger.info(self.strings("role_tracking_expired"))
-                    self.config["role_tracking_enabled"] = False # Update config to reflect expiration
+                    self.config["role_tracking_enabled"] = False
                     self._role_tracking_active = False
                     self._role_tracking_start_time = None
-                    if self._send_tracked_roles_task: # <--- Исправлено: отмена задачи при истечении времени
+                    if self._send_tracked_roles_task:
                         self._send_tracked_roles_task.cancel()
                         self._send_tracked_roles_task = None
-                else: # Role tracking is active and not expired. Process role announcements from any sender.
+                else: 
                     role_announcement_phrases_lower = [p.lower() for p in self.config["role_announcement_phrases"]]
                     
                     is_role_announcement = any(phrase in msg_text_lower for phrase in role_announcement_phrases_lower)
                     
                     if is_role_announcement:
                         found_tracked_role_clean = None
-                        is_role_active = True # Default to active
+                        is_role_active = True
 
                         for tracked_role_phrase_raw in self.config["tracked_roles_to_monitor"]:
                             role_to_match_lower = tracked_role_phrase_raw.lower()
@@ -893,11 +1021,8 @@ Mafia Combat Premium <code>1634167847</code>""",
 
                             if role_to_match_lower.endswith("(н)"):
                                 current_is_active = False
-                                role_to_match_lower = role_to_match_lower[:-3].strip() # Remove "(н)" and strip whitespace
+                                role_to_match_lower = role_to_match_lower[:-3].strip()
                             
-                            # NEW: Construct a more robust regex pattern for whole-word/phrase matching
-                            # Split by whitespace, escape each word, then join with \s+ for flexible whitespace matching
-                            # And wrap the whole pattern with \b for word boundaries.
                             parts = role_to_match_lower.split()
                             escaped_parts = [re.escape(p) for p in parts]
                             internal_pattern = r"\s+".join(escaped_parts)
@@ -910,22 +1035,38 @@ Mafia Combat Premium <code>1634167847</code>""",
                         
                         if found_tracked_role_clean:
                             nickname = self._get_user_nickname(sender)
-                            # Add to tracked list only if not already present for this sender_id AND this specific role
                             if not any(entry[0] == sender_id and entry[2] == found_tracked_role_clean for entry in self._tracked_roles_list): 
                                 self._tracked_roles_list.append((sender_id, nickname, found_tracked_role_clean, is_role_active)) 
                                 status_text = "Активная" if is_role_active else "Неактивная"
                                 logger.info(self.strings("role_tracked_success_with_status").format(nickname=nickname, role=found_tracked_role_clean, status=status_text))
             
-            # --- Обработка сообщения, устанавливающего ник игрока ---
+            # --- Обработка сообщения, устанавливающего ник игрока для линчевания ---
             player_to_lynch_user_id = self.config["player_to_lynch_user_id"]
             if player_to_lynch_user_id != 0 and sender_id == player_to_lynch_user_id:
                 nickname = message.text.strip()
                 if nickname.startswith('!'):
                     nickname = nickname[1:].strip() 
                 
-                self._player_nickname_to_lynch = nickname
-                logger.info(self.strings("player_nickname_set").format(nickname=self._player_nickname_to_lynch))
+                self._player_to_lynch_target_nickname = nickname
+                logger.info(self.strings("player_nickname_set").format(nickname=self._player_to_lynch_target_nickname))
                 return 
+
+            # --- Обработка команды для ночного хода от пользователя ---
+            night_action_user_id = self.config["night_action_user_id"]
+            night_action_command_prefix = self.config["night_action_command_prefix"]
+            if (self._night_phase_active and 
+                night_action_user_id != 0 and 
+                sender_id == night_action_user_id and 
+                night_action_command_prefix and 
+                msg_text_lower.startswith(night_action_command_prefix.lower())):
+                
+                target_nickname_raw = msg_text[len(night_action_command_prefix):].strip()
+                if target_nickname_raw:
+                    self._night_action_target_nickname = target_nickname_raw
+                    logger.info(self.strings("night_action_target_set").format(nickname=self._night_action_target_nickname))
+                else:
+                    logger.warning(f"AutoJoinGame: Команда ночного хода от {sender_id} обнаружена, но ник цели не указан. Сообщение: '{msg_text}'")
+                return # Возвращаем, так как это команда пользователя, а не бота
 
             # --- Обработка пересылки роли ---
             role_forward_chat_id = self.config["role_forward_chat_id"]
@@ -946,29 +1087,96 @@ Mafia Combat Premium <code>1634167847</code>""",
                     logger.error(self.strings("role_forward_error").format(chat_id=role_forward_chat_id, error=e))
                 return 
 
+            # --- Определение типа бота для дальнейшей обработки ---
             is_general_game_bot = getattr(sender, 'bot', False) and (
                 not self.config["bot_ids"] or sender_id in self.config["bot_ids"]
             )
             is_lynch_player_voting_bot = getattr(sender, 'bot', False) and sender_id == self.config["lynch_voting_bot_id"]
+            is_night_action_target_bot = getattr(sender, 'bot', False) and (
+                (self.config["night_action_bot_ids"] and sender_id in self.config["night_action_bot_ids"]) or
+                (not self.config["night_action_bot_ids"] and is_general_game_bot)
+            )
 
-            if not is_general_game_bot and not is_lynch_player_voting_bot:
-                logger.debug(f"AutoJoinGame: Сообщение {message.id} от бота {sender_id}, но его ID не в списке разрешенных ботов для общих триггеров и не является ботом для голосования за игрока. Пропускаю.")
+            if not is_general_game_bot and not is_lynch_player_voting_bot and not is_night_action_target_bot:
+                logger.debug(f"AutoJoinGame: Сообщение {message.id} от бота {sender_id}, но его ID не в списке разрешенных ботов для общих триггеров, голосования или ночного действия. Пропускаю.")
                 return
             
+            # --- Сброс состояния ночного хода при начале дня/игры/линчевания ---
+            is_game_join_trigger = any(phrase.lower() in msg_text_lower for phrase in self.config["game_join_trigger_phrases"])
+            is_lynch_trigger = any(phrase.lower() in msg_text_lower for phrase in self.config["lynch_trigger_phrases"] + self.config["lynch_hang_trigger_phrases"])
+            if self._night_phase_active and (is_game_join_trigger or is_lynch_trigger):
+                self._night_phase_active = False
+                self._night_action_target_nickname = None
+                logger.info(self.strings("night_phase_deactivated"))
+            
+            # --- Активация ночного хода ---
+            if (is_general_game_bot and 
+                any(phrase.lower() in msg_text_lower for phrase in self.config["night_phase_trigger_phrases"])):
+                if not self._night_phase_active:
+                    self._night_phase_active = True
+                    self._night_action_target_nickname = None # Сброс старой цели при начале новой ночи
+                    logger.info(self.strings("night_phase_activated"))
+                # Не возвращаем, чтобы сообщение могло быть обработано далее, если оно содержит кнопки сразу
+
+            # --- Выполнение ночного действия (нажатие кнопки) ---
+            if (self._night_phase_active and 
+                self._night_action_target_nickname and 
+                is_night_action_target_bot and 
+                getattr(message, 'buttons', None)):
+                
+                lynch_delays = self.config["lynch_delay"] # Используем задержку линчевания для ночного хода
+                chosen_lynch_delay = random.choice(lynch_delays)
+
+                logger.info(self.strings("night_action_triggered").format(nickname=self._night_action_target_nickname))
+                logger.info(f"⏳ AutoJoinGame: Ожидание {chosen_lynch_delay} секунд перед нажатием кнопки для ночного действия сообщения {message.id}...")
+                await asyncio.sleep(chosen_lynch_delay)
+
+                night_button_found = False
+                for row in message.buttons:
+                    for button in row:
+                        try:
+                            button_text = str(getattr(button, 'text', ''))
+                        except Exception as e:
+                            logger.warning(f"Error getting button text for night action message {message.id}: {e}")
+                            button_text = ''
+
+                        if self._night_action_target_nickname.lower() in button_text.lower():
+                            logger.info(self.strings("night_action_button_found").format(nickname=self._night_action_target_nickname))
+                            try:
+                                await button.click()
+                                logger.info(self.strings("night_action_success").format(nickname=self._night_action_target_nickname))
+                                night_button_found = True
+                                self._night_action_target_nickname = None # Сброс цели после успешного действия
+                                break 
+                            except Exception as e:
+                                logger.error(self.strings("night_action_error").format(nickname=self._night_action_target_nickname, error=e))
+                                self._night_action_target_nickname = None 
+                    if night_button_found:
+                        break 
+                
+                if not night_button_found:
+                    logger.warning(self.strings("night_action_button_not_found").format(nickname=self._night_action_target_nickname))
+                    # Ник не сбрасываем, возможно, кнопка появится в следующем сообщении, или цель будет изменена.
+                    # Хотя для предотвращения случайных нажатий, лучше сбросить.
+                    self._night_action_target_nickname = None 
+
+                return # Возвращаем после попытки ночного действия
+
+            # --- Выполнение линчевания конкретного игрока ---
             if (is_lynch_player_voting_bot and 
                 self.config["lynch_voting_bot_id"] != 0 and 
-                self._player_nickname_to_lynch and 
+                self._player_to_lynch_target_nickname and 
                 any(phrase.lower() in msg_text_lower for phrase in self.config["lynch_player_voting_trigger_phrases"])):
                 
                 if not getattr(message, 'buttons', None):
                     logger.warning(f"⚠️ AutoJoinGame: Запрос на голосование за игрока найден (msg_id: {message.id}), но кнопок нет. Пропускаю.")
-                    self._player_nickname_to_lynch = None 
+                    self._player_to_lynch_target_nickname = None 
                     return
 
                 lynch_delays = self.config["lynch_delay"]
                 chosen_lynch_delay = random.choice(lynch_delays)
 
-                logger.info(self.strings("player_lynch_triggered").format(nickname=self._player_nickname_to_lynch))
+                logger.info(self.strings("player_lynch_triggered").format(nickname=self._player_to_lynch_target_nickname))
                 logger.info(f"⏳ AutoJoinGame: Ожидание {chosen_lynch_delay} секунд перед нажатием кнопки для голосования за игрока сообщения {message.id}...")
                 await asyncio.sleep(chosen_lynch_delay)
 
@@ -981,26 +1189,27 @@ Mafia Combat Premium <code>1634167847</code>""",
                             logger.warning(f"Error getting button text for player lynch message {message.id}: {e}")
                             button_text = ''
 
-                        # MODIFIED: Check if the nickname is a substring of the button text (case-insensitive)
-                        if self._player_nickname_to_lynch.lower() in button_text.lower():
-                            logger.info(self.strings("player_lynch_button_found").format(nickname=self._player_nickname_to_lynch))
+                        if self._player_to_lynch_target_nickname.lower() in button_text.lower():
+                            logger.info(self.strings("player_lynch_button_found").format(nickname=self._player_to_lynch_target_nickname))
                             try:
                                 await button.click()
-                                logger.info(self.strings("player_lynch_success").format(nickname=self._player_nickname_to_lynch))
+                                logger.info(self.strings("player_lynch_success").format(nickname=self._player_to_lynch_target_nickname))
                                 player_lynch_button_found = True
+                                self._player_to_lynch_target_nickname = None 
                                 break 
                             except Exception as e:
-                                logger.error(self.strings("player_lynch_error").format(nickname=self._player_nickname_to_lynch, error=e))
-                                self._player_nickname_to_lynch = None 
+                                logger.error(self.strings("player_lynch_error").format(nickname=self._player_to_lynch_target_nickname, error=e))
+                                self._player_to_lynch_target_nickname = None 
                     if player_lynch_button_found:
                         break 
                 
                 if not player_lynch_button_found:
-                    logger.warning(self.strings("player_lynch_button_not_found").format(nickname=self._player_nickname_to_lynch))
-                    self._player_nickname_to_lynch = None 
+                    logger.warning(self.strings("player_lynch_button_not_found").format(nickname=self._player_to_lynch_target_nickname))
+                    self._player_to_lynch_target_nickname = None 
 
                 return 
 
+            # --- Общее линчевание/повешение ---
             if is_general_game_bot:
                 is_game_join = any(phrase.lower() in msg_text_lower for phrase in self.config["game_join_trigger_phrases"])
                 all_lynch_trigger_phrases = self.config["lynch_trigger_phrases"] + self.config["lynch_hang_trigger_phrases"]
