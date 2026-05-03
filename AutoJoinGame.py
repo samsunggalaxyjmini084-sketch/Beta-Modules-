@@ -2,7 +2,7 @@
 # meta name: AutoJoinGame
 # meta version: 2.4.0
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
-# 010000010101010001001111010010100100100101001110001000000100011101000001
+# 0100000101010100010011110100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000101
 import logging
 import asyncio
@@ -80,6 +80,7 @@ class AutoJoinGameMod(loader.Module):
 Работает только когда включен.
 Дополнительно, если настроен <code>player_to_lynch_user_id</code>, модуль будет ожидать сообщение с ником игрока от этого пользователя. Как только ник получен, модуль будет искать сообщение о голосовании от <code>lynch_voting_bot_id</code>, содержащее <code>lynch_player_voting_trigger_phrases</code>, и затем автоматически нажмет кнопку с соответствующим ником игрока.
 <b>Важное обновление:</b> Если сообщение от <code>player_to_lynch_user_id</code> начинается с символа <code>!</code>, этот символ будет автоматически удален из ника игрока перед использованием.
+<b>Обновление 2.4.0:</b> При линчевании конкретного игрока, модуль теперь будет искать ник игрока как <b>подстроку</b> в тексте кнопки (регистронезависимо), а не только как точное совпадение. Это позволяет корректно обрабатывать кнопки, содержащие никнейм игрока вместе с дополнительными символами.
 <b>Новая функция:</b> Модуль может автоматически пересылать сообщения с вашей ролью в мафии в указанный чат. Это работает, когда бот отправляет вам роль в приватном чате, и сообщение содержит одну из настроенных фраз-триггеров.
 <b>Улучшенная функция:</b> Модуль может отслеживать сообщения пользователей, объявляющих свою роль, и сохранять их ники и <b>конкретную объявленную роль</b> в список, если эта роль соответствует одной из настроенных фраз.
 Отслеживание включается/выключается автоматически по настроенным фразам-триггерам от ботов, а его длительность настраивается в конфиге.
@@ -674,7 +675,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                                 for row_idx, row in enumerate(msg.buttons):
                                     for btn_idx, btn in enumerate(row):
                                         btn_text = str(getattr(btn, 'text', f'Кнопка {btn_idx}'))
-                                        if btn_text.lower() == temp_player_nickname_for_test.lower():
+                                        if temp_player_nickname_for_test.lower() in btn_text.lower(): # MODIFIED LINE
                                             info_msg += f"  • <code>{btn_text}</code> (✅ ПОДХОДИТ! Действие: *была бы* нажата кнопка с ником <code>{temp_player_nickname_for_test}</code>)\n"
                                             button_matched_in_test = True
                                         else:
@@ -980,7 +981,8 @@ Mafia Combat Premium <code>1634167847</code>""",
                             logger.warning(f"Error getting button text for player lynch message {message.id}: {e}")
                             button_text = ''
 
-                        if button_text.lower() == self._player_nickname_to_lynch.lower():
+                        # MODIFIED: Check if the nickname is a substring of the button text (case-insensitive)
+                        if self._player_nickname_to_lynch.lower() in button_text.lower():
                             logger.info(self.strings("player_lynch_button_found").format(nickname=self._player_nickname_to_lynch))
                             try:
                                 await button.click()
