@@ -1,11 +1,12 @@
 # meta developer: @yourhandle
 # meta name: PinChat
-# meta version: 1.0.2 # Обновлена версия модуля
+# meta version: 1.0.3 # Обновлена версия модуля
 import logging
-from telethon.tl.types import Message, User, Channel, Chat # Добавлен импорт User, Channel, Chat
+import re # Добавлен импорт для регулярных выражений, для более надежного парсинга
+from telethon.tl.types import Message, User, Channel, Chat
 from telethon.errors import PeerIdInvalidError, RPCError
 from telethon import functions
-from .. import loader, utils
+from .. import loader, utils # <- utils все еще нужно для utils.answer
 
 logger = logging.getLogger(__name__)
 
@@ -62,23 +63,26 @@ class PinChatMod(loader.Module):
     @loader.command(ru_doc="Закрепляет или открепляет чат в списке чатов. Используйте .pchat -u [ID] для открепления.")
     async def pchatcmd(self, message: Message):
         """Закрепляет или открепляет чат в списке чатов."""
-        args = utils.get_args_raw(message).split(maxsplit=1)
         
+        # Ручной парсинг аргументов вместо utils.get_args_raw
+        cmd_prefix = message.text.split(None, 1)[0] # Получаем префикс команды, например ".pchat"
+        raw_args_text = message.text[len(cmd_prefix):].strip() # Все, что после команды
+        args = re.split(r'\s+', raw_args_text, maxsplit=1) # Разбиваем по пробелам, ограничивая до 2 частей
+
         target_entity = None
         pin_action = True  # По умолчанию: закрепить
-
         chat_id_str = None
 
-        if args:
+        if args and args[0]: # Если аргументы есть и первый не пустой
             if args[0].lower() == "-u":
                 pin_action = False
-                if len(args) > 1:  # .pchat -u <ID>
+                if len(args) > 1 and args[1]: # .pchat -u <ID>
                     chat_id_str = args[1]
-                else:  # .pchat -u (текущий чат)
+                else: # .pchat -u (текущий чат)
                     target_entity = message.chat
-            else:  # .pchat <ID>
+            else: # .pchat <ID>
                 chat_id_str = args[0]
-        else:  # .pchat (текущий чат)
+        else: # .pchat (текущий чат)
             target_entity = message.chat
 
         if chat_id_str:
@@ -103,7 +107,7 @@ class PinChatMod(loader.Module):
                 return
         
         try:
-            entity_name = self._get_entity_name(target_entity) # <-- Используем новую внутреннюю функцию
+            entity_name = self._get_entity_name(target_entity)
             
             # Получаем input_peer для выполнения RPC-запроса
             input_peer = await self._client.get_input_entity(target_entity)
