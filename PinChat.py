@@ -1,11 +1,11 @@
 # meta developer: @yourhandle
 # meta name: PinChat
-# meta version: 1.0.5 # Обновлена версия модуля для обхода специфичной ошибки herokutl
+# meta version: 1.0.6 # Обновлена версия модуля для обхода ошибки herokutl.errors.TLMessageError
 import logging
 import re
 from telethon.tl.types import Message, User, Channel, Chat
-from telethon.errors import PeerIdInvalidError, RPCError, TLMessageError # Добавлен TLMessageError
-from telethon import functions # <- Импортируем общий объект functions
+from telethon.errors import PeerIdInvalidError, RPCError # TLMessageError удален
+from telethon import functions
 from .. import loader, utils # <- utils все еще нужно для utils.answer
 
 logger = logging.getLogger(__name__)
@@ -138,7 +138,6 @@ class PinChatMod(loader.Module):
                 )
                 try:
                     # Попытка 2: Используем альтернативное имя запроса (UpdatePeerPinned)
-                    # Это обходной путь для нестандартных форков, если они переименовали RPC-вызов
                     alternative_rpc_call = getattr(functions.messages, 'UpdatePeerPinned', None)
                     if alternative_rpc_call:
                         await self._client(alternative_rpc_call(peer=input_peer, pinned=pin_action))
@@ -159,14 +158,11 @@ class PinChatMod(loader.Module):
                 else:
                     await utils.answer(message, self.strings("unpin_success").format(entity_name))
             else:
-                # Этот блок должен быть достигнут только в случае, если rpc_call_successful остается False
-                # после всех попыток, но исключение не было перехвачено.
-                # Теоретически не должно быть достигнуто, так как исключения должны быть перехвачены.
                 await utils.answer(message, self.strings("error_action").format(entity_name, "Не удалось выполнить действие (неизвестная ошибка)."))
 
         except PeerIdInvalidError:
             await utils.answer(message, self.strings("invalid_chat_id").format(chat_id_str if chat_id_str else "N/A"))
-        except (RPCError, TLMessageError) as e:
+        except RPCError as e: # Теперь обрабатываем только RPCError, так как TLMessageError был удален
             logger.error(f"Ошибка RPC при закреплении/откреплении чата {entity_name} ({getattr(target_entity, 'id', 'N/A')}): {e}")
             await utils.answer(message, self.strings("error_action").format(entity_name, e))
         except Exception as e:
