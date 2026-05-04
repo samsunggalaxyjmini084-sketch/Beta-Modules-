@@ -1,10 +1,10 @@
 # meta developer: @yourhandle
 # meta name: PinChat
-# meta version: 1.0.4 # Обновлена версия модуля
+# meta version: 1.0.5 # Обновлена версия модуля для обхода специфичной ошибки herokutl
 import logging
-import re # Добавлен импорт для регулярных выражений, для более надежного парсинга
+import re
 from telethon.tl.types import Message, User, Channel, Chat
-from telethon.errors import PeerIdInvalidError, RPCError
+from telethon.errors import PeerIdInvalidError, RPCError, TLMessageError # Добавлен TLMessageError
 from telethon import functions # <- Импортируем общий объект functions
 from .. import loader, utils # <- utils все еще нужно для utils.answer
 
@@ -113,28 +113,60 @@ class PinChatMod(loader.Module):
             target_dialog_from_dialogs = next((d for d in dialogs if d.id == target_entity.id), None)
             current_pin_status = target_dialog_from_dialogs.pinned if target_dialog_from_dialogs else False
 
+            rpc_call_successful = False
+            
             if pin_action:
                 if current_pin_status:
                     await utils.answer(message, self.strings("already_pinned").format(entity_name))
                     return
-                # ИСПРАВЛЕНИЕ ЗДЕСЬ: Используем functions.messages.UpdatePeerPinnedRequest
-                await self._client(functions.messages.UpdatePeerPinnedRequest(
-                    peer=input_peer, pinned=True
-                ))
-                await utils.answer(message, self.strings("pin_success").format(entity_name))
             else:
                 if not current_pin_status:
                     await utils.answer(message, self.strings("not_pinned").format(entity_name))
                     return
-                # ИСПРАВЛЕНИЕ ЗДЕСЬ: Используем functions.messages.UpdatePeerPinnedRequest
+
+            try:
+                # Попытка 1: Используем стандартное имя запроса Telethon (UpdatePeerPinnedRequest)
                 await self._client(functions.messages.UpdatePeerPinnedRequest(
-                    peer=input_peer, pinned=False
+                    peer=input_peer, pinned=pin_action
                 ))
-                await utils.answer(message, self.strings("unpin_success").format(entity_name))
+                rpc_call_successful = True
+            except AttributeError as e:
+                logger.warning(
+                    f"PinChat: Стандартный вызов UpdatePeerPinnedRequest не удался ({e}). "
+                    "Попытка использовать альтернативное имя 'UpdatePeerPinned'. "
+                    "Это может указывать на нестандартный форк Telethon (например, herokutl)."
+                )
+                try:
+                    # Попытка 2: Используем альтернативное имя запроса (UpdatePeerPinned)
+                    # Это обходной путь для нестандартных форков, если они переименовали RPC-вызов
+                    alternative_rpc_call = getattr(functions.messages, 'UpdatePeerPinned', None)
+                    if alternative_rpc_call:
+                        await self._client(alternative_rpc_call(peer=input_peer, pinned=pin_action))
+                        rpc_call_successful = True
+                    else:
+                        logger.error(
+                            "PinChat: Ни UpdatePeerPinnedRequest, ни UpdatePeerPinned не найдены "
+                            "в functions.messages. Ваша среда Telethon/Herokutl может быть несовместима."
+                        )
+                        raise e # Перебрасываем исходную ошибку, если альтернатива не найдена
+                except AttributeError as e_alt:
+                    logger.error(f"PinChat: Альтернативный вызов UpdatePeerPinned также не удался ({e_alt}).")
+                    raise e # Перебрасываем исходную ошибку
+
+            if rpc_call_successful:
+                if pin_action:
+                    await utils.answer(message, self.strings("pin_success").format(entity_name))
+                else:
+                    await utils.answer(message, self.strings("unpin_success").format(entity_name))
+            else:
+                # Этот блок должен быть достигнут только в случае, если rpc_call_successful остается False
+                # после всех попыток, но исключение не было перехвачено.
+                # Теоретически не должно быть достигнуто, так как исключения должны быть перехвачены.
+                await utils.answer(message, self.strings("error_action").format(entity_name, "Не удалось выполнить действие (неизвестная ошибка)."))
 
         except PeerIdInvalidError:
             await utils.answer(message, self.strings("invalid_chat_id").format(chat_id_str if chat_id_str else "N/A"))
-        except RPCError as e:
+        except (RPCError, TLMessageError) as e:
             logger.error(f"Ошибка RPC при закреплении/откреплении чата {entity_name} ({getattr(target_entity, 'id', 'N/A')}): {e}")
             await utils.answer(message, self.strings("error_action").format(entity_name, e))
         except Exception as e:
