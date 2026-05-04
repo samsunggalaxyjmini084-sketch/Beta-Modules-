@@ -1,10 +1,10 @@
 # meta developer: @yourhandle
 # meta name: PinChat
-# meta version: 1.0.0
+# meta version: 1.0.1
 import logging
-from telethon.tl.functions.messages import UpdatePeerPinnedRequest # <-- Эта строка использует стандартную библиотеку Telethon, а не herokutl.
 from telethon.tl.types import Message
 from telethon.errors import PeerIdInvalidError, RPCError
+from telethon import functions # <--- Изменено: импортируем общий объект functions
 from .. import loader, utils
 
 logger = logging.getLogger(__name__)
@@ -92,23 +92,31 @@ class PinChatMod(loader.Module):
         try:
             entity_name = await utils.get_chat_title(target_entity)
             
+            # Получаем input_peer для выполнения RPC-запроса
+            input_peer = await self._client.get_input_entity(target_entity)
+
             # Получаем все диалоги, чтобы узнать текущий статус закрепления
             dialogs = await self._client.get_dialogs()
-            target_dialog = next((d for d in dialogs if d.id == target_entity.id), None)
-
-            current_pin_status = target_dialog.pinned if target_dialog else False
+            target_dialog_from_dialogs = next((d for d in dialogs if d.id == target_entity.id), None)
+            current_pin_status = target_dialog_from_dialogs.pinned if target_dialog_from_dialogs else False
 
             if pin_action:  # Пользователь хочет закрепить
                 if current_pin_status:
                     await utils.answer(message, self.strings("already_pinned").format(entity_name))
                     return
-                await self._client(UpdatePeerPinnedRequest(peer=target_entity, pinned=True))
+                # Используем client.invoke с functions.messages.UpdatePeerPinned для обхода прямого импорта UpdatePeerPinnedRequest
+                await self._client(functions.messages.UpdatePeerPinned(
+                    peer=input_peer, pinned=True
+                ))
                 await utils.answer(message, self.strings("pin_success").format(entity_name))
             else:  # Пользователь хочет открепить
                 if not current_pin_status:
                     await utils.answer(message, self.strings("not_pinned").format(entity_name))
                     return
-                await self._client(UpdatePeerPinnedRequest(peer=target_entity, pinned=False))
+                # Используем client.invoke с functions.messages.UpdatePeerPinned
+                await self._client(functions.messages.UpdatePeerPinned(
+                    peer=input_peer, pinned=False
+                ))
                 await utils.answer(message, self.strings("unpin_success").format(entity_name))
 
         except PeerIdInvalidError:
