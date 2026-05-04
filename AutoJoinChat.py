@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinChat
-# meta version: 1.0.0
+# meta version: 1.0.1 # Обновлена версия
 import asyncio
 import logging
 import random
@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 
 from telethon import events
 from telethon.tl.types import Message, User, Channel, Chat
-from telethon.errors import (
+from telethon.errors import (##
     ChannelPrivateError,
     InviteHashExpiredError,
     UserChannelsTooMuchError,
@@ -44,9 +44,9 @@ class AutoJoinChatMod(loader.Module):
                   "Ключевые слова кнопок: {}\n"
                   "Обрабатывать только новые сообщения: {}",
         "joined_chat_success": "🎉 AutoJoinChat: Успешно вступил в чат <b>{}</b> (ID: <code>{}</code>).",
-        "already_in_chat": "ℹ️ AutoJoinChat: Уже являюсь участником чата <b>{}</b>. Пропускаю.",
-        "ignored_target_chat": "🚫 AutoJoinChat: Чат <b>{}</b> (ID: <code>{}</code>) находится в списке игнорируемых. Пропускаю.",
-        "private_channel_error": "❌ AutoJoinChat: Не удалось вступить в чат <code>{}</code>: это приватный канал/группа, для вступления нужен invite-hash, а предоставленная ссылка не является полноценным invite.",
+        "already_in_chat": "ℹ️ AutoJoinChat: Уже являюсь участником чата <b>{}</b> (ID: <code>{}</code>). Пропускаю.",
+        "ignored_target_chat": "🚫 AutoJoinChat: Чат <b>{}</b> (ID: <code>{}</code>) находится в списке игнорируемых. Покинул чат.",
+        "private_channel_error": "❌ AutoJoinChat: Не удалось вступить в чат <code>{}</code>: это приватный канал/группа, для вступления нужен invite-hash, а предоставленная ссылка не является полноценным invite, или она недействительна.",
         "invite_expired_error": "❌ AutoJoinChat: Не удалось вступить в чат <code>{}</code>: ссылка-приглашение истекла или недействительна.",
         "too_many_channels": "❌ AutoJoinChat: Слишком много каналов. Невозможно вступить в <b>{}</b>.",
         "join_error": "❌ AutoJoinChat: Ошибка при вступлении в чат <b>{}</b>: <code>{}</code>",
@@ -67,32 +67,33 @@ class AutoJoinChatMod(loader.Module):
         <b>Сценарий 2: Кнопки 'Вступить'</b>
         Если в разрешенном чате появляется сообщение с инлайн-кнопкой, текст которой содержит одно из настроенных ключевых слов (<code>button_join_keywords</code>, например "вступить", "join"), и эта кнопка является URL-кнопкой, модуль попытается вступить в чат по этому URL.
         
+        <b>Важное примечание о кнопке "Вступить в группу" (голубая кнопка в UI)</b>:
+        Когда вы переходите по invite-ссылке в официальном Telegram-клиенте, часто появляется экран предпросмотра с большой голубой кнопкой "Вступить в группу". Ваш юзербот, работая через API Telegram (Telethon), **не может напрямую взаимодействовать с этим элементом интерфейса**. Вместо этого, метод <code>client.join_chat(ссылка)</code> отправляет программный запрос на серверы Telegram, который **эквивалентен нажатию этой кнопки**. То есть, модуль уже выполняет это действие программно.
+
         <emoji document_id=5843843420468024653>⭐️</emoji> <b>Настройки (.cfg):</b>
         <code>enabled</code> (<code>bool</code>, по умолчанию <code>False</code>): Включить/выключить модуль.
         <code>auto_join_from_links</code> (<code>bool</code>, по умолчанию <code>True</code>): Включает/выключает вступление по ссылкам.
         <code>auto_join_from_buttons</code> (<code>bool</code>, по умолчанию <code>True</code>): Включает/выключает вступление по кнопкам.
         <code>allowed_source_chats</code> (<code>list</code>, по умолчанию <code>[]</code>): Список ID чатов, где модуль будет искать ссылки/кнопки. Если список пуст, отслеживаются все чаты.
-        <code>ignored_target_chats</code> (<code>list</code>, по умолчанию <code>[]</code>): Список ID чатов, в которые модуль НИКОГДА не будет вступать автоматически, даже если найдет ссылку/кнопку.
+        <code>ignored_target_chats</code> (<code>list</code>, по умолчанию <code>[]</code>): Список ID чатов, в которые модуль НИКОГДА не будет вступать автоматически, даже если найдет ссылку/кнопку. Если модуль вступит в такой чат, он попытается сразу же его покинуть.
         <code>join_delay</code> (<code>list</code>, по умолчанию <code>[2, 5]</code>): Диапазон случайной задержки (в секундах) перед попыткой вступления. Помогает избежать флуд-контроля. Если указано одно число, задержка фиксированная.
         <code>button_join_keywords</code> (<code>list</code>, по умолчанию <code>[\"вступить\", \"join\", \"присоединиться\", \"в канал\", \"в группу\"]</code>): Список ключевых слов (регистронезависимых), которые должны содержаться в тексте URL-кнопки для ее активации.
         <code>process_only_new_messages</code> (<code>bool</code>, по умолчанию <code>True</code>): Если <code>True</code>, модуль будет обрабатывать только сообщения, пришедшие после его загрузки/включения. Если <code>False</code>, он может попытаться обработать последние сообщения в чате при старте (не рекомендуется).
         """
     }
 
-    # Регулярное выражение для поиска потенциальных идентификаторов чатов
-    # (username, invite hash, или полная ссылка), которые client.join_chat может обработать.
-    # Group 1: joinchat/HASH (полная строка)
-    # Group 2: username (после t.me/ или telegram.me/)
-    # Group 3: hash или domain из tg:// deep link
+    # Регулярное выражение для поиска различных форматов Telegram-ссылок, включая t.me/+HASH
     TELEGRAM_LINK_PATTERN = re.compile(
         r'(?:https?://)?(?:t\.me|telegram\.me)/'
         r'(?:'
-            r'(joinchat/[a-zA-Z0-9_-]+)' # Group 1: joinchat/HASH
+            r'(joinchat/[a-zA-Z0-9_\-]+)' # Group 1: joinchat/HASH
             r'|'
-            r'([a-zA-Z0-9_]{5,})' # Group 2: username (минимум 5 символов для публичных хэндлов)
+            r'(\+[a-zA-Z0-9_\-]+)'       # Group 2: +HASH (e.g., t.me/+HASH, как на скриншоте)
+            r'|'
+            r'([a-zA-Z0-9_]{5,})'        # Group 3: username (минимум 5 символов для публичных хэндлов)
         r')\b'
         r'|'
-        r'tg://(?:resolve\?domain=|join\?invite=)([a-zA-Z0-9_-]+)\b' # Group 3: domain или hash из tg://
+        r'tg://(?:resolve\?domain=|join\?invite=)([a-zA-Z0-9_\-]+)\b' # Group 4: domain или hash из tg://
     )
 
     def __init__(self):
@@ -124,7 +125,7 @@ class AutoJoinChatMod(loader.Module):
             loader.ConfigValue(
                 "ignored_target_chats",
                 [],
-                lambda: "Список ID чатов, в которые НЕ нужно автоматически вступать.",
+                lambda: "Список ID чатов, в которые НЕ нужно автоматически вступать. Если модуль вступит в такой чат, он попытается сразу же его покинуть.",
                 validator=loader.validators.Series(loader.validators.Integer())
             ),
             loader.ConfigValue(
@@ -146,7 +147,6 @@ class AutoJoinChatMod(loader.Module):
                 validator=loader.validators.Boolean()
             ),
         )
-        # Для отслеживания уже обработанных сообщений и предотвращения дублирования действий
         self._processed_messages_ids = set() 
         self._cleanup_task = None
     
@@ -201,64 +201,49 @@ class AutoJoinChatMod(loader.Module):
         logger.debug(f"AutoJoinChat: Ожидание {chosen_delay:.2f} секунд перед попыткой вступления в чат '{target_identifier}'...")
         await asyncio.sleep(chosen_delay)
 
-        entity_name_for_logs = target_identifier
-        target_id_for_logs = "N/A"
-
         try:
-            # Сначала пытаемся разрешить сущность, чтобы проверить, не является ли это игнорируемым чатом
-            # или если мы уже являемся участником. Это эвристический подход.
-            potential_entity = None
-            try:
-                # client.get_entity может обрабатывать юзернеймы, публичные ID каналов (-100xxxx) и т.д.
-                # Он НЕ надежно разрешает invite-хэши до присоединения.
-                # Поэтому мы отдаем приоритет прямым типам идентификаторов.
-                if target_identifier.startswith("@") or target_identifier.startswith("-100") or target_identifier.isdigit():
-                    potential_entity = await self._client.get_entity(target_identifier)
-                elif "t.me/" in target_identifier or "telegram.me/" in target_identifier:
-                    parsed_url = urllib.parse.urlparse(target_identifier)
-                    path_parts = parsed_url.path.strip('/').split('/')
-                    if path_parts and path_parts[0] and path_parts[0] != "joinchat": # Избегаем попытки разрешить joinchat хэши этим способом
-                        potential_entity = await self._client.get_entity(path_parts[0])
-                elif "tg://resolve?domain=" in target_identifier:
-                    domain = target_identifier.split("?domain=")[-1]
-                    potential_entity = await self._client.get_entity(domain)
-
-            except Exception as e:
-                logger.debug(f"AutoJoinChat: Не удалось предварительно разрешить сущность для '{target_identifier}' (может быть инвайт-ссылка): {e}")
-            
-            if potential_entity:
-                target_id_for_logs = getattr(potential_entity, 'id', 'N/A')
-                entity_name_for_logs = self._get_entity_name(potential_entity)
-
-                # Проверяем, находится ли чат в списке игнорируемых
-                if target_id_for_logs in self.config["ignored_target_chats"]:
-                    logger.info(self.strings("ignored_target_chat").format(entity_name_for_logs, target_id_for_logs))
-                    await utils.answer(message, self.strings("ignored_target_chat").format(entity_name_for_logs, target_id_for_logs))
-                    return
-                
-                # Проверяем, являемся ли уже участником (более надежная эвристика)
-                try:
-                    await self._client.get_messages(potential_entity, limit=1)
-                    logger.info(self.strings("already_in_chat").format(entity_name_for_logs))
-                    await utils.answer(message, self.strings("already_in_chat").format(entity_name_for_logs))
-                    return
-                except Exception as e:
-                    logger.debug(f"AutoJoinChat: Не являюсь участником чата {entity_name_for_logs} (или другая ошибка get_messages): {e}. Попытка вступить.")
-            
-            # Если не игнорируется и не является участником, пытаемся вступить
+            # Пытаемся вступить в чат
             await self._client.join_chat(target_identifier)
 
-            # После успешного вступления получаем фактическую сущность и ее имя/ID для сообщения об успехе
+            # После успешного вступления получаем фактическую сущность и ее имя/ID
             joined_entity = await self._client.get_entity(target_identifier)
             joined_entity_name = self._get_entity_name(joined_entity)
             joined_entity_id = getattr(joined_entity, 'id', 'N/A')
+
+            # Проверяем, находится ли чат в списке игнорируемых
+            if joined_entity_id in self.config["ignored_target_chats"]:
+                logger.info(self.strings("ignored_target_chat").format(joined_entity_name, joined_entity_id))
+                await utils.answer(message, self.strings("ignored_target_chat").format(joined_entity_name, joined_entity_id))
+                # Покидаем чат, так как он игнорируется
+                try:
+                    await self._client.delete_dialog(joined_entity)
+                    logger.info(f"AutoJoinChat: Успешно покинул игнорируемый чат {joined_entity_name} ({joined_entity_id}).")
+                except Exception as e:
+                    logger.warning(f"AutoJoinChat: Не удалось покинуть игнорируемый чат {joined_entity_name} ({joined_entity_id}): {e}")
+                return
 
             logger.info(self.strings("joined_chat_success").format(joined_entity_name, joined_entity_id))
             await utils.answer(message, self.strings("joined_chat_success").format(joined_entity_name, joined_entity_id))
 
         except UserAlreadyParticipantError:
-            logger.info(self.strings("already_in_chat").format(entity_name_for_logs))
-            await utils.answer(message, self.strings("already_in_chat").format(entity_name_for_logs))
+            # Если уже состоим в чате, пытаемся получить его данные для логов и проверки на игнорирование
+            existing_entity_name = target_identifier
+            existing_entity_id = "N/A"
+            try:
+                existing_entity = await self._client.get_entity(target_identifier)
+                existing_entity_name = self._get_entity_name(existing_entity)
+                existing_entity_id = getattr(existing_entity, 'id', 'N/A')
+            except Exception as e:
+                logger.debug(f"AutoJoinChat: Не удалось разрешить сущность для '{target_identifier}' после UserAlreadyParticipantError: {e}")
+
+            if existing_entity_id in self.config["ignored_target_chats"]:
+                logger.info(self.strings("ignored_target_chat").format(existing_entity_name, existing_entity_id))
+                await utils.answer(message, self.strings("ignored_target_chat").format(existing_entity_name, existing_entity_id))
+                return # Не покидаем, т.к. уже были участником и это был только повторный join_chat
+            
+            logger.info(self.strings("already_in_chat").format(existing_entity_name, existing_entity_id))
+            await utils.answer(message, self.strings("already_in_chat").format(existing_entity_name, existing_entity_id))
+
         except ChannelPrivateError:
             logger.warning(self.strings("private_channel_error").format(target_identifier))
             await utils.answer(message, self.strings("private_channel_error").format(target_identifier))
@@ -266,14 +251,14 @@ class AutoJoinChatMod(loader.Module):
             logger.warning(self.strings("invite_expired_error").format(target_identifier))
             await utils.answer(message, self.strings("invite_expired_error").format(target_identifier))
         except UserChannelsTooMuchError:
-            logger.warning(self.strings("too_many_channels").format(entity_name_for_logs))
-            await utils.answer(message, self.strings("too_many_channels").format(entity_name_for_logs))
+            logger.warning(self.strings("too_many_channels").format(target_identifier))
+            await utils.answer(message, self.strings("too_many_channels").format(target_identifier))
         except RPCError as e:
-            logger.error(self.strings("join_error").format(entity_name_for_logs, e))
-            await utils.answer(message, self.strings("join_error").format(entity_name_for_logs, e))
+            logger.error(self.strings("join_error").format(target_identifier, e))
+            await utils.answer(message, self.strings("join_error").format(target_identifier, e))
         except Exception as e:
-            logger.exception(f"AutoJoinChat: Неожиданная ошибка при вступлении в чат '{target_identifier}' (имя: {entity_name_for_logs}): {e}")
-            await utils.answer(message, self.strings("join_error").format(entity_name_for_logs, e))
+            logger.exception(f"AutoJoinChat: Неожиданная ошибка при вступлении в чат '{target_identifier}': {e}")
+            await utils.answer(message, self.strings("join_error").format(target_identifier, e))
 
     @loader.command(ru_doc="Включить автовход в чаты")
     async def ajcon(self, message: Message):
@@ -358,10 +343,12 @@ class AutoJoinChatMod(loader.Module):
                     identifier = None
                     if match.group(1): # joinchat/HASH
                         identifier = match.group(1) 
-                    elif match.group(2): # username
+                    elif match.group(2): # +HASH (e.g., t.me/+HASH)
                         identifier = match.group(2)
-                    elif match.group(3): # tg:// domain or hash
+                    elif match.group(3): # username
                         identifier = match.group(3)
+                    elif match.group(4): # tg:// domain or hash
+                        identifier = match.group(4)
                     
                     if identifier:
                         extracted_identifiers.add(identifier)
@@ -387,7 +374,8 @@ class AutoJoinChatMod(loader.Module):
                                     f"AutoJoinChat: Обнаружена callback-кнопка '{button_text}' в сообщении {message.id}. "
                                     "Модуль не поддерживает автоматическое нажатие callback-кнопок для вступления (обычно требуют дополнительных действий)."
                                 )
-                            break # Обрабатываем только одну подходящую кнопку на сообщение
+                            # Не используем break здесь, чтобы дать возможность обработать все кнопки в сообщении, если их несколько.
+                            # Если нужно обрабатывать только одну кнопку, можно вернуть break.
             
         except Exception as e:
             logger.exception(f"❌ AutoJoinChat: Критическая ошибка в watcher для сообщения {getattr(message, 'id', 'N/A')} в чате {getattr(message, 'chat_id', 'N/A')}: {e}")
