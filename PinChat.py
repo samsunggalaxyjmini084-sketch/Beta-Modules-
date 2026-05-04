@@ -1,11 +1,11 @@
 # meta developer: @yourhandle
 # meta name: PinChat
-# meta version: 1.0.3 # Обновлена версия модуля
+# meta version: 1.0.4 # Обновлена версия модуля
 import logging
 import re # Добавлен импорт для регулярных выражений, для более надежного парсинга
 from telethon.tl.types import Message, User, Channel, Chat
 from telethon.errors import PeerIdInvalidError, RPCError
-from telethon import functions
+from telethon import functions # <- Импортируем общий объект functions
 from .. import loader, utils # <- utils все еще нужно для utils.answer
 
 logger = logging.getLogger(__name__)
@@ -64,25 +64,25 @@ class PinChatMod(loader.Module):
     async def pchatcmd(self, message: Message):
         """Закрепляет или открепляет чат в списке чатов."""
         
-        # Ручной парсинг аргументов вместо utils.get_args_raw
-        cmd_prefix = message.text.split(None, 1)[0] # Получаем префикс команды, например ".pchat"
-        raw_args_text = message.text[len(cmd_prefix):].strip() # Все, что после команды
-        args = re.split(r'\s+', raw_args_text, maxsplit=1) # Разбиваем по пробелам, ограничивая до 2 частей
+        # Ручной парсинг аргументов
+        cmd_prefix = message.text.split(None, 1)[0]
+        raw_args_text = message.text[len(cmd_prefix):].strip()
+        args = re.split(r'\s+', raw_args_text, maxsplit=1)
 
         target_entity = None
-        pin_action = True  # По умолчанию: закрепить
+        pin_action = True
         chat_id_str = None
 
-        if args and args[0]: # Если аргументы есть и первый не пустой
+        if args and args[0]:
             if args[0].lower() == "-u":
                 pin_action = False
-                if len(args) > 1 and args[1]: # .pchat -u <ID>
+                if len(args) > 1 and args[1]:
                     chat_id_str = args[1]
-                else: # .pchat -u (текущий чат)
+                else:
                     target_entity = message.chat
-            else: # .pchat <ID>
+            else:
                 chat_id_str = args[0]
-        else: # .pchat (текущий чат)
+        else:
             target_entity = message.chat
 
         if chat_id_str:
@@ -97,7 +97,6 @@ class PinChatMod(loader.Module):
                 return
 
         if not target_entity:
-            # Если не удалось определить entity по аргументам, ищем в ответе
             if message.is_reply:
                 reply_msg = await message.get_reply_message()
                 target_entity = await reply_msg.get_chat() or await reply_msg.get_sender()
@@ -108,28 +107,27 @@ class PinChatMod(loader.Module):
         
         try:
             entity_name = self._get_entity_name(target_entity)
-            
-            # Получаем input_peer для выполнения RPC-запроса
             input_peer = await self._client.get_input_entity(target_entity)
 
-            # Получаем все диалоги, чтобы узнать текущий статус закрепления
             dialogs = await self._client.get_dialogs()
             target_dialog_from_dialogs = next((d for d in dialogs if d.id == target_entity.id), None)
             current_pin_status = target_dialog_from_dialogs.pinned if target_dialog_from_dialogs else False
 
-            if pin_action:  # Пользователь хочет закрепить
+            if pin_action:
                 if current_pin_status:
                     await utils.answer(message, self.strings("already_pinned").format(entity_name))
                     return
-                await self._client(functions.messages.UpdatePeerPinned(
+                # ИСПРАВЛЕНИЕ ЗДЕСЬ: Используем functions.messages.UpdatePeerPinnedRequest
+                await self._client(functions.messages.UpdatePeerPinnedRequest(
                     peer=input_peer, pinned=True
                 ))
                 await utils.answer(message, self.strings("pin_success").format(entity_name))
-            else:  # Пользователь хочет открепить
+            else:
                 if not current_pin_status:
                     await utils.answer(message, self.strings("not_pinned").format(entity_name))
                     return
-                await self._client(functions.messages.UpdatePeerPinned(
+                # ИСПРАВЛЕНИЕ ЗДЕСЬ: Используем functions.messages.UpdatePeerPinnedRequest
+                await self._client(functions.messages.UpdatePeerPinnedRequest(
                     peer=input_peer, pinned=False
                 ))
                 await utils.answer(message, self.strings("unpin_success").format(entity_name))
