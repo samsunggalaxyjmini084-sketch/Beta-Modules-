@@ -1,10 +1,10 @@
 # meta developer: @yourhandle
 # meta name: PinChat
-# meta version: 1.0.1
+# meta version: 1.0.2 # Обновлена версия модуля
 import logging
-from telethon.tl.types import Message
+from telethon.tl.types import Message, User, Channel, Chat # Добавлен импорт User, Channel, Chat
 from telethon.errors import PeerIdInvalidError, RPCError
-from telethon import functions # <--- Изменено: импортируем общий объект functions
+from telethon import functions
 from .. import loader, utils
 
 logger = logging.getLogger(__name__)
@@ -45,13 +45,26 @@ class PinChatMod(loader.Module):
     async def client_ready(self, client, _):
         self._client = client
 
+    def _get_entity_name(self, entity):
+        """Вспомогательная функция для получения читаемого имени сущности Telethon."""
+        if isinstance(entity, User):
+            if entity.first_name and entity.last_name:
+                return f"{entity.first_name} {entity.last_name}"
+            if entity.first_name:
+                return entity.first_name
+            if entity.username:
+                return f"@{entity.username}"
+            return f"User {entity.id}"
+        elif isinstance(entity, (Channel, Chat)):
+            return entity.title
+        return f"Entity {entity.id}"
+
     @loader.command(ru_doc="Закрепляет или открепляет чат в списке чатов. Используйте .pchat -u [ID] для открепления.")
     async def pchatcmd(self, message: Message):
         """Закрепляет или открепляет чат в списке чатов."""
         args = utils.get_args_raw(message).split(maxsplit=1)
         
         target_entity = None
-        entity_name = "неизвестный чат"
         pin_action = True  # По умолчанию: закрепить
 
         chat_id_str = None
@@ -90,7 +103,7 @@ class PinChatMod(loader.Module):
                 return
         
         try:
-            entity_name = await utils.get_chat_title(target_entity)
+            entity_name = self._get_entity_name(target_entity) # <-- Используем новую внутреннюю функцию
             
             # Получаем input_peer для выполнения RPC-запроса
             input_peer = await self._client.get_input_entity(target_entity)
@@ -104,7 +117,6 @@ class PinChatMod(loader.Module):
                 if current_pin_status:
                     await utils.answer(message, self.strings("already_pinned").format(entity_name))
                     return
-                # Используем client.invoke с functions.messages.UpdatePeerPinned для обхода прямого импорта UpdatePeerPinnedRequest
                 await self._client(functions.messages.UpdatePeerPinned(
                     peer=input_peer, pinned=True
                 ))
@@ -113,7 +125,6 @@ class PinChatMod(loader.Module):
                 if not current_pin_status:
                     await utils.answer(message, self.strings("not_pinned").format(entity_name))
                     return
-                # Используем client.invoke с functions.messages.UpdatePeerPinned
                 await self._client(functions.messages.UpdatePeerPinned(
                     peer=input_peer, pinned=False
                 ))
