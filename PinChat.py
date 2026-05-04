@@ -2,7 +2,7 @@
 # meta name: PinChat
 # meta version: 1.0.0
 import logging
-from telethon.tl.functions.messages import UpdatePeerPinnedRequest
+from telethon.tl.functions.messages import UpdatePeerPinnedRequest # <-- Эта строка использует стандартную библиотеку Telethon, а не herokutl.
 from telethon.tl.types import Message
 from telethon.errors import PeerIdInvalidError, RPCError
 from .. import loader, utils
