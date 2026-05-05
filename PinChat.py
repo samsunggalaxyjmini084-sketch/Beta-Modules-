@@ -1,12 +1,12 @@
 # meta developer: @yourhandle
 # meta name: PinChat
-# meta version: 1.0.7 # Максимально автономная версия
+# meta version: 1.0.8 # Версия без импорта telethon.errors
 import logging
-import asyncio # Может понадобиться для await utils.answer, если не заменить
+import asyncio 
 from telethon.tl.types import Message, User, Channel, Chat
-from telethon.errors import PeerIdInvalidError, RPCError # Оставлены только базовые ошибки
+# from telethon.errors import PeerIdInvalidError, RPCError # УДАЛЕНО!
 from telethon import functions
-from .. import loader # utils больше не импортируется
+from .. import loader 
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class PinChatMod(loader.Module):
     }
 
     def __init__(self):
-        self._self_id = None # Для хранения ID юзербота
+        self._self_id = None
         self._client = None
 
     async def client_ready(self, client, _):
@@ -55,10 +55,11 @@ class PinChatMod(loader.Module):
 
     async def _answer(self, message: Message, text: str):
         """Внутренняя функция, имитирующая utils.answer."""
+        # Проверяем, является ли сообщение исходящим и отправлено ли нами, и не является ли ответом на другое сообщение
         if message.out and message.sender_id == self._self_id and not message.is_reply:
             try:
                 await message.edit(text, parse_mode="HTML")
-            except Exception: # Если редактирование не удалось (например, сообщение старое)
+            except Exception: # Если редактирование не удалось (например, сообщение старое или не наше), отвечаем
                 await message.reply(text, parse_mode="HTML")
         else:
             await message.reply(text, parse_mode="HTML")
@@ -82,7 +83,6 @@ class PinChatMod(loader.Module):
         """Закрепляет или открепляет чат в списке чатов."""
         
         # Ручной парсинг аргументов
-        # Удалена зависимость от re
         cmd_prefix_end = message.text.find(' ')
         if cmd_prefix_end == -1: # Нет аргументов после команды
             raw_args_text = ""
@@ -169,10 +169,10 @@ class PinChatMod(loader.Module):
                             "PinChat: Ни UpdatePeerPinnedRequest, ни UpdatePeerPinned не найдены "
                             "в functions.messages. Ваша среда Telethon/Herokutl может быть несовместима."
                         )
-                        raise e # Перебрасываем исходную ошибку, если альтернатива не найдена
+                        raise e 
                 except AttributeError as e_alt:
                     logger.error(f"PinChat: Альтернативный вызов UpdatePeerPinned также не удался ({e_alt}).")
-                    raise e # Перебрасываем исходную ошибку
+                    raise e 
 
             if rpc_call_successful:
                 if pin_action:
@@ -182,11 +182,14 @@ class PinChatMod(loader.Module):
             else:
                 await self._answer(message, self.strings("error_action").format(entity_name, "Не удалось выполнить действие (неизвестная ошибка)."))
 
-        except PeerIdInvalidError:
-            await self._answer(message, self.strings("invalid_chat_id").format(chat_id_str if chat_id_str else "N/A"))
-        except RPCError as e:
-            logger.error(f"Ошибка RPC при закреплении/откреплении чата {entity_name} ({getattr(target_entity, 'id', 'N/A')}): {e}")
-            await self._answer(message, self.strings("error_action").format(entity_name, e))
-        except Exception as e:
-            logger.exception(f"Неожиданная ошибка в pchatcmd для {entity_name} ({getattr(target_entity, 'id', 'N/A')}): {e}")
-            await self._answer(message, self.strings("error_action").format(entity_name, e))
+        except Exception as e: # Теперь обрабатываем все исключения через общий Exception
+            # Мы больше не можем различать PeerIdInvalidError и RPCError здесь напрямую
+            error_message = str(e) if str(e) else "Неизвестная ошибка API"
+            
+            # Попытаемся добавить контекст для PeerIdInvalidError, если это возможно,
+            # основываясь на тексте ошибки, но это не надежно.
+            if "peer id invalid" in error_message.lower():
+                await self._answer(message, self.strings("invalid_chat_id").format(chat_id_str if chat_id_str else "N/A"))
+            else:
+                logger.exception(f"Неожиданная ошибка в pchatcmd для {entity_name} ({getattr(target_entity, 'id', 'N/A')}): {e}")
+                await self._answer(message, self.strings("error_action").format(entity_name, error_message))
