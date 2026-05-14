@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: PinChatList
-# meta version: 1.0.1 # Версия обновлена
+# meta version: 1.0.1
 import logging
 from telethon.tl.types import Message
 from telethon.errors import RPCError
@@ -71,8 +71,8 @@ class PinChatListMod(loader.Module):
                     break
             
             if not target_dialog:
-                # Если диалог не найден в iter_dialogs, это означает, что чат либо не существует, либо
-                # с ним никогда не было активной переписки и он не отображается в списке диалогов.
+                # Если диалог не найден в iter_dialogs, это означает, что чат либо не существует,
+                # либо с ним никогда не было активной переписки и он не отображается в списке диалогов.
                 # В этом случае get_entity уже должен был отработать с ошибкой, но если entity
                 # был получен (например, по username, но диалог неактивен), то здесь нужно сообщить.
                 await utils.answer(message, self.strings("chat_not_found").format(chat_id=target_chat_id))
@@ -99,7 +99,7 @@ class PinChatListMod(loader.Module):
             logger.error(f"PinChatList: Ошибка Telethon RPC при {action_text} чата {target_chat_id}: {e}", exc_info=True)
             await utils.answer(message, self.strings("pin_fail").format(chat_id=target_chat_id, error=e) if pinned else self.strings("unpin_fail").format(chat_id=target_chat_id, error=e))
         except Exception as e:
-            logger.exception(f"PinChatList: Неожиданная ошибка при {action_text} чата {target_chat_id}: {e}")
+            logger.exception(f"PinChatList: Неожиданная ошибка при {action_chat_id} чата {target_chat_id}: {e}")
             await utils.answer(message, self.strings("pin_fail").format(chat_id=target_chat_id, error=e) if pinned else self.strings("unpin_fail").format(chat_id=target_chat_id, error=e))
 
 
