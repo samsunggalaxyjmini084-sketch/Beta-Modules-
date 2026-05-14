@@ -1,9 +1,10 @@
 # meta developer: @yourhandle
 # meta name: PinChatList
-# meta version: 1.0.1
+# meta version: 1.0.2 # Версия обновлена
 import logging
 from telethon.tl.types import Message
 from telethon.errors import RPCError
+from telethon import functions # Добавлен импорт functions
 from .. import loader, utils
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,8 @@ class PinChatListMod(loader.Module):
         await utils.answer(message, f"⏳ Пытаюсь {action_text} чат <code>{target_chat_id}</code> в вашем списке чатов...")
 
         try:
+            # get_entity может вернуть Channel, User, Chat, но ToggleDialogPin ожидает InputPeer
+            # Для надежности, получаем InputPeer из dialog.entity
             entity = await self._client.get_entity(target_chat_id)
         except (ValueError, TypeError):
             logger.error(f"PinChatList: Чат с ID {target_chat_id} не найден.")
@@ -71,10 +74,6 @@ class PinChatListMod(loader.Module):
                     break
             
             if not target_dialog:
-                # Если диалог не найден в iter_dialogs, это означает, что чат либо не существует,
-                # либо с ним никогда не было активной переписки и он не отображается в списке диалогов.
-                # В этом случае get_entity уже должен был отработать с ошибкой, но если entity
-                # был получен (например, по username, но диалог неактивен), то здесь нужно сообщить.
                 await utils.answer(message, self.strings("chat_not_found").format(chat_id=target_chat_id))
                 return
 
@@ -84,14 +83,22 @@ class PinChatListMod(loader.Module):
                 if is_currently_pinned:
                     await utils.answer(message, self.strings("pin_already_pinned").format(chat_id=target_chat_id))
                     return
-                await self._client.pin_peer(entity, pinned=True)
+                # Используем низкоуровневый RPC-вызов для закрепления
+                await self._client(functions.messages.ToggleDialogPinRequest(
+                    peer=target_dialog.entity,
+                    pinned=True
+                ))
                 await utils.answer(message, self.strings("pin_success").format(chat_id=target_chat_id))
                 logger.info(f"PinChatList: Чат {target_chat_id} успешно закреплен.")
             else: # Открепляем
                 if not is_currently_pinned:
                     await utils.answer(message, self.strings("unpin_not_pinned").format(chat_id=target_chat_id))
                     return
-                await self._client.pin_peer(entity, pinned=False)
+                # Используем низкоуровневый RPC-вызов для открепления
+                await self._client(functions.messages.ToggleDialogPinRequest(
+                    peer=target_dialog.entity,
+                    pinned=False
+                ))
                 await utils.answer(message, self.strings("unpin_success").format(chat_id=target_chat_id))
                 logger.info(f"PinChatList: Чат {target_chat_id} успешно откреплен.")
 
@@ -99,7 +106,8 @@ class PinChatListMod(loader.Module):
             logger.error(f"PinChatList: Ошибка Telethon RPC при {action_text} чата {target_chat_id}: {e}", exc_info=True)
             await utils.answer(message, self.strings("pin_fail").format(chat_id=target_chat_id, error=e) if pinned else self.strings("unpin_fail").format(chat_id=target_chat_id, error=e))
         except Exception as e:
-            logger.exception(f"PinChatList: Неожиданная ошибка при {action_chat_id} чата {target_chat_id}: {e}")
+            # Исправлена опечатка: action_chat_id -> action_text
+            logger.exception(f"PinChatList: Неожиданная ошибка при {action_text} чата {target_chat_id}: {e}")
             await utils.answer(message, self.strings("pin_fail").format(chat_id=target_chat_id, error=e) if pinned else self.strings("unpin_fail").format(chat_id=target_chat_id, error=e))
 
 
