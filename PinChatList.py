@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: PinChatList
-# meta version: 1.0.2 # Версия обновлена
+# meta version: 1.0.2
 import logging
 from telethon.tl.types import Message
 from telethon.errors import RPCError
