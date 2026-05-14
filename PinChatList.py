@@ -1,7 +1,6 @@
 # meta developer: @yourhandle
 # meta name: PinChatList
-# meta version: 1.0.0
-
+# meta version: 1.0.1 # Версия обновлена
 import logging
 from telethon.tl.types import Message
 from telethon.errors import RPCError
@@ -54,7 +53,7 @@ class PinChatListMod(loader.Module):
 
         try:
             entity = await self._client.get_entity(target_chat_id)
-        except (ValueError, TypeError): # ValueError для неверного формата ID, TypeError для проблем с get_entity
+        except (ValueError, TypeError):
             logger.error(f"PinChatList: Чат с ID {target_chat_id} не найден.")
             await utils.answer(message, self.strings("chat_not_found").format(chat_id=target_chat_id))
             return
@@ -64,9 +63,22 @@ class PinChatListMod(loader.Module):
             return
 
         try:
-            # Получаем список закрепленных чатов, чтобы дать более точные сообщения
-            current_pinned_peers = await self._client.get_pinned_peers()
-            is_currently_pinned = any(p.id == entity.id for p in current_pinned_peers)
+            # Ищем диалог, чтобы проверить его текущий статус закрепления
+            target_dialog = None
+            async for dialog in self._client.iter_dialogs():
+                if dialog.id == target_chat_id:
+                    target_dialog = dialog
+                    break
+            
+            if not target_dialog:
+                # Если диалог не найден в iter_dialogs, это означает, что чат либо не существует, либо
+                # с ним никогда не было активной переписки и он не отображается в списке диалогов.
+                # В этом случае get_entity уже должен был отработать с ошибкой, но если entity
+                # был получен (например, по username, но диалог неактивен), то здесь нужно сообщить.
+                await utils.answer(message, self.strings("chat_not_found").format(chat_id=target_chat_id))
+                return
+
+            is_currently_pinned = target_dialog.pinned
 
             if pinned: # Закрепляем
                 if is_currently_pinned:
