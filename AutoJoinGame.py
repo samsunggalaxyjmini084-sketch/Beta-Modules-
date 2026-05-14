@@ -33,7 +33,6 @@ class AutoJoinGameMod(loader.Module):
                   "Боты для отслеживания: {}\n"
                   "Разрешенные чаты: {}\n"
                   "Ключевые слова кнопок: {}\n"
-                  "Режим Deep-Link: {}\n"
                   "Маркер линчевания для '👎': {}\n"
                   "Фразы-триггеры входа в игру: {}\n"
                   "Фразы-триггеры линчевания: {}\n"
@@ -74,13 +73,13 @@ class AutoJoinGameMod(loader.Module):
 
 <emoji document_id=5877260593903177342>⚙</emoji> Как работает:
 Ждет сообщение о наборе в игру или о голосовании (линчевание/повешение) от указанных ботов (или от любого бота, если список пуст).
-Автоматически переходит по URL кнопки и отправляет /start для входа в игру.
+Автоматически нажимает кнопку для входа в игру.
 Если бот спрашивает "Вы точно хотите линчевать..." или "Вы точно хотите повесить...", модуль автоматически нажмет кнопку.
 Если в сообщении присутствует настроенный <code>lynch_target_marker</code> (по умолчанию 𝓝𝓚), модуль автоматически нажмет кнопку с эмодзи '👎'. В противном случае, если маркера нет, нажмет '👍'.
 Работает только когда включен.
 Дополнительно, если настроен <code>player_to_lynch_user_id</code>, модуль будет ожидать сообщение с ником игрока от этого пользователя. Как только ник получен, модуль будет искать сообщение о голосовании от <code>lynch_voting_bot_id</code>, содержащее <code>lynch_player_voting_trigger_phrases</code>, и затем автоматически нажмет кнопку с соответствующим ником игрока.
 <b>Важное обновление:</b> Если сообщение от <code>player_to_lynch_user_id</code> начинается с символа <code>!</code>, этот символ будет автоматически удален из ника игрока перед использованием.
-<b>Обновление 2.4.0:</b> При линчевании конкретного игрока, модуль теперь будет искать ник игрока как <b>подстроку</b> в тексте кнопки (регистронезависимо), а не только как точное совпадение. Это позволяет корректно обрабатывать кнопки, содержащие никнейм игрока вместе с дополнительными символами.
+<b>Обновление 2.4.0:</b> При линчевании конкретного игрока, модуль теперь будет искать ник игрока как <b>подстробу</b> в тексте кнопки (регистронезависимо), а не только как точное совпадение. Это позволяет корректно обрабатывать кнопки, содержащие никнейм игрока вместе с дополнительными символами.
 <b>Новая функция:</b> Модуль может автоматически пересылать сообщения с вашей ролью в мафии в указанный чат. Это работает, когда бот отправляет вам роль в приватном чате, и сообщение содержит одну из настроенных фраз-триггеров.
 <b>Улучшенная функция:</b> Модуль может отслеживать сообщения пользователей, объявляющих свою роль, и сохранять их ники и <b>конкретную объявленную роль</b> в список, если эта роль соответствует одной из настроенных фраз.
 Отслеживание включается/выключается автоматически по настроенным фразам-триггерам от ботов, а его длительность настраивается в конфиге.
@@ -93,7 +92,7 @@ class AutoJoinGameMod(loader.Module):
 В конфиге модуля можно изменить задержку(и) перед нажатием. Если указано несколько значений, будет выбрано случайное.
 Можно указать список ID ботов, от которых ожидать сообщение о наборе.
 Можно указать список ID чатов, в которых модуль будет активен. Если список пуст, модуль будет работать во всех чатах.
-<b>Настройка:</b> <code>button_keywords</code> - список ключевых слов, которые должны содержаться в тексте кнопки для ее активации. Регистр не учитывается. <b>Если среди ключевых слов есть "🌚" или "🌝", активируется специальный режим обработки Deep-Link URL, при котором боту будет отправляться команда <code>/start &lt;параметр_start&gt;</code>, извлеченный из URL кнопки.</b>
+<b>Настройка:</b> <code>button_keywords</code> - список ключевых слов, которые должны содержаться в тексте кнопки для ее активации. Регистр не учитывается.
 <b>Настройка:</b> <code>lynch_target_marker</code> - строка-маркер, которая, если присутствует в сообщении-триггере для голосования, заставит модуль нажать кнопку '👎'. Если отсутствует или маркер не указан (пустая строка), нажимается '👍'. По умолчанию: "" (пусто).
 <b>Настройка:</b> <code>game_join_trigger_phrases</code> - список фраз, которые модуль будет искать в сообщениях для активации автовхода в игру. По умолчанию: <code>[\"Ведётся набор в игру\", \"Регистрация началась!\"]</code>.
 <b>Настройка:</b> <code>lynch_trigger_phrases</code> - список фраз, которые модуль будет искать в сообщениях для активации автолинчевания. По умолчанию: <code>[\"Вы точно хотите линчевать\"]</code>.
@@ -224,8 +223,8 @@ Mafia Combat Premium <code>1634167847</code>""",
             ),
             loader.ConfigValue(
                 "button_keywords",
-                ["присоединиться", "играть", "🙋", "🎮", "✅", "🌚"],
-                lambda: "Список ключевых слов в тексте кнопки для активации автовхода (регистронезависимо). Если среди ключевых слов есть '🌚' или '🌝', активируется специальный режим обработки Deep-Link URL.",
+                ["присоединиться", "играть", "🙋", "🎮", "✅"],
+                lambda: "Список ключевых слов в тексте кнопки для активации автовхода (регистронезависимо).",
                 validator=loader.validators.Series(loader.validators.String())
             ),
             loader.ConfigValue(
@@ -497,14 +496,9 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         allowed_chats_display = ", ".join(map(str, self.config["allowed_chats"])) if self.config["allowed_chats"] else "Все чаты"
 
-        configured_button_keywords_lower = [kw.lower() for kw in self.config["button_keywords"]]
-        deep_link_mode_active = '🌚' in configured_button_keywords_lower or '🌝' in configured_button_keywords_lower
-
         button_keywords_display = ", ".join(self.config["button_keywords"])
         if not button_keywords_display:
             button_keywords_display = "(пусто)"
-
-        deep_link_status_display = "🟢 Активен (включен '🌚' или '🌝' в ключевых словах)" if deep_link_mode_active else "🔴 Неактивен (нет '🌚' или '🌝' в ключевых словах)"
 
         lynch_target_marker_display = self.config["lynch_target_marker"] if self.config["lynch_target_marker"] else "(пусто)"
 
@@ -552,7 +546,6 @@ Mafia Combat Premium <code>1634167847</code>""",
             bot_ids_display, 
             allowed_chats_display, 
             button_keywords_display, 
-            deep_link_status_display,
             lynch_target_marker_display,
             game_join_trigger_phrases_display,
             lynch_trigger_phrases_display,
@@ -588,10 +581,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         current_chat_id = message.chat_id
         configured_bot_ids = self.config["bot_ids"]
 
-        configured_button_keywords_lower = [kw.lower() for kw in self.config["button_keywords"]]
-        keywords_to_check_for_test = configured_button_keywords_lower 
-        deep_link_mode_active = '🌚' in configured_button_keywords_lower or '🌝' in configured_button_keywords_lower
-        deep_link_status_test_display = "🟢 Активен" if deep_link_mode_active else "🔴 Неактивен"
+        keywords_to_check_for_test = [kw.lower() for kw in self.config["button_keywords"]]
 
         game_join_phrases_for_test = self.config["game_join_trigger_phrases"]
         lynch_phrases_for_test = self.config["lynch_trigger_phrases"] + self.config["lynch_hang_trigger_phrases"]
@@ -601,7 +591,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         trigger_phrases_str = ", ".join(all_trigger_phrases_for_test) if all_trigger_phrases_for_test else "Не указаны"
 
-        await utils.answer(message, f"<emoji document_id=5874960879434338403>🔎</emoji> Ищу сообщения, содержащие одну из фраз: \"{trigger_phrases_str}\" (регистронезависимо) в последних 500 сообщениях в текущем чате (ID: <code>{current_chat_id}</code>) от ботов/пользователя.\nРежим Deep-Link: {deep_link_status_test_display}...")
+        await utils.answer(message, f"<emoji document_id=5874960879434338403>🔎</emoji> Ищу сообщения, содержащие одну из фраз: \"{trigger_phrases_str}\" (регистронезависимо) в последних 500 сообщениях в текущем чате (ID: <code>{current_chat_id}</code>) от ботов/пользователя...")
 
         try:
             results = []
@@ -714,27 +704,8 @@ Mafia Combat Premium <code>1634167847</code>""",
 
                                         info_msg += f"  • <code>{btn_text}</code>{match_indicator}"
                                         if btn_url:
-                                            parsed_url = urllib.parse.urlparse(btn_url)
-                                            query_params = urllib.parse.parse_qs(parsed_url.query)
-                                            start_param = query_params.get('start', [None])[0]
-
-                                            bot_username = None
-                                            if parsed_url.hostname in ['t.me', 'telegram.me'] and parsed_url.path:
-                                                path_parts = parsed_url.path.lstrip('/').split('/')
-                                                if path_parts and path_parts[0]:
-                                                    bot_username = path_parts[0]
-                                            elif parsed_url.scheme == 'tg' and parsed_url.netloc == 'resolve':
-                                                query_params_tg = urllib.parse.parse_qs(parsed_url.query)
-                                                bot_username = query_params_tg.get('domain', [None])[0]
-
                                             url_display = f" (URL: <code>{btn_url[:50]}...</code>)" if len(btn_url) > 50 else f" (URL: <code>{btn_url}</code>)"
-
-                                            if start_param and deep_link_mode_active and bot_username:
-                                                info_msg += f"{url_display} (Действие Deep-Link: *была бы* отправлена <code>/start {start_param}</code> боту @{bot_username})"
-                                            elif start_param and not deep_link_mode_active and bot_username:
-                                                info_msg += f"{url_display} (Действие Deep-Link: <b>не</b> была бы отправлена, режим Deep-Link неактивен)"
-                                            else:
-                                                info_msg += url_display
+                                            info_msg += url_display + " (Действие: *была бы* нажата URL-кнопка)"
                                         else:
                                             info_msg += " (URL: Нет, это Callback кнопка. *Была бы* нажата.)"
                                         info_msg += "\n"
@@ -1076,8 +1047,6 @@ Mafia Combat Premium <code>1634167847</code>""",
                     configured_button_keywords_lower = [kw.lower() for kw in self.config["button_keywords"]]
                     keywords_to_check = configured_button_keywords_lower
 
-                    deep_link_mode_active = '🌚' in configured_button_keywords_lower or '🌝' in configured_button_keywords_lower
-
                     button_found = False
                     for row in message.buttons:
                         for button in row:
@@ -1093,38 +1062,14 @@ Mafia Combat Premium <code>1634167847</code>""",
                                 logger.info(f"✅ AutoJoinGame: Найдена кнопка присоединения: '{button_text}'")
 
                                 if getattr(button, 'url', None):
-                                    button_url = button.url
-                                    logger.info(f"🔗 AutoJoinGame: URL кнопки: {button_url}")
-
-                                    parsed_url = urllib.parse.urlparse(button_url)
-                                    
-                                    bot_username = None
-                                    if parsed_url.hostname in ['t.me', 'telegram.me'] and parsed_url.path:
-                                        path_parts = parsed_url.path.lstrip('/').split('/')
-                                        if path_parts and path_parts[0]:
-                                            bot_username = path_parts[0]
-                                    elif parsed_url.scheme == 'tg' and parsed_url.netloc == 'resolve':
-                                        query_params_tg = urllib.parse.parse_qs(parsed_url.query)
-                                        bot_username = query_params_tg.get('domain', [None])[0]
-
-                                    query_params = urllib.parse.parse_qs(parsed_url.query)
-                                    start_param = query_params.get('start', [None])[0]
-
-                                    if deep_link_mode_active and bot_username and start_param:
-                                        logger.info(f"📤 AutoJoinGame: Режим Deep-Link активен. Отправка /start {start_param} боту @{bot_username}")
-
-                                        try:
-                                            await self._client.send_message(
-                                                bot_username,
-                                                f'/start {start_param}'
-                                            )
-                                            logger.info("🎉 AutoJoinGame: Успешно отправлена команда /start (уведомление в чат не отправлено).")
-                                            button_found = True
-                                            break 
-                                        except Exception as e:
-                                            logger.error(f"❌ AutoJoinGame: Ошибка при отправке Deep-Link команды /start для сообщения {message.id}: {e}")
-                                    else:
-                                        logger.warning(f"⚠️ AutoJoinGame: Найдена кнопка '{button_text}' с URL '{button_url}', но она не является Deep-Link или режим Deep-Link неактивен. Пропускаю.")
+                                    logger.info(f"🔗 AutoJoinGame: Найдена кнопка '{button_text}' с URL '{button.url}'. Нажимаю.")
+                                    try:
+                                        await button.click()
+                                        logger.info(f"🎉 AutoJoinGame: Успешно нажата URL-кнопка '{button_text}' для присоединения к игре.")
+                                        button_found = True
+                                        break
+                                    except Exception as e:
+                                        logger.error(f"❌ AutoJoinGame: Ошибка при нажатии URL-кнопки '{button_text}' для присоединения к игре: {e}")
                                 else: 
                                     logger.info(f"📤 AutoJoinGame: Найдена кнопка '{button_text}' (CallbackQuery). Нажимаю.")
                                     try:
