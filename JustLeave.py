@@ -1,6 +1,6 @@
-# meta developer: @yourhandle
+# meta developer: @hdjsfzbxm
 # meta name: Just leave
-# meta version: 1.1.2 # Версия обновлена
+# meta version: 1.1.3 # Версия обновлена
 import logging
 from .. import loader, utils
 from asyncio import sleep
@@ -13,7 +13,7 @@ from telethon.errors.rpcerrorlist import (
     ChatIdInvalidError,
     UserNotParticipantError,
 )
-from telethon.tl.types import User
+from telethon.tl.types import Message, User # ИСПРАВЛЕНО: Добавлен импорт Message
 
 logger = logging.getLogger(__name__)
 
@@ -47,11 +47,12 @@ class LeaveMod(loader.Module):
         args_raw = utils.get_args_raw(message)
         
         target_chat_id = message.chat_id
+        original_message_chat_id = message.chat_id # Сохраняем ID оригинального чата для отчета об ошибках
         delete_command = False
         
         # Обработка случая, когда нет контекста чата (например, команда в "Избранном")
         if not message.chat:
-            await message.respond(self.strings("no_chat")) # Используем respond вместо edit
+            await message.respond(self.strings("no_chat"))
             return
 
         # Разбираем аргументы: сначала пытаемся получить ID чата
@@ -80,41 +81,36 @@ class LeaveMod(loader.Module):
         else:
             initial_status_text = self.strings("leaving_specified").format(chat_id=target_chat_id)
 
-        status_message_to_update = None # Ссылка на сообщение, которое будет обновляться статусом
+        status_message_to_update = None
 
         if delete_command:
             await message.delete()
-            # Если команда удалена, status_message_to_update остается None,
-            # и никаких последующих сообщений отправляться не будет, даже об ошибках.
         else:
             try:
-                # Пытаемся изменить оригинальное сообщение команды
                 status_message_to_update = await message.edit(initial_status_text)
-            except Exception as e: # Ловим любые исключения, включая RPCError для "Message author required"
+            except Exception as e:
                 logger.warning(f"Не удалось изменить сообщение {message.id} из-за {type(e).__name__}: {e}. Отправляю новое сообщение вместо этого.")
-                # Если изменение не удалось, отправляем новое сообщение и используем его для последующих обновлений
                 status_message_to_update = await message.respond(initial_status_text)
         
-        await sleep(1) # Небольшая задержка перед фактическим выходом
+        await sleep(1)
 
         try:
             target_entity = await message.client.get_entity(target_chat_id)
 
             if isinstance(target_entity, User):
                 error_msg = self.strings("not_a_group_or_channel").format(chat_id=target_chat_id)
-                await self._report_error_status(status_message_to_update, target_chat_id, error_msg, delete_command)
+                await self._report_error_status(status_message_to_update, original_message_chat_id, target_chat_id, error_msg, delete_command)
                 logger.warning(error_msg)
                 return
 
             await message.client(LeaveChannelRequest(target_chat_id))
 
             logger.info(f"Успешно покинул чат {target_chat_id}")
-            # Если успешно покинули, никаких сообщений больше не отправляем, как запрошено.
-            # Сообщение статуса (если не del) просто останется на месте.
+            # После успешного выхода никаких дополнительных сообщений не отправляем.
 
         except UserNotParticipantError:
             error_msg = f"Я не состою в чате <code>{target_chat_id}</code>, чтобы его покинуть."
-            await self._report_error_status(status_message_to_update, target_chat_id, error_msg, delete_command)
+            await self._report_error_status(status_message_to_update, original_message_chat_id, target_chat_id, error_msg, delete_command)
             logger.warning(error_msg)
         except (ChatAdminRequiredError, ChannelPrivateError, UserIsBlockedError, PeerIdInvalidError, ChatIdInvalidError, ValueError) as e:
             error_message = str(e)
@@ -127,36 +123,36 @@ class LeaveMod(loader.Module):
             elif isinstance(e, (PeerIdInvalidError, ChatIdInvalidError, ValueError)):
                  error_message = "Указан неверный или недоступный ID чата."
 
-            await self._report_error_status(status_message_to_update, target_chat_id, error_message, delete_command)
+            await self._report_error_status(status_message_to_update, original_message_chat_id, target_chat_id, error_message, delete_command)
             logger.error(f"Не удалось покинуть чат {target_chat_id}: {error_message}")
         except Exception as e:
             logger.exception(f"Произошла непредвиденная ошибка при попытке покинуть чат {target_chat_id}")
-            await self._report_error_status(status_message_to_update, target_chat_id, str(e), delete_command)
+            await self._report_error_status(status_message_to_update, original_message_chat_id, target_chat_id, str(e), delete_command)
 
-    async def _report_error_status(self, status_message: Message, chat_id: int, error_text: str, delete_command_used: bool):
-        """Вспомогательная функция для обновления сообщения статуса с ошибкой или отправки нового сообщения при сбое."""
+    async def _report_error_status(self, status_message: Message, original_chat_id: int, target_chat_id: int, error_text: str, delete_command_used: bool):
+        """
+        Вспомогательная функция для обновления сообщения статуса с ошибкой или отправки нового сообщения при сбое.
+        Принимает original_chat_id для надежного ответа в чат, если все остальное не удалось.
+        """
         if delete_command_used:
-            # Если был использован 'del', никаких сообщений отправляться/изменяться не должно, только запись в лог.
-            logger.error(f"Произошла ошибка после команды 'del' для чата {chat_id}: {error_text}. Пользователю сообщение не отправлено.")
+            logger.error(f"Произошла ошибка после команды 'del' для чата {target_chat_id}: {error_text}. Пользователю сообщение не отправлено.")
             return
 
-        full_error_text = self.strings("leave_error").format(chat_id=chat_id, error=error_text)
+        full_error_text = self.strings("leave_error").format(chat_id=target_chat_id, error=error_text)
         
-        if status_message: # Пытаемся обновить сообщение статуса, если оно существует
+        if status_message:
             try:
                 await status_message.edit(full_error_text)
-            except Exception as e: # Ловим любые исключения при попытке редактирования
-                logger.warning(f"Не удалось изменить сообщение статуса {status_message.id} с ошибкой {type(e).__name__}: {e}. Пытаюсь ответить вместо этого.")
-                try:
-                    # Если редактирование не удалось, пытаемся ответить в тот же чат, где было сообщение статуса
-                    await status_message.respond(full_error_text)
-                except Exception as e2:
-                    logger.error(f"Двойной откат не удался, не удалось сообщить об ошибке в чат {status_message.chat_id}: {e2}", exc_info=True)
-        else: # Этот блок теоретически не должен быть достигнут, если delete_command_used == False
-            # На всякий случай, если status_message почему-то None, а delete_command_used == False,
-            # пытаемся ответить в оригинальном чате команды.
-            try:
-                # Используем message.chat_id из оригинального message, чтобы ответить в тот же чат.
-                await self._client.send_message(message.chat_id, full_error_text) 
             except Exception as e:
-                logger.error(f"Откат на send_message не удался, не удалось сообщить об ошибке в чат {message.chat_id}: {e}", exc_info=True)
+                logger.warning(f"Не удалось изменить сообщение статуса {status_message.id} с ошибкой {type(e).__name__}: {e}. Пытаюсь ответить в оригинальный чат.")
+                try:
+                    await self._client.send_message(original_chat_id, full_error_text)
+                except Exception as e2:
+                    logger.error(f"Двойной откат не удался, не удалось сообщить об ошибке в чат {original_chat_id}: {e2}", exc_info=True)
+        else:
+            # Этот блок выполняется, если status_message изначально был None (т.е. message.edit/respond не удалось),
+            # и delete_command_used == False.
+            try:
+                await self._client.send_message(original_chat_id, full_error_text) 
+            except Exception as e:
+                logger.error(f"Откат на send_message не удался, не удалось сообщить об ошибке в чат {original_chat_id}: {e}", exc_info=True)
