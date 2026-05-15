@@ -1,22 +1,14 @@
 # meta developer: @hdjsfzbxm
 # meta name: AutoJoinLink
-# meta version: 1.0.1 # Версия обновлена
+# meta version: 1.0.2 # Версия обновлена
 
 import logging
 import re
 import urllib.parse
 import asyncio
 from telethon.tl.types import Message, MessageEntityTextUrl, MessageEntityUrl
-# ИСПРАВЛЕНО: Явно импортируем ошибки из telethon.errors.rpcerrorlist
-from telethon.errors.rpcerrorlist import (
-    UserAlreadyParticipantError,
-    InviteHashExpiredError,
-    InviteHashInvalidError,
-    FloodWaitError,
-    BotMethodInvalidError,
-    ChannelPrivateError,
-    PeerInvalidError,
-)
+# ИСПРАВЛЕНО: Импортируем модуль errors из telethon
+from telethon import errors
 from telethon.tl.functions.messages import ImportChatInviteRequest
 
 from .. import loader, utils
@@ -217,15 +209,15 @@ class AutoJoinLinkMod(loader.Module):
                 else:
                     response_messages.append(self.strings("other_join_error").format(link_ref=display_link_ref, error="Неизвестный формат ссылки"))
 
-            except UserAlreadyParticipantError:
+            except errors.UserAlreadyParticipantError: # ИСПРАВЛЕНО: использование errors.
                 response_messages.append(self.strings("already_participant").format(link_ref=display_link_ref))
-            except (InviteHashExpiredError, InviteHashInvalidError):
+            except (errors.InviteHashExpiredError, errors.InviteHashInvalidError): # ИСПРАВЛЕНО: использование errors.
                 response_messages.append(self.strings("invite_expired_invalid").format(link_ref=display_link_ref))
-            except FloodWaitError as e:
+            except errors.FloodWaitError as e: # ИСПРАВЛЕНО: использование errors.
                 response_messages.append(self.strings("flood_wait").format(link_ref=display_link_ref, seconds=e.seconds))
-            except ChannelPrivateError:
+            except errors.ChannelPrivateError: # ИСПРАВЛЕНО: использование errors.
                 response_messages.append(self.strings("private_channel_error").format(link_ref=display_link_ref))
-            except PeerInvalidError:
+            except errors.PeerInvalidError: # ИСПРАВЛЕНО: использование errors.
                 response_messages.append(self.strings("peer_invalid_error").format(link_ref=display_link_ref))
             except Exception as e:
                 logger.error(f"AutoJoinLink: Ошибка при присоединении по ссылке {ref}: {e}", exc_info=True)
