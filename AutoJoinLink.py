@@ -1,22 +1,23 @@
 # meta developer: @hdjsfzbxm
 # meta name: AutoJoinLink
-# meta version: 1.0.0
+# meta version: 1.0.1 # Версия обновлена
 
 import logging
 import re
 import urllib.parse
-import asyncio # Добавлен импорт для asyncio.sleep
+import asyncio
 from telethon.tl.types import Message, MessageEntityTextUrl, MessageEntityUrl
-from telethon.errors import (
+# ИСПРАВЛЕНО: Явно импортируем ошибки из telethon.errors.rpcerrorlist
+from telethon.errors.rpcerrorlist import (
     UserAlreadyParticipantError,
     InviteHashExpiredError,
     InviteHashInvalidError,
     FloodWaitError,
-    BotMethodInvalidError, # Может быть полезно для отладки
+    BotMethodInvalidError,
     ChannelPrivateError,
-    PeerInvalidError, # Для ошибок с неверными peer ID или username
+    PeerInvalidError,
 )
-from telethon.tl.functions.messages import ImportChatInviteRequest # Для ссылок joinchat
+from telethon.tl.functions.messages import ImportChatInviteRequest
 
 from .. import loader, utils
 
@@ -36,8 +37,7 @@ def _parse_telegram_link(url: str):
         if path_parts:
             if path_parts[0] == "joinchat" and len(path_parts) > 1:
                 return f"invite:{path_parts[1]}"
-            elif path_parts[0]: # Предполагаем, что это имя пользователя
-                # Проверяем, соответствует ли имя пользователя стандартному формату
+            elif path_parts[0]:
                 if re.fullmatch(r"[a-zA-Z0-9_]+", path_parts[0]):
                     return f"username:{path_parts[0]}"
     elif parsed_url.scheme == "tg":
@@ -50,7 +50,6 @@ def _parse_telegram_link(url: str):
             query_params = urllib.parse.parse_qs(parsed_url.query)
             domain = query_params.get('domain', [None])[0]
             if domain:
-                # Проверяем, соответствует ли домен стандартному формату имени пользователя
                 if re.fullmatch(r"[a-zA-Z0-9_]+", domain):
                     return f"username:{domain}"
     return None
@@ -141,20 +140,17 @@ class AutoJoinLinkMod(loader.Module):
         if not self.config["enabled"]:
             return
 
-        # Не обрабатываем сообщения, отправленные самим собой
         if message.sender_id == self._self_id:
             return
 
-        # Проверяем, находится ли сообщение в отслеживаемом чате
         if self.config["watch_chat_ids"] and message.chat_id not in self.config["watch_chat_ids"]:
             return
 
         if not message.text:
             return
 
-        unique_chat_refs = set() # Хранит ссылки в формате "invite:HASH" или "username:USERNAME"
+        unique_chat_refs = set()
 
-        # 1. Сначала разбираем сущности (более надежно и включает text_urls)
         if message.entities:
             for entity in message.entities:
                 url_text = None
@@ -172,24 +168,20 @@ class AutoJoinLinkMod(loader.Module):
                         logger.warning(self.strings("error_parsing_link").format(url_text, e))
 
 
-        # 2. Резервный вариант: поиск ссылок в сыром тексте с помощью регулярных выражений
-        # Этот regex пытается найти t.me/joinchat/HASH, t.me/USERNAME, tg://join?invite=HASH, tg://resolve?domain=USERNAME
         telegram_link_regex = r"(?:https?://)?(?:t\.me|telegram\.me)/(?:joinchat/([a-zA-Z0-9_-]+)|([a-zA-Z0-9_]+))"
         tg_scheme_regex = r"tg://(?:join\?invite=([a-zA-Z0-9_-]+)|resolve\?domain=([a-zA-Z0-9_]+))"
 
-        # Поиск ссылок t.me/telegram.me
         for match in re.finditer(telegram_link_regex, message.text, re.IGNORECASE):
-            invite_hash = match.group(1) # Хэш joinchat
-            username = match.group(2) # Имя пользователя
+            invite_hash = match.group(1)
+            username = match.group(2)
             if invite_hash:
                 unique_chat_refs.add(f"invite:{invite_hash}")
             elif username:
                 unique_chat_refs.add(f"username:{username}")
         
-        # Поиск ссылок tg://
         for match in re.finditer(tg_scheme_regex, message.text, re.IGNORECASE):
-            invite_hash = match.group(1) # Хэш инвайта
-            username = match.group(2) # Имя домена
+            invite_hash = match.group(1)
+            username = match.group(2)
             if invite_hash:
                 unique_chat_refs.add(f"invite:{invite_hash}")
             elif username:
@@ -201,7 +193,6 @@ class AutoJoinLinkMod(loader.Module):
 
         response_messages = []
         for ref in unique_chat_refs:
-            # Формируем читабельное представление ссылки для отображения
             display_link_ref = ref
             if ref.startswith("invite:"):
                 display_link_ref = f"t.me/joinchat/{ref.split(':')[1]}"
@@ -219,7 +210,6 @@ class AutoJoinLinkMod(loader.Module):
                     response_messages.append(self.strings("join_success").format(link_ref=display_link_ref))
                 elif ref.startswith("username:"):
                     username = ref.split(":")[1]
-                    # Добавляем '@', если его нет, хотя join_chat обычно это обрабатывает
                     if not username.startswith('@'):
                         username = '@' + username
                     await self._client.join_chat(username)
@@ -241,10 +231,7 @@ class AutoJoinLinkMod(loader.Module):
                 logger.error(f"AutoJoinLink: Ошибка при присоединении по ссылке {ref}: {e}", exc_info=True)
                 response_messages.append(self.strings("other_join_error").format(link_ref=display_link_ref, error=e))
             
-            # Добавляем небольшую задержку между присоединением к нескольким чатам,
-            # чтобы избежать потенциальных Flood Wait, особенно если в одном сообщении много ссылок.
             await asyncio.sleep(1) 
         
         if response_messages:
-            # Объединяем все ответные сообщения символами новой строки и отправляем как одно сообщение
             await self._client.send_message(message.chat_id, "\n".join(response_messages))
