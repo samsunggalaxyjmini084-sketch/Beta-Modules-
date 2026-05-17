@@ -19,27 +19,27 @@ logger = logging.getLogger(__name__)
 
 @loader.tds
 class AutoJoinGameMod(loader.Module):
-    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам."""
+    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Также модуль может автоматически подтверждать добавление других модулей/плагинов, нажимая на кнопку 'Подтвердить' в сообщении-запросе от имени пользователя.""" # Updated docstring
 
     strings = {
         "name": "AutoJoinGame",
-        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам.",
+        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Также модуль может автоматически подтверждать добавление других модулей/плагинов, нажимая на кнопку 'Подтвердить' в сообщении-запросе от имени пользователя.", # Updated
         "enabled": "✅ Автовход в игру и автолинчевание включены.",
         "disabled": "❌ Автовход в игру и автолинчевание выключены.",
         "status": "<emoji document_id=5875291072225087249>📊</emoji> Статус автовхода и автолинчевания:\n"
                   "Статус: {}\n"
                   "Задержка входа (секунды): {}\n"
                   "Задержка линчевания (секунды): {}\n"
-                  "Боты для отслеживания: {}\n" # Изменено
+                  "Боты для отслеживания: {}\n"
                   "Разрешенные чаты: {}\n"
                   "Ключевые слова кнопок: {}\n"
-                  "Режим Deep-Link: {}\n" # Изменено
+                  "Режим Deep-Link: {}\n"
                   "Маркер линчевания для '👎': {}\n"
                   "Фразы-триггеры входа в игру: {}\n"
                   "Фразы-триггеры линчевания: {}\n"
                   "Фразы-триггеры повешения: {}\n"
                   "ID пользователя для линчевания игрока: {}\n"
-                  "Фразы-триггеры голосования за игрока: {}\n" # Изменено
+                  "Фразы-триггеры голосования за игрока: {}\n"
                   "Последний ник игрока для линчевания: {}\n"
                   "\n<emoji document_id=5877485980901971030>📊</emoji> Статус пересылки роли:\n"
                   "Чат для пересылки роли: {}\n"
@@ -56,7 +56,11 @@ class AutoJoinGameMod(loader.Module):
                   "Автоматическое включение отслеживания ролей (фразы): {}\n"
                   "Автоматическое включение отслеживания ролей (боты): {}\n"
                   "Автоматическое выключение отслеживания ролей (фразы): {}\n"
-                  "Автоматическое выключение отслеживания ролей (боты): {}",
+                  "Автоматическое выключение отслеживания ролей (боты): {}\n"
+                  "\n<emoji document_id=5776375003280838798>👑</emoji> Статус автоподтверждения добавления:\n" # NEW
+                  "Фраза-триггер подтверждения: {}\n" # NEW
+                  "Текст кнопки подтверждения: {}\n" # NEW
+                  "Задержка подтверждения (секунды): {}", # NEW
         "error": "❌ Ошибка при нажатии кнопки: {}",
         "no_button": "⚠️ Кнопка не найдена под сообщением",
         "help_text": """<emoji document_id=5931415565955503486>🤖</emoji> AutoJoinGame - Помощь
@@ -87,6 +91,7 @@ class AutoJoinGameMod(loader.Module):
 <b>Новая функция:</b> Модуль может автоматически включать отслеживание ролей при получении сообщения, содержащего определенные фразы, от указанных ботов.
 <b>Новая функция:</b> Модуль может автоматически <b>выключать</b> отслеживание ролей при получении сообщения, содержащего определенные фразы, от указанных ботов.
 <b>Улучшение:</b> Теперь модуль более точно определяет роли, включая составные фразы, и позволяет помечать роли как 'неактивные' с помощью суффикса <code>(н)</code> для раздельного отображения.
+<b>Новая функция:</b> Модуль может автоматически нажимать кнопку '👑 Подтвердить' в сообщениях от владельца модуля, содержащих фразу-триггер (по умолчанию "⚠️ Ты действительно хочешь добавить"). Это удобно для автоматического подтверждения добавления других модулей/плагинов.
 
 <emoji document_id=5843843420468024653>⭐️</emoji> Настройки:
 В конфиге модуля можно изменить задержку(и) перед нажатием. Если указано несколько значений, будет выбрано случайное.
@@ -113,6 +118,9 @@ class AutoJoinGameMod(loader.Module):
 <b>Новая настройка:</b> <code>auto_track_roles_bot_ids</code> - Список ID ботов, от которых ожидается сообщение с фразами для автоматического включения отслеживания ролей. Если список пуст, сообщения будут отслеживаться от любого бота. По умолчанию: <code>[]</code>.
 <b>Новая настройка:</b> <code>auto_disable_track_roles_trigger_phrases</code> - Список фраз, которые модуль будет искать в сообщениях для автоматического выключения отслеживания ролей. По умолчанию: <code>[]</code>.
 <b>Новая настройка:</b> <code>auto_disable_track_roles_bot_ids</code> - Список ID ботов, от которых ожидается сообщение с фразами для автоматического выключения отслеживания ролей. Если список пуст, сообщения будут отслеживаться от любого бота. По умолчанию: <code>[]</code>.
+<b>Новая настройка:</b> <code>confirm_add_trigger_phrase</code> - Фраза-триггер, которую модуль будет искать в *своих собственных* сообщениях для автоматического нажатия кнопки подтверждения. По умолчанию: <code>"⚠️ Ты действительно хочешь добавить"</code>.
+<b>Новая настройка:</b> <code>confirm_add_button_text</code> - Текст кнопки (точный), которую модуль будет искать и нажимать при обнаружении <code>confirm_add_trigger_phrase</code>. По умолчанию: <code>"👑 Подтвердить"</code>.
+<b>Новая настройка:</b> <code>confirm_add_delay</code> - Список задержек в секундах перед нажатием кнопки подтверждения. Если указано несколько значений, будет выбрано случайное.
 """,
         "ajgid_bots_list": """<emoji document_id=5771887475421090729>👤</emoji> Список ID ботов для мафии:
 
@@ -154,7 +162,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         "ajgtest_player_nickname_would_be_set": "🔔 Сообщение ID <code>{msg_id}</code> от <code>{sender_id}</code> *установило бы* ник: <code>{nickname}</code>.",
         "ajgtest_player_nickname_not_set_yet": "ℹ️ Ник игрока для голосования не установлен в конфиге или не найден в последних 500 сообщениях.",
         "ajgtest_player_nickname_used": "ℹ️ Для последующих тестов используется ник: <code>{nickname}</code>.",
-        "ajgtest_player_lynch_disabled": "ℹ️ ID пользователя для линчевания игрока не установлен в конфиге. Эта часть теста неактивна.", # Изменено
+        "ajgtest_player_lynch_disabled": "ℹ️ ID пользователя для линчевания игрока не установлен в конфиге. Эта часть теста неактивна.",
         "ajgtest_no_matches": "❌ Сообщения с набором, запросом на линчевание или голосование за игрока от настроенных ботов/пользователя не найдено в текущем чате ID <code>{chat_id}</code>\n📊 Проверено сообщений: {count}",
         "ajgtest_error": "❌ Ошибка: <code>{error}</code>",
         "role_forward_chat_id_display": "Отключено (0)",
@@ -188,6 +196,10 @@ Mafia Combat Premium <code>1634167847</code>""",
         "auto_disable_track_roles_trigger_phrases_display": "(пусто)",
         "auto_disable_track_roles_bot_ids_display": "Не указаны (любой бот)",
         "auto_role_tracking_deactivated": "<emoji document_id=5944122171441618396>❌</emoji> Автоматическое отслеживание ролей выключено.",
+        "confirm_add_trigger_detected": "<emoji document_id=5776375003280838798>✅</emoji> Обнаружен запрос на подтверждение добавления. Ищу кнопку '{button_text}'.", # NEW
+        "confirm_add_button_clicked": "🎉 AutoJoinGame: Успешно нажата кнопка '{button_text}' для подтверждения добавления.", # NEW
+        "confirm_add_button_not_found": "⚠️ AutoJoinGame: Запрос на подтверждение найден, но кнопка '{button_text}' не найдена.", # NEW
+        "confirm_add_error": "❌ AutoJoinGame: Ошибка при нажатии кнопки подтверждения: {error}", # NEW
     }
 
     def __init__(self):
@@ -213,7 +225,7 @@ Mafia Combat Premium <code>1634167847</code>""",
             loader.ConfigValue(
                 "bot_ids",
                 [],
-                lambda: "Список ID ботов, от которых ожидается сообщение о наборе в игру, линчевании, повешении или голосовании за игрока. Если список пуст, сообщения будут отслеживаться от любого бота.", # Описание обновлено
+                lambda: "Список ID ботов, от которых ожидается сообщение о наборе в игру, линчевании, повешении или голосовании за игрока. Если список пуст, сообщения будут отслеживаться от любого бота.",
                 validator=loader.validators.Series(loader.validators.Integer())
             ),
             loader.ConfigValue(
@@ -225,7 +237,7 @@ Mafia Combat Premium <code>1634167847</code>""",
             loader.ConfigValue(
                 "button_keywords",
                 ["присоединиться", "играть", "🙋", "🎮", "✅", "🌚"],
-                lambda: "Список ключевых слов в тексте кнопки для активации автовхода (регистронезависимо). Если кнопка содержит Deep-Link URL, он будет автоматически обработан.", # Описание обновлено
+                lambda: "Список ключевых слов в тексте кнопки для активации автовхода (регистронезависимо). Если кнопка содержит Deep-Link URL, он будет автоматически обработан.",
                 validator=loader.validators.Series(loader.validators.String())
             ),
             loader.ConfigValue(
@@ -258,11 +270,10 @@ Mafia Combat Premium <code>1634167847</code>""",
                 lambda: "ID пользователя, чье сообщение будет использоваться как ник игрока для линчевания. Если 0, то функция отключена.",
                 validator=loader.validators.Integer(minimum=0)
             ),
-            # loader.ConfigValue("lynch_voting_bot_id" был удален и объединен с bot_ids)
             loader.ConfigValue(
                 "lynch_player_voting_trigger_phrases",
                 ["Пришло время искать виноватых!", "Кого ты хочешь повесить?", "Пришло время определить и наказать виновных", "Пришло время искать виноватых! Кого ты хочешь линчевать?"],
-                lambda: "Список фраз, которые модуль будет искать в сообщениях от ботов (из bot_ids) для активации голосования за конкретного игрока.", # Описание обновлено
+                lambda: "Список фраз, которые модуль будет искать в сообщениях от ботов (из bot_ids) для активации голосования за конкретного игрока.",
                 validator=loader.validators.Series(loader.validators.String())
             ),
             loader.ConfigValue(
@@ -336,6 +347,24 @@ Mafia Combat Premium <code>1634167847</code>""",
                 [],
                 lambda: "Список ID ботов, от которых ожидается сообщение с фразами для автоматического выключения отслеживания ролей. Если список пуст, сообщения будут отслеживаться от любого бота.",
                 validator=loader.validators.Series(loader.validators.Integer())
+            ),
+            loader.ConfigValue( # NEW
+                "confirm_add_trigger_phrase",
+                "⚠️ Ты действительно хочешь добавить",
+                lambda: "Фраза-триггер для подтверждения добавления (от лица владельца модуля).",
+                validator=loader.validators.String()
+            ),
+            loader.ConfigValue( # NEW
+                "confirm_add_button_text",
+                "👑 Подтвердить",
+                lambda: "Текст кнопки, которую нужно нажать при обнаружении триггера подтверждения добавления.",
+                validator=loader.validators.String()
+            ),
+            loader.ConfigValue( # NEW
+                "confirm_add_delay",
+                [0.5],
+                lambda: "Список задержек перед нажатием кнопки подтверждения (секунды). Если указано несколько, будет выбрано случайное.",
+                validator=loader.validators.Series(loader.validators.Float(minimum=0.1, maximum=10.0))
             ),
         )
 
@@ -496,7 +525,6 @@ Mafia Combat Premium <code>1634167847</code>""",
         if not button_keywords_display:
             button_keywords_display = "(пусто)"
 
-        # Deep-Link status display updated
         deep_link_status_display = "🟢 Активен (автоматически обрабатывает Deep-Link URL, если они есть у подходящих кнопок)"
 
         lynch_target_marker_display = self.config["lynch_target_marker"] if self.config["lynch_target_marker"] else "(пусто)"
@@ -506,7 +534,6 @@ Mafia Combat Premium <code>1634167847</code>""",
         lynch_hang_trigger_phrases_display = ", ".join(self.config["lynch_hang_trigger_phrases"]) if self.config["lynch_hang_trigger_phrases"] else "(пусто)"
         
         player_to_lynch_user_id_display = str(self.config["player_to_lynch_user_id"]) if self.config["player_to_lynch_user_id"] else "Отключено (0)"
-        # lynch_voting_bot_id_display удален
         lynch_player_voting_trigger_phrases_display = ", ".join(self.config["lynch_player_voting_trigger_phrases"]) if self.config["lynch_player_voting_trigger_phrases"] else "(пусто)"
         current_player_nickname_display = self._player_nickname_to_lynch if self._player_nickname_to_lynch else "(нет)"
 
@@ -538,6 +565,12 @@ Mafia Combat Premium <code>1634167847</code>""",
         auto_disable_track_roles_trigger_phrases_display = ", ".join(self.config["auto_disable_track_roles_trigger_phrases"]) if self.config["auto_disable_track_roles_trigger_phrases"] else self.strings("auto_disable_track_roles_trigger_phrases_display")
         auto_disable_track_roles_bot_ids_display = ", ".join(map(str, self.config["auto_disable_track_roles_bot_ids"])) if self.config["auto_disable_track_roles_bot_ids"] else self.strings("auto_disable_track_roles_bot_ids_display")
 
+        # NEW: Confirm Add settings display
+        confirm_add_trigger_phrase_display = self.config["confirm_add_trigger_phrase"] if self.config["confirm_add_trigger_phrase"] else "(пусто)"
+        confirm_add_button_text_display = self.config["confirm_add_button_text"] if self.config["confirm_add_button_text"] else "(пусто)"
+        confirm_add_delays = self.config["confirm_add_delay"]
+        confirm_add_delay_display = f"[{', '.join(map(str, confirm_add_delays))}]" if len(confirm_add_delays) > 1 else str(confirm_add_delays[0])
+
         await utils.answer(message, self.strings("status").format(
             status, 
             delay_display, 
@@ -545,13 +578,12 @@ Mafia Combat Premium <code>1634167847</code>""",
             bot_ids_display, 
             allowed_chats_display, 
             button_keywords_display, 
-            deep_link_status_display, # Изменено
+            deep_link_status_display,
             lynch_target_marker_display,
             game_join_trigger_phrases_display,
             lynch_trigger_phrases_display,
             lynch_hang_trigger_phrases_display,
             player_to_lynch_user_id_display,
-            # lynch_voting_bot_id_display удален
             lynch_player_voting_trigger_phrases_display,
             current_player_nickname_display,
             role_forward_chat_id_display,
@@ -567,7 +599,10 @@ Mafia Combat Premium <code>1634167847</code>""",
             auto_track_roles_trigger_phrases_display,
             auto_track_roles_bot_ids_display,
             auto_disable_track_roles_trigger_phrases_display,
-            auto_disable_track_roles_bot_ids_display
+            auto_disable_track_roles_bot_ids_display,
+            confirm_add_trigger_phrase_display, # NEW
+            confirm_add_button_text_display, # NEW
+            confirm_add_delay_display # NEW
         ))
 
     @loader.command(ru_doc="Показать справку")
@@ -584,7 +619,6 @@ Mafia Combat Premium <code>1634167847</code>""",
         configured_button_keywords_lower = [kw.lower() for kw in self.config["button_keywords"]]
         keywords_to_check_for_test = configured_button_keywords_lower 
         
-        # Deep-Link status display updated
         deep_link_status_test_display = "🟢 Активен (автоматически обрабатывает Deep-Link URL, если они есть у подходящих кнопок)"
 
         game_join_phrases_for_test = self.config["game_join_trigger_phrases"]
@@ -595,7 +629,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         trigger_phrases_str = ", ".join(all_trigger_phrases_for_test) if all_trigger_phrases_for_test else "Не указаны"
 
-        await utils.answer(message, f"<emoji document_id=5874960879434338403>🔎</emoji> Ищу сообщения, содержащие одну из фраз: \"{trigger_phrases_str}\" (регистронезависимо) в последних 500 сообщениях в текущем чате (ID: <code>{current_chat_id}</code>) от ботов/пользователя.\nРежим Deep-Link: {deep_link_status_test_display}...") # Изменено
+        await utils.answer(message, f"<emoji document_id=5874960879434338403>🔎</emoji> Ищу сообщения, содержащие одну из фраз: \"{trigger_phrases_str}\" (регистронезависимо) в последних 500 сообщениях в текущем чате (ID: <code>{current_chat_id}</code>) от ботов/пользователя.\nРежим Deep-Link: {deep_link_status_test_display}...")
 
         try:
             results = []
@@ -639,19 +673,16 @@ Mafia Combat Premium <code>1634167847</code>""",
                     not configured_bot_ids or sender_id in configured_bot_ids
                 )
 
-                # is_player_voting_bot_message удален
-
-                if not is_general_bot_message: # Изменено
+                if not is_general_bot_message:
                     continue
                 
                 msg_text_lower = msg.text.lower() 
                 
                 is_game_join_test_message = any(phrase.lower() in msg_text_lower for phrase in game_join_phrases_for_test)
                 is_general_lynch_test_message = any(phrase.lower() in msg_text_lower for phrase in lynch_phrases_for_test)
-                # is_player_voting_test_message теперь проверяется по is_general_bot_message и trigger phrases
                 is_player_voting_test_message = (
-                    self.config["player_to_lynch_user_id"] != 0 and # Проверяем, что функция линчевания игрока включена
-                    is_general_bot_message and # От бота из общего списка ботов
+                    self.config["player_to_lynch_user_id"] != 0 and
+                    is_general_bot_message and
                     any(phrase.lower() in msg_text_lower for phrase in player_lynch_phrases_for_test)
                 )
 
@@ -666,7 +697,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                         info_msg += "Список кнопок:\n"
                         button_matched_in_test = False
                         
-                        if is_player_voting_test_message: # Условие изменено
+                        if is_player_voting_test_message:
                             if temp_player_nickname_for_test:
                                 info_msg += f"  <emoji document_id=5935968647901089910>🔫</emoji> (Режим голосования за игрока: ищу ник <code>{temp_player_nickname_for_test}</code>)\n"
                                 for row_idx, row in enumerate(msg.buttons):
@@ -726,7 +757,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
                                             url_display = f" (URL: <code>{btn_url[:50]}...</code>)" if len(btn_url) > 50 else f" (URL: <code>{btn_url}</code>)"
 
-                                            if start_param and bot_username: # Изменено (убрана deep_link_mode_active)
+                                            if start_param and bot_username:
                                                 info_msg += f"{url_display} (Действие Deep-Link: *была бы* отправлена <code>/start {start_param}</code> боту @{bot_username})"
                                             else:
                                                 info_msg += url_display
@@ -800,6 +831,51 @@ Mafia Combat Premium <code>1634167847</code>""",
 
             msg_text = message.text
             msg_text_lower = msg_text.lower() 
+
+            # --- Автоматическое подтверждение добавления (NEW) ---
+            confirm_add_trigger_phrase = self.config["confirm_add_trigger_phrase"]
+            confirm_add_button_text = self.config["confirm_add_button_text"]
+            confirm_add_delays = self.config["confirm_add_delay"]
+
+            if (self._self_id and sender_id == self._self_id and # Check if message is from the module owner
+                    confirm_add_trigger_phrase and
+                    confirm_add_button_text and
+                    confirm_add_trigger_phrase.lower() in msg_text_lower):
+                
+                logger.info(self.strings("confirm_add_trigger_detected").format(button_text=confirm_add_button_text))
+
+                if not getattr(message, 'buttons', None):
+                    logger.warning(f"⚠️ AutoJoinGame: Запрос на подтверждение добавления найден (msg_id: {message.id}), но кнопок нет. Пропускаю.")
+                    return
+                
+                chosen_delay = random.choice(confirm_add_delays)
+                logger.info(f"⏳ AutoJoinGame: Ожидание {chosen_delay} секунд перед нажатием кнопки подтверждения добавления сообщения {message.id}...")
+                await asyncio.sleep(chosen_delay)
+
+                confirm_button_found = False
+                for row in message.buttons:
+                    for button in row:
+                        try:
+                            button_text = str(getattr(button, 'text', ''))
+                        except Exception as e:
+                            logger.warning(f"Error getting button text for confirm add message {message.id}: {e}")
+                            button_text = ''
+                        
+                        if button_text == confirm_add_button_text: # Exact match for button text
+                            logger.info(f"✅ AutoJoinGame: Найдена кнопка '{confirm_add_button_text}' для подтверждения добавления.")
+                            try:
+                                await button.click()
+                                logger.info(self.strings("confirm_add_button_clicked").format(button_text=confirm_add_button_text))
+                                confirm_button_found = True
+                                break
+                            except Exception as e:
+                                logger.error(self.strings("confirm_add_error").format(error=e))
+                    if confirm_button_found:
+                        break
+                
+                if not confirm_button_found:
+                    logger.warning(self.strings("confirm_add_button_not_found").format(button_text=confirm_add_button_text))
+                return # Important to return after handling this specific trigger.
 
             # --- Автоматическое включение отслеживания ролей ---
             auto_track_phrases = self.config["auto_track_roles_trigger_phrases"]
@@ -941,14 +1017,14 @@ Mafia Combat Premium <code>1634167847</code>""",
                 not self.config["bot_ids"] or sender_id in self.config["bot_ids"]
             )
 
-            if not is_general_game_bot: # is_lynch_player_voting_bot удален, все боты теперь в bot_ids
+            if not is_general_game_bot:
                 logger.debug(f"AutoJoinGame: Сообщение {message.id} от бота {sender_id}, но его ID не в списке разрешенных ботов. Пропускаю.")
                 return
             
             # Логика голосования за конкретного игрока
-            if (self.config["player_to_lynch_user_id"] != 0 and # Проверяем, что функция линчевания игрока включена
+            if (self.config["player_to_lynch_user_id"] != 0 and
                 self._player_nickname_to_lynch and 
-                any(phrase.lower() in msg_text_lower for phrase in self.config["lynch_player_voting_trigger_phrases"])): # bot_id теперь проверяется через is_general_game_bot
+                any(phrase.lower() in msg_text_lower for phrase in self.config["lynch_player_voting_trigger_phrases"])):
                 
                 if not getattr(message, 'buttons', None):
                     logger.warning(f"⚠️ AutoJoinGame: Запрос на голосование за игрока найден (msg_id: {message.id}), но кнопок нет. Пропускаю.")
@@ -1025,7 +1101,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
                 lynch_button_found = False
                 for row in message.buttons:
-                    for button in row:
+                    for button in button:
                         try:
                             button_text = str(getattr(button, 'text', ''))
                         except Exception as e:
@@ -1097,7 +1173,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                                 query_params = urllib.parse.parse_qs(parsed_url.query)
                                 start_param = query_params.get('start', [None])[0]
 
-                                if bot_username and start_param: # Изменено (убрана deep_link_mode_active)
+                                if bot_username and start_param:
                                     logger.info(f"📤 AutoJoinGame: Deep-Link URL обнаружен. Отправка /start {start_param} боту @{bot_username}")
 
                                     try:
