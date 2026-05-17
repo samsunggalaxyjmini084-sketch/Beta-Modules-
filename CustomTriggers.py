@@ -85,9 +85,7 @@ class CustomTriggersMod(loader.Module):
                 "triggers",
                 [],
                 lambda: "Список настроенных триггеров. Не редактируйте вручную.", # User should use commands, not edit directly
-                validator=loader.validators.Series(
-                    loader.validators.Object() # Исправлено с Dict на Object
-                )
+                validator=loader.validators.Series() # Исправлено: просто Series, без указания внутреннего валидатора
             ),
         )
         self._client = None
