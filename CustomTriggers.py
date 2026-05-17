@@ -65,6 +65,7 @@ class CustomTriggersMod(loader.Module):
         "sender_name_unknown": "Неизвестный отправитель",
         "trigger_type_text": "Текст",
         "trigger_type_command": "Команда",
+        "command_dispatcher_unavailable": "❌ Ошибка: Не удалось получить доступ к диспетчеру команд для выполнения триггера '<code>{phrase}</code>'. Убедитесь, что ваш юзербот корректно настроен.",
     }
 
     def __init__(self):
@@ -84,8 +85,8 @@ class CustomTriggersMod(loader.Module):
             loader.ConfigValue(
                 "triggers",
                 [],
-                lambda: "Список настроенных триггеров. Не редактируйте вручную.", # User should use commands, not edit directly
-                validator=loader.validators.Series() # Исправлено: просто Series, без указания внутреннего валидатора
+                lambda: "Список настроенных триггеров. Не редактируйте вручную.",
+                validator=loader.validators.Series()
             ),
         )
         self._client = None
@@ -202,6 +203,7 @@ class CustomTriggersMod(loader.Module):
             return
 
         # Пропускаем сообщения от самого себя, чтобы не создавать рекурсию команд
+        # (например, если триггер запускает команду, которая сама содержит триггер)
         if message.sender_id == self._self_id:
             return
 
@@ -250,20 +252,30 @@ class CustomTriggersMod(loader.Module):
 
                 if trigger["is_command"]:
                     # Simulate command execution
+                    # Check if client and dispatcher are available
+                    if not self._client or not hasattr(self._client, 'dispatcher'):
+                        logger.error(self.strings("command_dispatcher_unavailable").format(phrase=trigger["phrase"]))
+                        # Send error message to chat if dispatcher is not available
+                        await self._client.send_message(chat_id, self.strings("command_dispatcher_unavailable").format(phrase=trigger["phrase"]))
+                        return # Stop processing this trigger
+                    
                     try:
+                        # Send the command as a reply. It will be an outgoing message.
                         temp_message = await message.reply(
                             response_text,
-                            parse_mode=None # Crucial for command execution
+                            parse_mode=None # Crucial for command execution to treat as raw text
                         )
-                        # Ensure the temporary message is marked as outgoing and from the current userbot
-                        # sender_id is already correctly set by message.reply() for an outgoing message.
-                        temp_message.out = True
+                        # The `temp_message` returned by `message.reply()` for an outgoing message
+                        # will already have `out=True` and `sender_id` set to `self._self_id`.
+                        # Explicitly setting `temp_message.out = True` is redundant but harmless.
+                        # Do NOT try to set sender_id, as it's read-only.
 
-                        # Use parse_command to execute the command
-                        await self.allmodules.parse_command(temp_message)
+                        # Use the client's dispatcher to parse and execute the command
+                        await self._client.dispatcher.parse_command(temp_message)
                         logger.info(self.strings("command_executed").format(phrase=trigger["phrase"]))
 
                         # Delete the temporary message if it was successfully processed as a command
+                        # This makes the command execution "silent" from the chat's perspective.
                         if temp_message:
                             await temp_message.delete()
 
