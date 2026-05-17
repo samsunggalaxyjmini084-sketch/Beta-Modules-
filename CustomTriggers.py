@@ -65,7 +65,6 @@ class CustomTriggersMod(loader.Module):
         "sender_name_unknown": "Неизвестный отправитель",
         "trigger_type_text": "Текст",
         "trigger_type_command": "Команда",
-        "command_dispatcher_unavailable": "❌ Ошибка: Не удалось выполнить команду для триггера '<code>{phrase}</code>'. Метод <code>allmodules.parse_command</code> недоступен в вашем фреймворке. Пожалуйста, сообщите об этом разработчику фреймворка.",
     }
 
     def __init__(self):
@@ -85,8 +84,8 @@ class CustomTriggersMod(loader.Module):
             loader.ConfigValue(
                 "triggers",
                 [],
-                lambda: "Список настроенных триггеров. Не редактируйте вручную.",
-                validator=loader.validators.Series()
+                lambda: "Список настроенных триггеров. Не редактируйте вручную.", # User should use commands, not edit directly
+                validator=loader.validators.Series() # Исправлено: просто Series, без указания внутреннего валидатора
             ),
         )
         self._client = None
@@ -203,7 +202,6 @@ class CustomTriggersMod(loader.Module):
             return
 
         # Пропускаем сообщения от самого себя, чтобы не создавать рекурсию команд
-        # (например, если триггер запускает команду, которая сама содержит триггер)
         if message.sender_id == self._self_id:
             return
 
@@ -252,29 +250,26 @@ class CustomTriggersMod(loader.Module):
 
                 if trigger["is_command"]:
                     # Simulate command execution
-                    # Check if self.allmodules and its parse_command method are available
-                    if not hasattr(self.allmodules, 'parse_command'):
-                        logger.error(self.strings("command_dispatcher_unavailable").format(phrase=trigger["phrase"]))
-                        # Send error message to chat if dispatcher is not available
-                        await self._client.send_message(chat_id, self.strings("command_dispatcher_unavailable").format(phrase=trigger["phrase"]))
-                        return # Stop processing this trigger
-                    
                     try:
-                        # Send the command as a reply. It will be an outgoing message.
+                        # Create a temporary message object to hold the command
+                        # This mimics a userbot sending a command to itself.
+                        # Using message.reply() for better context and to avoid sending to peer_id directly
+                        # The `parse_mode=None` is crucial here to ensure the command is treated as raw text.
+                        # `self.allmodules.parse_command` expects an outgoing message for commands
+                        # originating from the userbot itself.
                         temp_message = await message.reply(
                             response_text,
-                            parse_mode=None # Crucial for command execution to treat as raw text
+                            parse_mode=None # Crucial for command execution
                         )
-                        # The `temp_message` returned by `message.reply()` for an outgoing message
-                        # will already have `out=True` and `sender_id` set to `self._self_id`.
-                        # No need to manually set these.
+                        # Ensure the temporary message is marked as outgoing and from the current userbot
+                        temp_message.out = True
+                        temp_message.sender_id = self._self_id
 
-                        # Use the allmodules object to parse and execute the command
-                        await self.allmodules.parse_command(temp_message) 
+                        # Use parse_command to execute the command
+                        await self.allmodules.parse_command(temp_message)
                         logger.info(self.strings("command_executed").format(phrase=trigger["phrase"]))
 
                         # Delete the temporary message if it was successfully processed as a command
-                        # This makes the command execution "silent" from the chat's perspective.
                         if temp_message:
                             await temp_message.delete()
 
