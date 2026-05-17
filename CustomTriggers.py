@@ -251,19 +251,13 @@ class CustomTriggersMod(loader.Module):
                 if trigger["is_command"]:
                     # Simulate command execution
                     try:
-                        # Create a temporary message object to hold the command
-                        # This mimics a userbot sending a command to itself.
-                        # Using message.reply() for better context and to avoid sending to peer_id directly
-                        # The `parse_mode=None` is crucial here to ensure the command is treated as raw text.
-                        # `self.allmodules.parse_command` expects an outgoing message for commands
-                        # originating from the userbot itself.
                         temp_message = await message.reply(
                             response_text,
                             parse_mode=None # Crucial for command execution
                         )
                         # Ensure the temporary message is marked as outgoing and from the current userbot
+                        # sender_id is already correctly set by message.reply() for an outgoing message.
                         temp_message.out = True
-                        temp_message.sender_id = self._self_id
 
                         # Use parse_command to execute the command
                         await self.allmodules.parse_command(temp_message)
