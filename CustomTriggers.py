@@ -86,13 +86,7 @@ class CustomTriggersMod(loader.Module):
                 [],
                 lambda: "Список настроенных триггеров. Не редактируйте вручную.", # User should use commands, not edit directly
                 validator=loader.validators.Series(
-                    loader.validators.Dict(
-                        keys={
-                            "phrase": loader.validators.String(),
-                            "response": loader.validators.String(),
-                            "is_command": loader.validators.Boolean(),
-                        }
-                    )
+                    loader.validators.Object() # Исправлено с Dict на Object
                 )
             ),
         )
@@ -209,6 +203,10 @@ class CustomTriggersMod(loader.Module):
         if not self.config["enabled"]:
             return
 
+        # Пропускаем сообщения от самого себя, чтобы не создавать рекурсию команд
+        if message.sender_id == self._self_id:
+            return
+
         if not getattr(message, 'text', None):
             return
 
@@ -257,14 +255,15 @@ class CustomTriggersMod(loader.Module):
                     try:
                         # Create a temporary message object to hold the command
                         # This mimics a userbot sending a command to itself.
-                        temp_message = await message.client.send_message(
-                            message.peer_id, # Send to the same chat
+                        # Using message.reply() for better context and to avoid sending to peer_id directly
+                        # The `parse_mode=None` is crucial here to ensure the command is treated as raw text.
+                        # `self.allmodules.parse_command` expects an outgoing message for commands
+                        # originating from the userbot itself.
+                        temp_message = await message.reply(
                             response_text,
-                            reply_to=message.id, # Optionally reply to original message for context
-                            parse_mode=None, # Important: disable parsing to ensure command is raw
-                            silent=True # Don't notify users about this 'internal' message
+                            parse_mode=None # Crucial for command execution
                         )
-                        # Mark the message as outgoing from self, essential for parse_command to work
+                        # Ensure the temporary message is marked as outgoing and from the current userbot
                         temp_message.out = True
                         temp_message.sender_id = self._self_id
 
