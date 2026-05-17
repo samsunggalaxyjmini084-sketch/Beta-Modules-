@@ -65,7 +65,7 @@ class CustomTriggersMod(loader.Module):
         "sender_name_unknown": "Неизвестный отправитель",
         "trigger_type_text": "Текст",
         "trigger_type_command": "Команда",
-        "command_dispatcher_unavailable": "❌ Ошибка: Не удалось получить доступ к диспетчеру команд для выполнения триггера '<code>{phrase}</code>'. Убедитесь, что ваш юзербот корректно настроен.",
+        "command_dispatcher_unavailable": "❌ Ошибка: Не удалось выполнить команду для триггера '<code>{phrase}</code>'. Метод <code>allmodules.parse_command</code> недоступен в вашем фреймворке. Пожалуйста, сообщите об этом разработчику фреймворка.",
     }
 
     def __init__(self):
@@ -252,8 +252,8 @@ class CustomTriggersMod(loader.Module):
 
                 if trigger["is_command"]:
                     # Simulate command execution
-                    # Check if client and dispatcher are available
-                    if not self._client or not hasattr(self._client, 'dispatcher'):
+                    # Check if self.allmodules and its parse_command method are available
+                    if not hasattr(self.allmodules, 'parse_command'):
                         logger.error(self.strings("command_dispatcher_unavailable").format(phrase=trigger["phrase"]))
                         # Send error message to chat if dispatcher is not available
                         await self._client.send_message(chat_id, self.strings("command_dispatcher_unavailable").format(phrase=trigger["phrase"]))
@@ -267,11 +267,10 @@ class CustomTriggersMod(loader.Module):
                         )
                         # The `temp_message` returned by `message.reply()` for an outgoing message
                         # will already have `out=True` and `sender_id` set to `self._self_id`.
-                        # Explicitly setting `temp_message.out = True` is redundant but harmless.
-                        # Do NOT try to set sender_id, as it's read-only.
+                        # No need to manually set these.
 
-                        # Use the client's dispatcher to parse and execute the command
-                        await self._client.dispatcher.parse_command(temp_message)
+                        # Use the allmodules object to parse and execute the command
+                        await self.allmodules.parse_command(temp_message) 
                         logger.info(self.strings("command_executed").format(phrase=trigger["phrase"]))
 
                         # Delete the temporary message if it was successfully processed as a command
