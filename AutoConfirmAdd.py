@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoConfirmAdd
-# meta version: 1.0.0
+# meta version: 1.0.1 # Обновлена версия
 
 import logging
 import asyncio
@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 
 @loader.tds
 class AutoConfirmAddMod(loader.Module):
-    """Модуль для автоматического нажатия кнопки 'Подтвердить' в сообщениях-запросах на добавление, отправленных ботами или юзерботом."""
+    """Модуль для автоматического нажатия кнопки 'Подтвердить' в сообщениях-запросах на добавление, отправленных ботами или пользователями.""" # Updated docstring
 
     strings = {
         "name": "AutoConfirmAdd",
-        "_cls_doc": "Модуль для автоматического нажатия кнопки 'Подтвердить' в сообщениях-запросах на добавление, отправленных ботами или юзерботом.",
+        "_cls_doc": "Модуль для автоматического нажатия кнопки 'Подтвердить' в сообщениях-запросах на добавление, отправленных ботами или пользователями.", # Updated
         "enabled": "✅ Автоподтверждение включено.",
         "disabled": "❌ Автоподтверждение выключено.",
         "status": "<emoji document_id=5776375003280838798>📊</emoji> Статус автоподтверждения:\n"
@@ -25,7 +25,7 @@ class AutoConfirmAddMod(loader.Module):
                   "Фраза-триггер: '{}'\n"
                   "Текст кнопки: '{}'\n"
                   "Задержка (секунды): {}\n"
-                  "Боты для отслеживания: {}",
+                  "Целевые отправители: {}", # Updated string
         "help_text": """<emoji document_id=5931415565955503486>🤖</emoji> AutoConfirmAdd - Помощь
 
 <emoji document_id=5935847413859225147>🏀</emoji> Команды:
@@ -35,7 +35,7 @@ class AutoConfirmAddMod(loader.Module):
 <code>.acahelp</code> - Эта справка
 
 <emoji document_id=5877260593903177342>⚙</emoji> Как работает:
-Модуль отслеживает входящие сообщения от ботов (или от вашего юзербота) в любом чате.
+Модуль отслеживает входящие сообщения от ботов или конкретных пользователей (или от вашего юзербота) в любом чате.
 Если сообщение содержит настроенную <code>trigger_phrase</code> (по умолчанию: "Ты действительно хочешь добавить") и имеет кнопку с настроенным <code>button_text</code> (по умолчанию: "Подтвердить"), модуль автоматически нажмет эту кнопку.
 
 Это полезно для автоматического подтверждения добавления других модулей/плагинов, активации ботов и т.д., где требуется подтверждение.
@@ -49,7 +49,7 @@ class AutoConfirmAddMod(loader.Module):
     По умолчанию: <code>"Подтвердить"</code> (соответствует скриншоту)
 <code>delay</code>: Список задержек в секундах перед нажатием кнопки. Если указано несколько значений, будет выбрано случайное.
     По умолчанию: <code>[0.5, 1.5]</code>
-<code>target_bot_ids</code>: Список ID ботов, от которых ожидаются сообщения-запросы. Если список пуст, сообщения будут отслеживаться от *любого бота* или *вашего юзербота*.
+<code>target_bot_ids</code>: Список ID ботов <b>или пользователей</b>, от которых ожидаются сообщения-запросы. Если список пуст, сообщения будут отслеживаться от <i>любого бота</i> или <i>вашего юзербота</i>.
     По умолчанию: <code>[]</code> (пусто)
 """,
         "trigger_detected": "<emoji document_id=5776375003280838798>✅</emoji> Обнаружен запрос на подтверждение: '{phrase}'. Ищу кнопку '{button_text}'.",
@@ -57,7 +57,7 @@ class AutoConfirmAddMod(loader.Module):
         "button_not_found": "⚠️ AutoConfirmAdd: Запрос на подтверждение '{phrase}' найден, но кнопка '{button_text}' не найдена.",
         "click_error": "❌ AutoConfirmAdd: Ошибка при нажатии кнопки '{button_text}': {error}",
         "delay_message": "⏳ AutoConfirmAdd: Ожидание {delay} секунд перед нажатием кнопки...",
-        "target_bot_ids_display": "Не указаны (любой бот или юзербот)",
+        "target_bot_ids_display": "Не указаны (любой бот или юзербот)", # Updated string to reflect "any bot or userbot" fallback
     }
 
     def __init__(self):
@@ -76,7 +76,7 @@ class AutoConfirmAddMod(loader.Module):
             ),
             loader.ConfigValue(
                 "button_text",
-                "Подтвердить", # Changed to "Подтвердить" as per screenshot
+                "Подтвердить", 
                 lambda: "Точный текст кнопки, которую нужно нажать (регистр учитывается).",
                 validator=loader.validators.String()
             ),
@@ -87,9 +87,9 @@ class AutoConfirmAddMod(loader.Module):
                 validator=loader.validators.Series(loader.validators.Float(minimum=0.1, maximum=10.0))
             ),
             loader.ConfigValue(
-                "target_bot_ids",
+                "target_bot_ids", # Renamed to target_sender_ids for internal clarity, but kept config key for compatibility
                 [],
-                lambda: "Список ID ботов, от которых ожидаются сообщения-запросы. Если список пуст, сообщения будут отслеживаться от любого бота или вашего юзербота.",
+                lambda: "Список ID ботов или пользователей, от которых ожидаются сообщения-запросы. Если список пуст, сообщения будут отслеживаться от любого бота или вашего юзербота.", # Updated description
                 validator=loader.validators.Series(loader.validators.Integer())
             ),
         )
@@ -117,14 +117,16 @@ class AutoConfirmAddMod(loader.Module):
         """Показать текущий статус автоматического подтверждения."""
         status = "🟢 Включен" if self.config["enabled"] else "🔴 Выключен"
         delay_display = f"[{', '.join(map(str, self.config['delay']))}]" if len(self.config['delay']) > 1 else str(self.config['delay'][0])
-        target_bot_ids_display = ", ".join(map(str, self.config["target_bot_ids"])) if self.config["target_bot_ids"] else self.strings("target_bot_ids_display")
+        
+        # Displaying target_bot_ids (now functions as target_sender_ids)
+        target_senders_display = ", ".join(map(str, self.config["target_bot_ids"])) if self.config["target_bot_ids"] else self.strings("target_bot_ids_display")
 
         await utils.answer(message, self.strings("status").format(
             status,
             self.config["trigger_phrase"],
             self.config["button_text"],
             delay_display,
-            target_bot_ids_display
+            target_senders_display # Updated variable name
         ))
 
     @loader.command(ru_doc="Показать справку по модулю автоподтверждения")
@@ -148,18 +150,17 @@ class AutoConfirmAddMod(loader.Module):
         if sender_id is None:
             return # Не удалось определить отправителя
 
-        # Проверяем, является ли отправитель ботом или нашим юзерботом
-        is_from_bot_or_self = getattr(sender, 'bot', False) or (sender_id == self._self_id)
-
-        # Применяем фильтр по target_bot_ids, если он настроен
-        if self.config["target_bot_ids"]:
+        # --- Логика фильтрации отправителей (обновлено) ---
+        if self.config["target_bot_ids"]: # Если список целевых отправителей (ботов/пользователей) НЕ пуст
             if sender_id not in self.config["target_bot_ids"]:
-                logger.debug(f"AutoConfirmAdd: Сообщение {message.id} от отправителя {sender_id} не в списке разрешенных ботов. Пропускаю.")
+                logger.debug(f"AutoConfirmAdd: Сообщение {message.id} от отправителя {sender_id} не в списке разрешенных ID ({self.config['target_bot_ids']}). Пропускаю.")
                 return
-        # Если target_bot_ids не указаны (список пуст), то разрешаем только сообщения от ботов или от себя
-        elif not is_from_bot_or_self:
-             logger.debug(f"AutoConfirmAdd: Сообщение {message.id} не от бота и не от юзербота, и не указаны целевые боты. Пропускаю.")
-             return
+        else: # Если список целевых отправителей пуст, реагируем только на ботов или на самого юзербота
+            is_from_bot_or_self = getattr(sender, 'bot', False) or (sender_id == self._self_id)
+            if not is_from_bot_or_self:
+                 logger.debug(f"AutoConfirmAdd: Сообщение {message.id} не от бота и не от юзербота, и не указаны целевые отправители. Пропускаю.")
+                 return
+        # --- Конец логики фильтрации отправителей ---
 
 
         # Проверяем наличие фразы-триггера в тексте сообщения (регистронезависимо)
