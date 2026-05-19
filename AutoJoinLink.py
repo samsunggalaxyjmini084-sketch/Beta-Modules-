@@ -1,81 +1,61 @@
-# meta developer: @hdjsfzbxm
-# meta name: AutoJoinLink
-# meta version: 1.0.2 # Версия обновлена
+ meta developer: @yourhandle
+# meta name: AutoJoinChat
+# meta version: 1.0.0
 
 import logging
-import re
-import urllib.parse
 import asyncio
-from telethon.tl.types import Message, MessageEntityTextUrl, MessageEntityUrl
-# ИСПРАВЛЕНО: Импортируем модуль errors из telethon
-from telethon import errors
+import random
+import re
+from telethon.tl.types import Message, MessageEntityUrl, MessageEntityTextUrl, Channel, Chat, User
+from telethon.tl.functions.channels import JoinChannelRequest
 from telethon.tl.functions.messages import ImportChatInviteRequest
-
 from .. import loader, utils
 
 logger = logging.getLogger(__name__)
 
-# Вспомогательная функция для разбора ссылок Telegram
-def _parse_telegram_link(url: str):
-    """
-    Разбирает ссылку Telegram (t.me, telegram.me, tg://) и возвращает
-    стандартизированную ссылку, такую как "invite:HASH" или "username:USERNAME".
-    Возвращает None, если это не распознанная ссылка на чат/канал Telegram.
-    """
-    parsed_url = urllib.parse.urlparse(url)
-
-    if parsed_url.scheme in ["http", "https"] and parsed_url.hostname in ["t.me", "telegram.me"]:
-        path_parts = parsed_url.path.lstrip('/').split('/')
-        if path_parts:
-            if path_parts[0] == "joinchat" and len(path_parts) > 1:
-                return f"invite:{path_parts[1]}"
-            elif path_parts[0]:
-                if re.fullmatch(r"[a-zA-Z0-9_]+", path_parts[0]):
-                    return f"username:{path_parts[0]}"
-    elif parsed_url.scheme == "tg":
-        if parsed_url.hostname == "join":
-            query_params = urllib.parse.parse_qs(parsed_url.query)
-            invite_hash = query_params.get('invite', [None])[0]
-            if invite_hash:
-                return f"invite:{invite_hash}"
-        elif parsed_url.hostname == "resolve":
-            query_params = urllib.parse.parse_qs(parsed_url.query)
-            domain = query_params.get('domain', [None])[0]
-            if domain:
-                if re.fullmatch(r"[a-zA-Z0-9_]+", domain):
-                    return f"username:{domain}"
-    return None
-
 
 @loader.tds
-class AutoJoinLinkMod(loader.Module):
-    """
-    Модуль для автоматического входа в чаты/каналы Telegram по ссылкам,
-    размещенным в определенных чатах.
-    """
+class AutoJoinChatMod(loader.Module):
+    """Модуль для автоматического присоединения к чатам/каналам Telegram по ссылкам, найденным в сообщениях."""
 
     strings = {
-        "name": "AutoJoinLink",
-        "_cls_doc": "Автоматически заходит по ссылкам на чаты/каналы Telegram.",
-        "config_watch_chats_doc": "Список ID чатов, где модуль будет отслеживать ссылки. Если список пуст, отслеживание ведется во всех чатах.",
-        "config_status": "<b><emoji document_id=5875291072225087249>📊</emoji> Статус AutoJoinLink:</b>\n"
-                         "Статус: {}\n"
-                         "Чаты для отслеживания ссылок: {}\n",
-        "enabled": "✅ AutoJoinLink включен.",
-        "disabled": "❌ AutoJoinLink выключен.",
-        "watch_chats_display_all": "Все чаты",
-        "watch_chats_display_ids": "<code>{}</code>",
-        "link_found_prefix": "🔗 Обнаружена ссылка на чат/канал: ",
-        "joining_chat": "➡️ Пытаюсь присоединиться к чату/каналу по ссылке: <code>{link_ref}</code>",
-        "join_success": "✅ Успешно присоединился к: <code>{link_ref}</code>",
-        "already_participant": "ℹ️ Уже являюсь участником чата/канала по ссылке: <code>{link_ref}</code>",
-        "invite_expired_invalid": "❌ Ссылка устарела или недействительна: <code>{link_ref}</code>",
-        "flood_wait": "⏳ Превышен лимит запросов, попробуйте позже. Ссылка: <code>{link_ref}</code> (Ожидайте {seconds}с)",
-        "private_channel_error": "❌ Не удалось присоединиться к приватному чату/каналу по ссылке: <code>{link_ref}</code>. Возможно, нужна дополнительная инвайт-ссылка или это приватный канал без публичной ссылки.",
-        "peer_invalid_error": "❌ Неверный Peer ID или недействительное имя пользователя для ссылки: <code>{link_ref}</code>.",
-        "other_join_error": "❌ Неизвестная ошибка при присоединении к <code>{link_ref}</code>: <code>{error}</code>",
+        "name": "AutoJoinChat",
+        "_cls_doc": "Модуль для автоматического присоединения к чатам/каналам Telegram по ссылкам, найденным в сообщениях. Поддерживает отслеживание ссылок в определенном чате или во всех чатах.",
+        "enabled": "✅ Автовход по ссылкам включен.",
+        "disabled": "❌ Автовход по ссылкам выключен.",
+        "status": "<emoji document_id=5875291072225087249>📊</emoji> Статус автовхода по ссылкам:\n"
+                  "Статус: {}\n"
+                  "Чат для отслеживания ссылок: {}\n"
+                  "Задержка перед входом (секунды): {}",
+        "help_text": """<emoji document_id=5931415565955503486>🤖</emoji> AutoJoinChat - Помощь
+
+<emoji document_id=5935847413859225147>🏀</emoji> Команды:
+<code>.ajcon</code> - Включить автовход по ссылкам
+<code>.ajcoff</code> - Выключить автовход по ссылкам
+<code>.ajcsetchat &lt;ID чата&gt;</code> - Установить ID чата, в котором модуль будет отслеживать ссылки. Если <code>0</code>, отслеживаются все чаты.
+<code>.ajcstatus</code> - Показать статус
+<code>.ajchelp</code> - Эта справка
+
+<emoji document_id=5877260593903177342>⚙</emoji> Как работает:
+Модуль отслеживает входящие сообщения. Если в сообщении найдена ссылка на Telegram чат/канал (например, <code>t.me/joinchat/...</code>, <code>t.me/+...</code>, <code>t.me/channel_username</code>), модуль автоматически пытается присоединиться к этому чату/каналу.
+
+Можно настроить конкретный чат, в котором будут отслеживаться ссылки. Если чат для отслеживания не указан (или установлен в <code>0</code>), модуль будет реагировать на ссылки во всех чатах, где он активен.
+
+<emoji document_id=5843843420468024653>⭐️</emoji> Настройки:
+В конфиге модуля можно изменить:
+<code>enabled</code>: Включено ли автоматическое присоединение. По умолчанию: <code>False</code>.
+<code>listening_chat_id</code>: ID чата, в котором модуль будет отслеживать ссылки. Установите <code>0</code>, чтобы отслеживать ссылки во всех чатах. По умолчанию: <code>0</code>.
+<code>join_delay</code>: Список задержек в секундах перед попыткой присоединения. Если указано несколько, будет выбрано случайное. По умолчанию: <code>[1.0, 3.0]</code>.
+""",
+        "listening_chat_display_all": "Все чаты",
+        "listening_chat_display_specific": "<code>{}</code>",
+        "set_chat_usage": "⚠️ Использование: <code>.ajcsetchat &lt;ID чата&gt;</code> (например, <code>.ajcsetchat -1001234567890</code> или <code>.ajcsetchat 0</code> для всех чатов).",
+        "chat_set_success": "✅ Чат для отслеживания ссылок установлен: {}.",
         "no_links_found": "ℹ️ В сообщении не найдено ссылок на Telegram чаты/каналы.",
-        "error_parsing_link": "❌ Ошибка при разборе ссылки <code>{}</code>: {}",
+        "delay_before_join": "⏳ AutoJoinChat: Обнаружена ссылка '{link}'. Ожидание {delay} секунд перед присоединением...",
+        "joined_chat": "🎉 AutoJoinChat: Успешно присоединен к чату/каналу по ссылке '{link}'.",
+        "join_error": "❌ AutoJoinChat: Ошибка при присоединении к чату/каналу по ссылке '{link}': {error}",
+        "processing_link": "🔍 AutoJoinChat: Обработка ссылки: {link}",
     }
 
     def __init__(self):
@@ -83,147 +63,172 @@ class AutoJoinLinkMod(loader.Module):
             loader.ConfigValue(
                 "enabled",
                 False,
-                lambda: "Включен ли модуль автоматического входа в чаты по ссылкам",
+                lambda: "Включено ли автоматическое присоединение к чатам/каналам по ссылкам",
                 validator=loader.validators.Boolean()
             ),
             loader.ConfigValue(
-                "watch_chat_ids",
-                [],
-                lambda: self.strings("config_watch_chats_doc"),
-                validator=loader.validators.Series(loader.validators.Integer())
+                "listening_chat_id",
+                0, # 0 means all chats
+                lambda: "ID чата, в котором модуль будет отслеживать ссылки. Установите 0, чтобы отслеживать ссылки во всех чатах.",
+                validator=loader.validators.Integer(minimum=0)
+            ),
+            loader.ConfigValue(
+                "join_delay",
+                [1.0, 3.0], # Random delay between 1 and 3 seconds
+                lambda: "Список задержек в секундах перед попыткой присоединения. Если указано несколько, будет выбрано случайное.",
+                validator=loader.validators.Series(loader.validators.Float(minimum=0.1, maximum=30.0))
             ),
         )
+        self._client = None
+        self._self_id = None
+        self._processed_messages = set() # Для отслеживания уже обработанных сообщений
+        self._processed_messages_cleanup_task = None
 
     async def client_ready(self, client, _):
         self._client = client
         self._self_id = (await self._client.get_me()).id
+        if self._processed_messages_cleanup_task is None:
+            self._processed_messages_cleanup_task = asyncio.create_task(self._cleanup_processed_messages_loop())
 
+    async def _cleanup_processed_messages_loop(self):
+        """Периодически очищает набор обработанных ID сообщений."""
+        while True:
+            await asyncio.sleep(300) # Очищать каждые 5 минут
+            if self._processed_messages:
+                logger.debug(f"AutoJoinChat: Очистка {len(self._processed_messages)} обработанных ID сообщений.")
+                self._processed_messages.clear()
+            
+    async def _on_unload(self):
+        """Останавливает задачи при выгрузке модуля."""
+        if self._processed_messages_cleanup_task:
+            self._processed_messages_cleanup_task.cancel()
+            try:
+                await self._processed_messages_cleanup_task
+            except asyncio.CancelledError:
+                logger.debug("AutoJoinChat: Задача очистки обработанных сообщений отменена.")
 
-    @loader.command(ru_doc="Включить модуль AutoJoinLink")
-    async def ajlon(self, message: Message):
-        """Включить модуль AutoJoinLink"""
+    @loader.command(ru_doc="Включить автовход по ссылкам")
+    async def ajcon(self, message: Message):
+        """Включить автовход по ссылкам."""
         self.config["enabled"] = True
         await utils.answer(message, self.strings("enabled"))
 
-    @loader.command(ru_doc="Выключить модуль AutoJoinLink")
-    async def ajloff(self, message: Message):
-        """Выключить модуль AutoJoinLink"""
+    @loader.command(ru_doc="Выключить автовход по ссылкам")
+    async def ajcoff(self, message: Message):
+        """Выключить автовход по ссылкам."""
         self.config["enabled"] = False
         await utils.answer(message, self.strings("disabled"))
 
-    @loader.command(ru_doc="Показать статус модуля AutoJoinLink")
-    async def ajlstatus(self, message: Message):
-        """Показать статус модуля AutoJoinLink"""
-        status_text = "🟢 Включен" if self.config["enabled"] else "🔴 Выключен"
-        watch_chats_display = self.strings("watch_chats_display_all")
-        if self.config["watch_chat_ids"]:
-            watch_chats_display = self.strings("watch_chats_display_ids").format(
-                ", ".join(map(str, self.config["watch_chat_ids"]))
-            )
+    @loader.command(ru_doc="Установить ID чата для отслеживания ссылок")
+    async def ajcsetchat(self, message: Message):
+        """Установить ID чата, в котором модуль будет отслеживать ссылки. Установите 0, чтобы отслеживать ссылки во всех чатах."""
+        args = utils.get_args_raw(message)
+        try:
+            chat_id = int(args)
+            self.config["listening_chat_id"] = chat_id
+            
+            chat_display_name = ""
+            if chat_id == 0:
+                chat_display_name = self.strings("listening_chat_display_all")
+            else:
+                chat_display_name = self.strings("listening_chat_display_specific").format(chat_id)
+
+            await utils.answer(message, self.strings("chat_set_success").format(chat_display_name))
+        except ValueError:
+            await utils.answer(message, self.strings("set_chat_usage"))
+
+    @loader.command(ru_doc="Показать статус автовхода по ссылкам")
+    async def ajcstatus(self, message: Message):
+        """Показать текущий статус автовхода по ссылкам."""
+        status = "🟢 Включен" if self.config["enabled"] else "🔴 Выключен"
         
-        await utils.answer(message, self.strings("config_status").format(
-            status_text,
-            watch_chats_display
+        listening_chat_id = self.config["listening_chat_id"]
+        chat_display_name = ""
+        if listening_chat_id == 0:
+            chat_display_name = self.strings("listening_chat_display_all")
+        else:
+            chat_display_name = self.strings("listening_chat_display_specific").format(listening_chat_id)
+
+        join_delays = self.config["join_delay"]
+        delay_display = f"[{', '.join(map(str, join_delays))}]" if len(join_delays) > 1 else str(join_delays[0])
+
+        await utils.answer(message, self.strings("status").format(
+            status,
+            chat_display_name,
+            delay_display
         ))
+
+    @loader.command(ru_doc="Показать справку по модулю автовхода по ссылкам")
+    async def ajchelp(self, message: Message):
+        """Показать справку по модулю AutoJoinChat."""
+        await utils.answer(message, self.strings("help_text"))
 
     @loader.watcher(incoming=True, outgoing=False)
     async def watcher(self, message: Message):
-        """Слушает входящие сообщения на наличие ссылок на чаты/каналы."""
+        """Отслеживает входящие сообщения для обнаружения ссылок и автоматического присоединения."""
         if not self.config["enabled"]:
             return
 
-        if message.sender_id == self._self_id:
+        if not getattr(message, 'text', None):
             return
 
-        if self.config["watch_chat_ids"] and message.chat_id not in self.config["watch_chat_ids"]:
+        message_identifier = (message.chat_id, message.id)
+        if message_identifier in self._processed_messages:
+            logger.debug(f"AutoJoinChat: Сообщение {message.id} в чате {message.chat_id} уже было обработано. Пропускаю.")
+            return
+        
+        self._processed_messages.add(message_identifier)
+
+        listening_chat_id = self.config["listening_chat_id"]
+        if listening_chat_id != 0 and message.chat_id != listening_chat_id:
+            logger.debug(f"AutoJoinChat: Сообщение в чате {message.chat_id} не соответствует настроенному чату для отслеживания ({listening_chat_id}). Пропускаю.")
             return
 
-        if not message.text:
-            return
+        found_links = set() # Используем set для хранения уникальных ссылок
 
-        unique_chat_refs = set()
-
+        # 1. Поиск ссылок через message.entities
         if message.entities:
             for entity in message.entities:
                 url_text = None
                 if isinstance(entity, MessageEntityUrl):
                     url_text = message.text[entity.offset:entity.offset + entity.length]
                 elif isinstance(entity, MessageEntityTextUrl):
-                    url_text = entity.url
+                    url_text = entity.url # Прямой URL из TextUrl
+                
+                if url_text and ("t.me/joinchat/" in url_text or "t.me/+" in url_text or re.search(r"t\.me/[a-zA-Z0-9_]{5,}", url_text)):
+                    if not url_text.startswith(("http://", "https://")):
+                        url_text = "https://" + url_text # Добавляем схему, если отсутствует
+                    found_links.add(url_text)
 
-                if url_text:
-                    try:
-                        ref = _parse_telegram_link(url_text)
-                        if ref:
-                            unique_chat_refs.add(ref)
-                    except Exception as e:
-                        logger.warning(self.strings("error_parsing_link").format(url_text, e))
+        # 2. Дополнительный поиск ссылок с помощью регулярного выражения в тексте сообщения
+        # Этот regex более общий, но может быть полезен, если сущности пропущены
+        telegram_link_pattern = r"(?:https?://)?t\.me/(?:joinchat/([a-zA-Z0-9_-]+)|(?:\+)?([a-zA-Z0-9_-]+)(?:\?.*)?|([a-zA-Z0-9_]{5,}))"
+        matches = re.findall(telegram_link_pattern, message.text)
+        for match in matches:
+            if match[0]: # joinchat invite hash
+                found_links.add(f"https://t.me/joinchat/{match[0]}")
+            elif match[1]: # +invite or channel username
+                found_links.add(f"https://t.me/{match[1]}")
+            elif match[2]: # channel username (at least 5 chars)
+                found_links.add(f"https://t.me/{match[2]}")
 
-
-        telegram_link_regex = r"(?:https?://)?(?:t\.me|telegram\.me)/(?:joinchat/([a-zA-Z0-9_-]+)|([a-zA-Z0-9_]+))"
-        tg_scheme_regex = r"tg://(?:join\?invite=([a-zA-Z0-9_-]+)|resolve\?domain=([a-zA-Z0-9_]+))"
-
-        for match in re.finditer(telegram_link_regex, message.text, re.IGNORECASE):
-            invite_hash = match.group(1)
-            username = match.group(2)
-            if invite_hash:
-                unique_chat_refs.add(f"invite:{invite_hash}")
-            elif username:
-                unique_chat_refs.add(f"username:{username}")
-        
-        for match in re.finditer(tg_scheme_regex, message.text, re.IGNORECASE):
-            invite_hash = match.group(1)
-            username = match.group(2)
-            if invite_hash:
-                unique_chat_refs.add(f"invite:{invite_hash}")
-            elif username:
-                unique_chat_refs.add(f"username:{username}")
-
-        if not unique_chat_refs:
-            logger.debug(f"AutoJoinLink: В сообщении {message.id} в чате {message.chat_id} не найдено ссылок на чаты Telegram.")
+        if not found_links:
+            logger.debug(f"AutoJoinChat: В сообщении {message.id} не найдено подходящих ссылок. Пропускаю.")
             return
 
-        response_messages = []
-        for ref in unique_chat_refs:
-            display_link_ref = ref
-            if ref.startswith("invite:"):
-                display_link_ref = f"t.me/joinchat/{ref.split(':')[1]}"
-            elif ref.startswith("username:"):
-                display_link_ref = f"t.me/{ref.split(':')[1]}"
-
-            response_messages.append(self.strings("link_found_prefix") + f"<code>{display_link_ref}</code>")
-            
-            logger.info(self.strings("joining_chat").format(link_ref=display_link_ref))
-            
+        for link in found_links:
+            logger.info(self.strings("processing_link").format(link=link))
             try:
-                if ref.startswith("invite:"):
-                    invite_hash = ref.split(":")[1]
-                    await self._client(ImportChatInviteRequest(invite_hash))
-                    response_messages.append(self.strings("join_success").format(link_ref=display_link_ref))
-                elif ref.startswith("username:"):
-                    username = ref.split(":")[1]
-                    if not username.startswith('@'):
-                        username = '@' + username
-                    await self._client.join_chat(username)
-                    response_messages.append(self.strings("join_success").format(link_ref=display_link_ref))
-                else:
-                    response_messages.append(self.strings("other_join_error").format(link_ref=display_link_ref, error="Неизвестный формат ссылки"))
+                join_delay = random.choice(self.config["join_delay"])
+                logger.info(self.strings("delay_before_join").format(link=link, delay=join_delay))
+                await asyncio.sleep(join_delay)
 
-            except errors.UserAlreadyParticipantError: # ИСПРАВЛЕНО: использование errors.
-                response_messages.append(self.strings("already_participant").format(link_ref=display_link_ref))
-            except (errors.InviteHashExpiredError, errors.InviteHashInvalidError): # ИСПРАВЛЕНО: использование errors.
-                response_messages.append(self.strings("invite_expired_invalid").format(link_ref=display_link_ref))
-            except errors.FloodWaitError as e: # ИСПРАВЛЕНО: использование errors.
-                response_messages.append(self.strings("flood_wait").format(link_ref=display_link_ref, seconds=e.seconds))
-            except errors.ChannelPrivateError: # ИСПРАВЛЕНО: использование errors.
-                response_messages.append(self.strings("private_channel_error").format(link_ref=display_link_ref))
-            except errors.PeerInvalidError: # ИСПРАВЛЕНО: использование errors.
-                response_messages.append(self.strings("peer_invalid_error").format(link_ref=display_link_ref))
+                # Используем высокоуровневый метод join_chat, который сам разбирается с типом ссылки
+                await self._client.join_chat(link)
+                logger.info(self.strings("joined_chat").format(link=link))
             except Exception as e:
-                logger.error(f"AutoJoinLink: Ошибка при присоединении по ссылке {ref}: {e}", exc_info=True)
-                response_messages.append(self.strings("other_join_error").format(link_ref=display_link_ref, error=e))
-            
-            await asyncio.sleep(1) 
-        
-        if response_messages:
-            await self._client.send_message(message.chat_id, "\n".join(response_messages))
+                # Если уже состоим в чате, это не ошибка, просто информационное сообщение
+                if "USER_ALREADY_PARTICIPANT" in str(e).upper():
+                    logger.info(f"AutoJoinChat: Уже состою в чате по ссылке '{link}'.")
+                else:
+                    logger.error(self.strings("join_error").format(link=link, error=e))
