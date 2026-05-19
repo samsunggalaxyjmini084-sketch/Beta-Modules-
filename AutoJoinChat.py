@@ -1,6 +1,6 @@
-# meta developer: @yourhandle
+meta developer: @yourhandle
 # meta name: AutoJoinChat
-# meta version: 1.0.0
+# meta version: 1.0.1 # Обновлена версия, так как сделаны уточнения и поправки
 
 import logging
 import asyncio
@@ -16,11 +16,11 @@ logger = logging.getLogger(__name__)
 
 @loader.tds
 class AutoJoinChatMod(loader.Module):
-    """Модуль для автоматического присоединения к чатам/каналам Telegram по ссылкам, найденным в сообщениях."""
+    """Модуль для автоматического присоединения к чатам/каналам Telegram по ссылкам, включая формат t.me/+, найденным в сообщениях.""" # Updated docstring
 
     strings = {
         "name": "AutoJoinChat",
-        "_cls_doc": "Модуль для автоматического присоединения к чатам/каналам Telegram по ссылкам, найденным в сообщениях. Поддерживает отслеживание ссылок в определенном чате или во всех чатах.",
+        "_cls_doc": "Модуль для автоматического присоединения к чатам/каналам Telegram по ссылкам, включая формат t.me/+, найденным в сообщениях. Поддерживает отслеживание ссылок в определенном чате или во всех чатах.", # Updated
         "enabled": "✅ Автовход по ссылкам включен.",
         "disabled": "❌ Автовход по ссылкам выключен.",
         "status": "<emoji document_id=5875291072225087249>📊</emoji> Статус автовхода по ссылкам:\n"
@@ -38,6 +38,7 @@ class AutoJoinChatMod(loader.Module):
 
 <emoji document_id=5877260593903177342>⚙</emoji> Как работает:
 Модуль отслеживает входящие сообщения. Если в сообщении найдена ссылка на Telegram чат/канал (например, <code>t.me/joinchat/...</code>, <code>t.me/+...</code>, <code>t.me/channel_username</code>), модуль автоматически пытается присоединиться к этому чату/каналу.
+<b>Важное уточнение:</b> Модуль корректно обрабатывает ссылки вида <code>https://t.me/+ИдентификаторПриглашения</code>.
 
 Можно настроить конкретный чат, в котором будут отслеживаться ссылки. Если чат для отслеживания не указан (или установлен в <code>0</code>), модуль будет реагировать на ссылки во всех чатах, где он активен.
 
@@ -45,7 +46,7 @@ class AutoJoinChatMod(loader.Module):
 В конфиге модуля можно изменить:
 <code>enabled</code>: Включено ли автоматическое присоединение. По умолчанию: <code>False</code>.
 <code>listening_chat_id</code>: ID чата, в котором модуль будет отслеживать ссылки. Установите <code>0</code>, чтобы отслеживать ссылки во всех чатах. По умолчанию: <code>0</code>.
-<code>join_delay</code>: Список задержек в секундах перед попыткой присоединения. Если указано несколько, будет выбрано случайное. По умолчанию: <code>[1.0, 3.0]</code>.
+<code>join_delay</code>: Список задержек в секундах перед попыткой присоединения. Используется случайное значение из списка, чтобы имитировать действие человека. Если указано несколько, будет выбрано случайное. По умолчанию: <code>[1.0, 3.0]</code>.
 """,
         "listening_chat_display_all": "Все чаты",
         "listening_chat_display_specific": "<code>{}</code>",
@@ -75,7 +76,7 @@ class AutoJoinChatMod(loader.Module):
             loader.ConfigValue(
                 "join_delay",
                 [1.0, 3.0], # Random delay between 1 and 3 seconds
-                lambda: "Список задержек в секундах перед попыткой присоединения. Если указано несколько, будет выбрано случайное.",
+                lambda: "Список задержек в секундах перед попыткой присоединения. Используется случайное значение из списка, чтобы имитировать действие человека.", # Clarified description
                 validator=loader.validators.Series(loader.validators.Float(minimum=0.1, maximum=30.0))
             ),
         )
@@ -195,22 +196,28 @@ class AutoJoinChatMod(loader.Module):
                 elif isinstance(entity, MessageEntityTextUrl):
                     url_text = entity.url # Прямой URL из TextUrl
                 
+                # Check for t.me links, including t.me/+
                 if url_text and ("t.me/joinchat/" in url_text or "t.me/+" in url_text or re.search(r"t\.me/[a-zA-Z0-9_]{5,}", url_text)):
                     if not url_text.startswith(("http://", "https://")):
                         url_text = "https://" + url_text # Добавляем схему, если отсутствует
                     found_links.add(url_text)
 
         # 2. Дополнительный поиск ссылок с помощью регулярного выражения в тексте сообщения
-        # Этот regex более общий, но может быть полезен, если сущности пропущены
-        telegram_link_pattern = r"(?:https?://)?t\.me/(?:joinchat/([a-zA-Z0-9_-]+)|(?:\+)?([a-zA-Z0-9_-]+)(?:\?.*)?|([a-zA-Z0-9_]{5,}))"
+        # Этот regex более общий и явно учитывает t.me/+
+        # Измененный паттерн для более надежного захвата t.me/+
+        # Группы: 1 - hash для joinchat/, 2 - идентификатор для t.me/+, 3 - username для t.me/username
+        telegram_link_pattern = r"(?:https?://)?t\.me/(?:joinchat/([a-zA-Z0-9_-]+)|(?:\+([a-zA-Z0-9_-]+))(?:\?.*)?|([a-zA-Z0-9_]{5,}))"
         matches = re.findall(telegram_link_pattern, message.text)
         for match in matches:
+            # match will be a tuple like (joinchat_hash, plus_invite, channel_username)
+            # Only one element in the tuple will be non-empty for a given match
             if match[0]: # joinchat invite hash
                 found_links.add(f"https://t.me/joinchat/{match[0]}")
-            elif match[1]: # +invite or channel username
-                found_links.add(f"https://t.me/{match[1]}")
+            elif match[1]: # +invite (captured as 'invite_hash' in group 1, so reconstruct)
+                found_links.add(f"https://t.me/+{match[1]}") # Explicitly add '+'
             elif match[2]: # channel username (at least 5 chars)
                 found_links.add(f"https://t.me/{match[2]}")
+
 
         if not found_links:
             logger.debug(f"AutoJoinChat: В сообщении {message.id} не найдено подходящих ссылок. Пропускаю.")
