@@ -1,4 +1,4 @@
-meta developer: @yourhandle
+# meta developer: @yourhandle
 # meta name: AutoJoinGame
 # meta version: 2.5.0 # Версия обновлена
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
