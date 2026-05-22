@@ -1,4 +1,4 @@
-# meta developer: @yourhandle
+meta developer: @yourhandle
 # meta name: AutoJoinGame
 # meta version: 2.5.0 # Версия обновлена
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
@@ -233,7 +233,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                 "button_keywords_profiles",
                 {"default": ["присоединиться", "играть", "🙋", "🎮", "✅"]}, # Default profile
                 lambda: "Словарь профилей ключевых слов для кнопок. Ключ - название профиля, значение - список ключевых слов (регистронезависимо). Цифры и скобки игнорируются при сравнении.",
-                # validator=loader.validators.Object() # <-- УДАЛЕНО: Вызывает AttributeError
+                # validator=loader.validators.Object() # <-- УДАЛЕНО: Вызывает AttributeError, поэтому оставлено без явного валидатора для сложных объектов.
             ),
             loader.ConfigValue( # NEW: active_button_keywords_profile
                 "active_button_keywords_profile",
@@ -366,6 +366,14 @@ Mafia Combat Premium <code>1634167847</code>""",
         if self._processed_messages_cleanup_task is None:
             self._processed_messages_cleanup_task = asyncio.create_task(self._cleanup_processed_messages_loop())
         
+        # NEW: Ensure button_keywords_profiles is a dictionary
+        if not isinstance(self.config["button_keywords_profiles"], dict):
+            logger.warning(
+                "AutoJoinGame: button_keywords_profiles в конфиге не является словарем. "
+                "Инициализация со значением по умолчанию."
+            )
+            self.config["button_keywords_profiles"] = {"default": ["присоединиться", "играть", "🙋", "🎮", "✅"]}
+
         # Ensure 'default' profile exists if not already present
         if "default" not in self.config["button_keywords_profiles"]:
             self.config["button_keywords_profiles"]["default"] = ["присоединиться", "играть", "🙋", "🎮", "✅"]
@@ -539,6 +547,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         # Display for button keywords profiles
         active_profile_name = self.config["active_button_keywords_profile"]
+        # Здесь .get() теперь безопасно, так как button_keywords_profiles гарантированно является словарем
         active_keywords = self.config["button_keywords_profiles"].get(active_profile_name, [])
         keywords_display = ", ".join(active_keywords) if active_keywords else "(пусто)"
 
@@ -627,6 +636,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         # Get active keywords for test
         active_profile_name = self.config["active_button_keywords_profile"]
+        # Здесь .get() теперь безопасно
         raw_keywords_for_test = self.config["button_keywords_profiles"].get(active_profile_name, [])
         # Normalize keywords for comparison in test
         keywords_to_check_for_test = [self._normalize_text(kw) for kw in raw_keywords_for_test]
@@ -750,6 +760,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                                         
                                         # Get and normalize active keywords for test
                                         active_profile_name_test = self.config["active_button_keywords_profile"]
+                                        # Здесь .get() теперь безопасно
                                         raw_keywords_test = self.config["button_keywords_profiles"].get(active_profile_name_test, [])
                                         normalized_keywords_test = [self._normalize_text(kw) for kw in raw_keywords_test]
 
@@ -1115,6 +1126,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
                 # Get active keywords and normalize them
                 active_profile_name = self.config["active_button_keywords_profile"]
+                # Здесь .get() теперь безопасно
                 raw_keywords = self.config["button_keywords_profiles"].get(active_profile_name, [])
                 normalized_keywords = [self._normalize_text(kw) for kw in raw_keywords]
 
