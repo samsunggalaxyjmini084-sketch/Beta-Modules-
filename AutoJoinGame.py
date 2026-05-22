@@ -233,7 +233,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                 "button_keywords_profiles",
                 {"default": ["присоединиться", "играть", "🙋", "🎮", "✅"]}, # Default profile
                 lambda: "Словарь профилей ключевых слов для кнопок. Ключ - название профиля, значение - список ключевых слов (регистронезависимо). Цифры и скобки игнорируются при сравнении.",
-                validator=loader.validators.Object() # Use Object to avoid specific Dict/Series validation issues
+                # validator=loader.validators.Object() # <-- УДАЛЕНО: Вызывает AttributeError
             ),
             loader.ConfigValue( # NEW: active_button_keywords_profile
                 "active_button_keywords_profile",
