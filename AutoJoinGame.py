@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.5.0 # Обновлена версия
+# meta version: 2.5.0 # Версия обновлена
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 0100000101010100010011110100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000101
@@ -527,7 +527,8 @@ Mafia Combat Premium <code>1634167847</code>""",
         status = "🟢 Включен" if self.config["enabled"] else "🔴 Выключен"
         
         delays = self.config["delays"]
-        delay_display = f"[{', '.'.join(map(str, delays))}]" if len(delays) > 1 else str(delays[0])
+        # Исправлено: убран лишний '.' в ', '.'.join'
+        delay_display = f"[{', '.join(map(str, delays))}]" if len(delays) > 1 else str(delays[0])
 
         lynch_delays = self.config["lynch_delay"]
         lynch_delay_display = f"[{', '.join(map(str, lynch_delays))}]" if len(lynch_delays) > 1 else str(lynch_delays[0])
@@ -1185,4 +1186,3 @@ Mafia Combat Premium <code>1634167847</code>""",
             
         except Exception as e:
             logger.exception(f"❌ AutoJoinGame: Критическая ошибка в watcher для сообщения {getattr(message, 'id', 'N/A')} в чате {getattr(message, 'chat_id', 'N/A')}: {e}")
-```
