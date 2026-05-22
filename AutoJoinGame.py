@@ -1,9 +1,9 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.5.1 # Версия обновлена
+# meta version: 2.4.2 # Версия обновлена
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 0100000101010100010011110100100101001110001000000100011101000001
-# 0100110101000101001000000100110101000100010101010100110001000101
+# 0100110101000101001000000100110101000100010101010100110001000111
 import logging
 import asyncio
 import random
@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from telethon.tl.types import Message, User
 from telethon import events
 import re
+from collections import defaultdict
 from .. import loader, utils
 
 logger = logging.getLogger(__name__)
@@ -19,14 +20,11 @@ logger = logging.getLogger(__name__)
 
 @loader.tds
 class AutoJoinGameMod(loader.Module):
-    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам.
-    
-    Расширенная настройка ключевых слов для кнопок: теперь можно создавать несколько профилей ключевых слов и переключаться между ними, а также игнорировать цифры и скобки при сравнении текста кнопок.
-    """
+    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам."""
 
     strings = {
         "name": "AutoJoinGame",
-        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Расширенная настройка ключевых слов для кнопок: теперь можно создавать несколько профилей ключевых слов и переключаться между ними, а также игнорировать цифры и скобки при сравнении текста кнопок.",
+        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам.",
         "enabled": "✅ Автовход в игру и автолинчевание включены.",
         "disabled": "❌ Автовход в игру и автолинчевание выключены.",
         "status": "<emoji document_id=5875291072225087249>📊</emoji> Статус автовхода и автолинчевания:\n"
@@ -35,7 +33,9 @@ class AutoJoinGameMod(loader.Module):
                   "Задержка линчевания (секунды): {}\n"
                   "Боты для отслеживания: {}\n"
                   "Разрешенные чаты: {}\n"
-                  "Активный профиль кнопок: {} (Ключевые слова: {})\n" # Изменено для профилей кнопок
+                  "Конфигурации ключевых слов кнопок (сырые): {}\n" # Изменено
+                  "Активная конфигурация ключевых слов: {} (Ключевые слова: {})\n" # Изменено
+                  "Доступные ID конфигураций: {}\n" # Добавлено
                   "Режим Deep-Link: {}\n"
                   "Маркер линчевания для '👎': {}\n"
                   "Фразы-триггеры входа в игру: {}\n"
@@ -73,7 +73,7 @@ class AutoJoinGameMod(loader.Module):
 <code>.ajgid</code> - Показать список ID ботов для мафии
 <code>.ajgtournaments</code> - Показать информацию о регистрации на турниры
 <code>.ajgshowtrackedroles</code> - Показать список найденных отслеживаемых ролей
-<code>.ajgsetprofile &lt;имя_профиля&gt;</code> - Установить активный профиль ключевых слов для кнопок.
+<code>.ajgswitchkeywords &lt;ID_конфига&gt;</code> - Переключить активную конфигурацию ключевых слов для кнопок.
 
 <emoji document_id=5877260593903177342>⚙</emoji> Как работает:
 Ждет сообщение о наборе в игру или о голосовании (линчевание/повешение) от указанных ботов (или от любого бота, если список пуст).
@@ -97,18 +97,18 @@ class AutoJoinGameMod(loader.Module):
 Можно указать список ID ботов, от которых ожидать сообщение о наборе.
 <b>Обновление:</b> Теперь параметр <code>bot_ids</code> включает в себя все боты, от которых ожидаются триггеры, включая ботов для голосования за игроков. Если список пуст, модуль будет работать со всеми ботами.
 Можно указать список ID чатов, в которых модуль будет активен. Если список пуст, модуль будет работать во всех чатах.
-<b>Настройка:</b> <code>button_keywords_config_string</code> - Строка, содержащая определения профилей ключевых слов для кнопок. Каждый профиль определяется как "ИМЯ_ПРОФИЛЯ: КЛЮЧЕВОЕ_СЛОВО1, КЛЮЧЕВОЕ_СЛОВО2;". Профили разделяются точкой с запятой. Регистр не учитывается, цифры и скобки игнорируются при сравнении.
-    Пример: <code>default: присоединиться, играть, 🙋, 🎮, ✅; baku: 🔴, 🔵; mafioso: 🔵, 🟠</code>
-<b>Настройка:</b> <code>active_button_profile_name</code> - Имя активного профиля ключевых слов для кнопок. По умолчанию: <code>"default"</code>.
-<b>Обновление: Если кнопка содержит URL вида <code>t.me/bot_username?start=param</code>, модуль автоматически отправит команду <code>/start &lt;param&gt;</code> соответствующему боту. Этот режим теперь активен для любого совпадения по <code>active_button_profile_name</code> с Deep-Link URL.</b>
-<b>Настройка:</b> <code>lynch_target_marker</code> - Строка-маркер, которая, если присутствует в сообщении-триггере для голосования, заставит модуль нажать кнопку '👎'. Если отсутствует или маркер не указан (пустая строка), нажимается '👍'. По умолчанию: "".
-<b>Настройка:</b> <code>game_join_trigger_phrases</code> - Список фраз, которые модуль будет искать в сообщениях для активации автовхода в игру. По умолчанию: <code>[\"Ведётся набор в игру\", \"Регистрация началась!\"]</code>.
-<b>Настройка:</b> <code>lynch_trigger_phrases</code> - Список фраз, которые модуль будет искать в сообщениях для активации автолинчевания. По умолчанию: <code>[\"Вы точно хотите линчевать\"]</code>.
-<b>Настройка:</b> <code>lynch_hang_trigger_phrases</code> - Список фраз, которые модуль будет искать в сообщениях для активации автоповешения. По умолчанию: <code>[\"Вы точно хотите повесить\"]</code>.
+<b>Настройка:</b> <code>button_keyword_configs_string</code> - строка с конфигурациями ключевых слов кнопок. Формат: <code>"Ключевое слово 1 (ID_конфига), Ключевое слово 2 (Другой_ID)"</code>. Например: <code>"присоединиться (1), играть (1), 🙋 (2), 🎮 (2)"</code>. Ключевые слова регистронезависимы. <b>Скобки с ID не учитываются при поиске кнопок.</b>
+<b>Новая настройка:</b> <code>active_button_config_id</code> - ID активной конфигурации ключевых слов из <code>button_keyword_configs_string</code>. Например: <code>"1"</code> или <code>"default"</code>.
+<b>Обновление: Если кнопка содержит URL вида <code>t.me/bot_username?start=param</code>, модуль автоматически отправит команду <code>/start &lt;param&gt;</code> соответствующему боту. Этот режим теперь активен для любого совпадения по <code>button_keywords</code> с Deep-Link URL.</b>
+<b>Настройка:</b> <code>lynch_target_marker</code> - строка-маркер, которая, если присутствует в сообщении-триггере для голосования, заставит модуль нажать кнопку '👎'. Если отсутствует или маркер не указан (пустая строка), нажимается '👍'. По умолчанию: "" (пусто).
+<b>Настройка:</b> <code>game_join_trigger_phrases</code> - список фраз, которые модуль будет искать в сообщениях для активации автовхода в игру. По умолчанию: <code>[\"Ведётся набор в игру\", \"Регистрация началась!\"]</code>.
+<b>Настройка:</b> <code>lynch_trigger_phrases</code> - список фраз, которые модуль будет искать в сообщениях для активации автолинчевания. По умолчанию: <code>[\"Вы точно хотите линчевать\"]</code>.
+<b>Настройка:</b> <code>lynch_hang_trigger_phrases</code> - список фраз, которые модуль будет искать в сообщениях для активации автоповешения. По умолчанию: <code>[\"Вы точно хотите повесить\"]</code>.
 <b>Настройка:</b> <code>player_to_lynch_user_id</code> - ID пользователя, чье сообщение будет использоваться как ник игрока для линчевания. Если <code>0</code>, то функция отключена.
-<b>Настройка:</b> <code>lynch_player_voting_trigger_phrases</code> - Список фраз, которые модуль будет искать в сообщениях от *любого бота из списка* <code>bot_ids</code> для активации голосования за конкретного игрока. По умолчанию: <code>[\"Пришло время искать виноватых!\", \"Кого ты хочешь повесить?\", \"Пришло время определить и наказать виновных\", \"Пришло время искать виноватых! Кого ты хочешь линчевать?\"]</code>.
+<b>Обновление:</b> <code>lynch_voting_bot_id</code> был объединен с <code>bot_ids</code>. Боты, отправляющие сообщения для голосования за конкретного игрока, теперь должны быть включены в список <code>bot_ids</code>.
+<b>Настройка:</b> <code>lynch_player_voting_trigger_phrases</code> - список фраз, которые модуль будет искать в сообщениях от *любого бота из списка* <code>bot_ids</code> для активации голосования за конкретного игрока. По умолчанию: <code>[\"Пришло время искать виноватых!\", \"Кого ты хочешь повесить?\", \"Пришло время определить и наказать виновных\", \"Пришло время искать виноватых! Кого ты хочешь линчевать?\"]</code>.
 <b>Настройка:</b> <code>role_forward_chat_id</code> - ID чата, куда будет пересылаться полученная роль в мафии. Если <code>0</code>, функция отключена.
-<b>Настройка:</b> <code>role_trigger_phrases</code> - Список фраз, которые модуль будет искать в сообщениях от бота в ЛС для определения роли. По умолчанию: <code>[\"Ваша роль:\", \"Ты - \", \"Твоя роль:\", \"Ты стал(а) \"]</code>.
+<b>Настройка:</b> <code>role_trigger_phrases</code> - список фраз, которые модуль будет искать в сообщениях от бота в ЛС для определения роли. По умолчанию: <code>[\"Ваша роль:\", \"Ты - \", \"Твоя роль:\", \"Ты стал(а) \"]</code>.
 <b>Настройка:</b> <code>role_tracking_enabled</code> - Включено ли отслеживание ролей. По умолчанию: <code>False</code>.
 <b>Настройка:</b> <code>role_tracking_duration</code> - Длительность отслеживания ролей в секундах. По умолчанию: <code>300</code> (5 минут).
 <b>Улучшенная настройка:</b> <code>tracked_roles_to_monitor</code> - Список фраз, указывающих на роли, которые нужно отслеживать. Модуль будет искать эти фразы в объявлениях ролей пользователей. Если роль должна быть "неактивной" (т.е. отображаться в отдельном списке), добавьте к ней суффикс <code>(н)</code>, например: <code>[\"мирный житель\", \"мафия (н)\", \"комиссар\"]</code>.
@@ -139,12 +139,14 @@ Mafia Combat Premium <code>1634167847</code>""",
 🔵 или 🟠
 Для Мафиосо
 
-<b>Для настройки кнопок турниров используйте:</b>
-<code>.cfg AutoJoinGame button_keywords_config_string</code>
-Создайте профили, например:
-<code>default: присоединиться, играть, 🙋, 🎮, ✅; baku: 🔴, 🔵; mafioso: 🔵, 🟠</code>
-Затем активируйте нужный профиль командой: <code>.ajgsetprofile baku</code> или <code>.ajgsetprofile mafioso</code>.
-""", # Updated tournaments text and help
+🌚 или 🌝
+
+Для Комбата
+Примечание, в Мафиосо платиум можно менять эмодзи которые стоят на регистрации, поэтому смотрите на регистрации какие там эмодзи и потом нужные ставите в .cfg 
+
+Настроить можно в
+
+.cfg AutoJoinGame button_keyword_configs_string""", # Изменено
         "lynch_triggered_positive": "<emoji document_id=5935968647901089910>🔫</emoji> Обнаружен запрос на линчевание/повешение. Нажимаю '👍'.",
         "lynch_button_not_found_positive": "⚠️ Запрос на линчевание/повешение обнаружен, но кнопка '👍' не найдена.",
         "lynch_triggered_negative": "<emoji document_id=5935968647901089910>🔫</emoji> Обнаружен запрос на линчевание/повешение с маркером '{marker}'. Нажимаю '👎'.",
@@ -192,13 +194,14 @@ Mafia Combat Premium <code>1634167847</code>""",
         "auto_disable_track_roles_trigger_phrases_display": "(пусто)",
         "auto_disable_track_roles_bot_ids_display": "Не указаны (любой бот)",
         "auto_role_tracking_deactivated": "<emoji document_id=5944122171441618396>❌</emoji> Автоматическое отслеживание ролей выключено.",
-        "profile_not_found": "⚠️ Профиль ключевых слов '<code>{profile_name}</code>' не найден. Доступные профили: {available_profiles}.",
-        "profile_set_success": "✅ Активный профиль ключевых слов установлен на '<code>{profile_name}</code>'.",
-        "set_profile_usage": "⚠️ Использование: <code>.ajgsetprofile &lt;имя_профиля&gt;</code>",
-        "config_string_parse_error": "❌ Ошибка при парсинге 'button_keywords_config_string': {error}. Использован профиль по умолчанию.",
+        "switch_keywords_success": "✅ Активная конфигурация ключевых слов переключена на <code>{config_id}</code>. Теперь используются ключевые слова: {keywords}", # Добавлено
+        "switch_keywords_not_found": "⚠️ Конфигурация с ID <code>{config_id}</code> не найдена. Доступные ID: {available_ids}.", # Добавлено
+        "switch_keywords_no_configs": "⚠️ Нет настроенных конфигураций ключевых слов. Используйте <code>.cfg AutoJoinGame button_keyword_configs_string</code> для настройки.", # Добавлено
+        "switch_keywords_current": "ℹ️ Активная конфигурация уже <code>{config_id}</code>.", # Добавлено
     }
 
     def __init__(self):
+        super().__init__() # Call super().__init__() first
         self.config = loader.ModuleConfig(
             loader.ConfigValue(
                 "enabled",
@@ -221,7 +224,7 @@ Mafia Combat Premium <code>1634167847</code>""",
             loader.ConfigValue(
                 "bot_ids",
                 [],
-                lambda: "Список ID ботов, от которых ожидается сообщение о наборе в игру, линчевании, повешении или голосовании за игрока. Если список пуст, сообщения будут отслеживаться от любого бота.",
+                lambda: "Список ID ботов, от которых ожидается сообщение о наборе в игру, линчевании, повешении или голосовании за игрока. Если список пуст, сообщения будут отслеживаться от любого бота.", # Описание обновлено
                 validator=loader.validators.Series(loader.validators.Integer())
             ),
             loader.ConfigValue(
@@ -230,16 +233,16 @@ Mafia Combat Premium <code>1634167847</code>""",
                 lambda: "Список ID чатов, в которых модуль будет активен. Если список пуст, модуль будет работать во всех чатах.",
                 validator=loader.validators.Series(loader.validators.Integer())
             ),
-            loader.ConfigValue( # NEW: button_keywords_config_string
-                "button_keywords_config_string",
-                "default: присоединиться, играть, 🙋, 🎮, ✅", # Default profile definition in a string
-                lambda: "Строка, содержащая определения профилей ключевых слов для кнопок. Каждый профиль определяется как 'ИМЯ_ПРОФИЛЯ: КЛЮЧЕВОЕ_СЛОВО1, КЛЮЧЕВОЕ_СЛОВО2;'. Профили разделяются точкой с запятой. Регистр не учитывается, цифры и скобки игнорируются при сравнении.",
+            loader.ConfigValue(
+                "button_keyword_configs_string",
+                "присоединиться (default), играть (default), 🙋 (default), 🎮 (default), ✅ (default), 🌚 (default)",
+                lambda: "Строка с конфигурациями ключевых слов для кнопок. Формат: 'Ключевое слово (ID_конфига), Другое слово (Другой_ID)'. Например: 'присоединиться (1), играть (1), 🙋 (2), 🎮 (2)'. Ключевые слова регистронезависимы. Скобки с ID не учитываются при поиске кнопок.", # Описание обновлено
                 validator=loader.validators.String()
             ),
-            loader.ConfigValue( # NEW: active_button_profile_name
-                "active_button_profile_name",
+            loader.ConfigValue(
+                "active_button_config_id",
                 "default",
-                lambda: "Имя активного профиля ключевых слов для кнопок.",
+                lambda: "ID активной конфигурации ключевых слов из 'button_keyword_configs_string'. Например: '1' или 'default'.", # Описание обновлено
                 validator=loader.validators.String()
             ),
             loader.ConfigValue(
@@ -263,7 +266,7 @@ Mafia Combat Premium <code>1634167847</code>""",
             loader.ConfigValue(
                 "lynch_hang_trigger_phrases",
                 ["Вы точно хотите повесить"],
-                lambda: "Список фраз, которые модуль будет искать в сообщениях для активации автоповешения. По умолчанию: <code>[\"Вы точно хотите повесить\"]</code>.",
+                lambda: "Список фраз, которые указывают на сообщение для голосования за повешение игрока (без маркера).",
                 validator=loader.validators.Series(loader.validators.String())
             ),
             loader.ConfigValue(
@@ -272,10 +275,11 @@ Mafia Combat Premium <code>1634167847</code>""",
                 lambda: "ID пользователя, чье сообщение будет использоваться как ник игрока для линчевания. Если 0, то функция отключена.",
                 validator=loader.validators.Integer(minimum=0)
             ),
+            # loader.ConfigValue("lynch_voting_bot_id" был удален и объединен с bot_ids)
             loader.ConfigValue(
                 "lynch_player_voting_trigger_phrases",
                 ["Пришло время искать виноватых!", "Кого ты хочешь повесить?", "Пришло время определить и наказать виновных", "Пришло время искать виноватых! Кого ты хочешь линчевать?"],
-                lambda: "Список фраз, которые модуль будет искать в сообщениях от ботов (из bot_ids) для активации голосования за конкретного игрока.",
+                lambda: "Список фраз, которые модуль будет искать в сообщениях от ботов (из bot_ids) для активации голосования за конкретного игрока.", # Описание обновлено
                 validator=loader.validators.Series(loader.validators.String())
             ),
             loader.ConfigValue(
@@ -360,38 +364,10 @@ Mafia Combat Premium <code>1634167847</code>""",
         self._processed_messages = set() 
         self._processed_messages_cleanup_task = None 
         self._send_tracked_roles_task = None
-        self._parsed_keyword_profiles = {} # Internal storage for parsed profiles
-        self._last_parsed_config_string = None # To track changes in config string
 
-
-    def _parse_button_keywords_config(self, config_string: str) -> dict:
-        """Parses the button_keywords_config_string into a dictionary of profiles."""
-        profiles = {}
-        if not isinstance(config_string, str):
-            logger.error(f"AutoJoinGame: Ожидалась строка для button_keywords_config_string, получено {type(config_string)}. Использую профиль по умолчанию.")
-            return {"default": ["присоединиться", "играть", "🙋", "🎮", "✅"]}
-
-        profile_definitions = [p.strip() for p in config_string.split(';') if p.strip()]
-        
-        for p_def in profile_definitions:
-            if ':' in p_def:
-                profile_name, keywords_str = p_def.split(':', 1)
-                profile_name = profile_name.strip()
-                keywords = [kw.strip() for kw in keywords_str.split(',') if kw.strip()]
-                profiles[profile_name] = keywords
-            else:
-                logger.warning(f"AutoJoinGame: Некорректное определение профиля в button_keywords_config_string: '{p_def}'. Пропускаю.")
-
-        if not profiles:
-            logger.warning("AutoJoinGame: Не удалось распарсить ни одного профиля из button_keywords_config_string. Использую профиль по умолчанию.")
-            return {"default": ["присоединиться", "играть", "🙋", "🎮", "✅"]}
-        
-        if "default" not in profiles:
-            profiles["default"] = ["присоединиться", "играть", "🙋", "🎮", "✅"]
-            logger.info("AutoJoinGame: Профиль 'default' не найден, создан по умолчанию.")
-            
-        return profiles
-
+        # Новые переменные для конфигураций ключевых слов кнопок
+        self._parsed_button_keywords: dict[str, list[str]] = {} # {"ID": ["keyword1", "keyword2"]}
+        self._current_button_keywords_to_use: list[str] = [] # Активные ключевые слова
 
     async def client_ready(self, client, _):
         self._client = client
@@ -399,17 +375,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         if self._processed_messages_cleanup_task is None:
             self._processed_messages_cleanup_task = asyncio.create_task(self._cleanup_processed_messages_loop())
         
-        # Parse button keywords config string at startup
-        self._parsed_keyword_profiles = self._parse_button_keywords_config(
-            self.config["button_keywords_config_string"]
-        )
-        self._last_parsed_config_string = self.config["button_keywords_config_string"]
-
-        # Ensure active_button_profile_name points to an existing profile
-        if self.config["active_button_profile_name"] not in self._parsed_keyword_profiles:
-            self.config["active_button_profile_name"] = "default"
-            logger.warning("AutoJoinGame: Активный профиль ключевых слов не найден, установлен 'default'.")
-
+        self._update_button_keywords_from_config() # Инициализация при запуске
 
     async def _cleanup_processed_messages_loop(self):
         """Периодически очищает набор обработанных ID сообщений."""
@@ -435,14 +401,40 @@ Mafia Combat Premium <code>1634167847</code>""",
             except asyncio.CancelledError:
                 logger.debug("AutoJoinGame: Задача отправки списка отслеживаемых ролей отменена при выгрузке.")
 
-    def _normalize_for_comparison(self, text: str) -> str:
-        """Удаляет цифры, скобки и преобразует текст в нижний регистр для сравнения.
-        Используется как для текста кнопки, так и для ключевых слов из конфига."""
-        # Удаляем цифры, открывающие и закрывающие скобки, и лишние пробелы
-        # Изменено для более полного игнорирования содержимого скобок, включая слова/цифры.
-        text = re.sub(r"[\(\[][^\]\)]*[\)\]]", "", text) # Удаляет содержимое любых скобок
-        text = re.sub(r"[0-9]", "", text) # Удаляет оставшиеся цифры
-        return text.strip().lower()
+    def _parse_button_keywords_string(self, config_string: str) -> dict[str, list[str]]:
+        """Парсит строку конфигурации ключевых слов кнопок в словарь."""
+        parsed_configs = defaultdict(list)
+        entries = [e.strip() for e in config_string.split(',')]
+
+        for entry in entries:
+            match = re.match(r"(.+?)\s*\(([\w\d]+)\)", entry)
+            if match:
+                keyword_part = match.group(1).strip()
+                config_id = match.group(2).strip()
+                parsed_configs[config_id].append(keyword_part.lower())
+            elif entry:
+                logger.warning(f"AutoJoinGame: Не удалось разобрать часть конфига 'button_keyword_configs_string': '{entry}'. Ожидается формат 'Ключевое слово (ID_конфига)'. Пропускаю.")
+        return dict(parsed_configs)
+
+    def _update_button_keywords_from_config(self):
+        """Обновляет активные ключевые слова на основе конфига."""
+        self._parsed_button_keywords = self._parse_button_keywords_string(self.config["button_keyword_configs_string"])
+        
+        active_id = self.config["active_button_config_id"]
+        
+        if active_id and active_id in self._parsed_button_keywords:
+            self._current_button_keywords_to_use = self._parsed_button_keywords[active_id]
+            logger.debug(f"AutoJoinGame: Активная конфигурация ключевых слов кнопок установлена на '{active_id}'. Использованы ключевые слова: {self._current_button_keywords_to_use}")
+        elif self._parsed_button_keywords:
+            # Если активный ID не задан или не найден, пробуем использовать первый доступный
+            first_id = next(iter(self._parsed_button_keywords))
+            self.config["active_button_config_id"] = first_id # Сохраняем в конфиг для постоянства
+            self._current_button_keywords_to_use = self._parsed_button_keywords[first_id]
+            logger.warning(f"AutoJoinGame: Активная конфигурация ключевых слов кнопок '{active_id}' не найдена или не установлена. Установлено на первую доступную: '{first_id}'.")
+        else:
+            self._current_button_keywords_to_use = []
+            logger.warning("AutoJoinGame: Нет настроенных конфигураций ключевых слов кнопок. Модуль не будет активировать кнопки по ключевым словам.")
+
 
     def _get_user_nickname(self, user: User) -> str:
         """Получает никнейм пользователя, предпочитая имя и фамилию."""
@@ -542,30 +534,32 @@ Mafia Combat Premium <code>1634167847</code>""",
         
         await utils.answer(message, message_text)
 
-    @loader.command(ru_doc="Установить активный профиль ключевых слов для кнопок")
-    async def ajgsetprofile(self, message: Message):
-        """Установить активный профиль ключевых слов для кнопок: .ajgsetprofile <имя_профиля>"""
-        profile_name = utils.get_args_raw(message).strip()
-        if not profile_name:
-            await utils.answer(message, self.strings("set_profile_usage"))
+    @loader.command(ru_doc="Переключить активную конфигурацию ключевых слов для кнопок")
+    async def ajgswitchkeywords(self, message: Message, config_id: str):
+        """Переключить активную конфигурацию ключевых слов для кнопок.
+        Пример: .ajgswitchkeywords 1"""
+        if not self._parsed_button_keywords:
+            await utils.answer(message, self.strings("switch_keywords_no_configs"))
             return
 
-        # Re-parse if config string has changed
-        if self.config["button_keywords_config_string"] != self._last_parsed_config_string:
-            self._parsed_keyword_profiles = self._parse_button_keywords_config(
-                self.config["button_keywords_config_string"]
-            )
-            self._last_parsed_config_string = self.config["button_keywords_config_string"]
+        if config_id == self.config["active_button_config_id"]:
+            await utils.answer(message, self.strings("switch_keywords_current").format(config_id=config_id))
+            return
 
-        if profile_name in self._parsed_keyword_profiles:
-            self.config["active_button_profile_name"] = profile_name
-            await utils.answer(message, self.strings("profile_set_success").format(profile_name=profile_name))
-        else:
-            available_profiles = ", ".join([f"<code>{p}</code>" for p in self._parsed_keyword_profiles.keys()])
-            await utils.answer(message, self.strings("profile_not_found").format(
-                profile_name=profile_name,
-                available_profiles=available_profiles
+        if config_id in self._parsed_button_keywords:
+            self.config["active_button_config_id"] = config_id
+            self._update_button_keywords_from_config() # Обновить активные ключевые слова
+            await utils.answer(message, self.strings("switch_keywords_success").format(
+                config_id=config_id,
+                keywords=", ".join(self._current_button_keywords_to_use)
             ))
+        else:
+            available_ids = ", ".join(self._parsed_button_keywords.keys())
+            await utils.answer(message, self.strings("switch_keywords_not_found").format(
+                config_id=config_id,
+                available_ids=available_ids if available_ids else "нет"
+            ))
+
 
     @loader.command(ru_doc="Показать статус автовхода и автолинчевания")
     async def ajgstatus(self, message: Message):
@@ -581,18 +575,12 @@ Mafia Combat Premium <code>1634167847</code>""",
         bot_ids_display = ", ".join(map(str, self.config["bot_ids"])) if self.config["bot_ids"] else "Не указаны (любой бот)"
 
         allowed_chats_display = ", ".join(map(str, self.config["allowed_chats"])) if self.config["allowed_chats"] else "Все чаты"
-        
-        # Re-parse if config string has changed
-        if self.config["button_keywords_config_string"] != self._last_parsed_config_string:
-            self._parsed_keyword_profiles = self._parse_button_keywords_config(
-                self.config["button_keywords_config_string"]
-            )
-            self._last_parsed_config_string = self.config["button_keywords_config_string"]
 
-        # Display for button keywords profiles
-        active_profile_name = self.config["active_button_profile_name"]
-        active_keywords_list = self._parsed_keyword_profiles.get(active_profile_name, [])
-        keywords_display = ", ".join(active_keywords_list) if active_keywords_list else "(пусто)"
+        # Новые отображения для button_keywords
+        button_keyword_configs_string_display = self.config["button_keyword_configs_string"] if self.config["button_keyword_configs_string"] else "(пусто)"
+        active_button_config_id_display = self.config["active_button_config_id"] if self.config["active_button_config_id"] else "(не задан)"
+        current_button_keywords_display = ", ".join(self._current_button_keywords_to_use) if self._current_button_keywords_to_use else "(пусто)"
+        available_config_ids_display = ", ".join(self._parsed_button_keywords.keys()) if self._parsed_button_keywords else "(нет)"
 
         deep_link_status_display = "🟢 Активен (автоматически обрабатывает Deep-Link URL, если они есть у подходящих кнопок)"
 
@@ -640,9 +628,11 @@ Mafia Combat Premium <code>1634167847</code>""",
             lynch_delay_display,
             bot_ids_display, 
             allowed_chats_display, 
-            active_profile_name, # New: active profile name
-            keywords_display,    # New: keywords of active profile
-            deep_link_status_display,
+            button_keyword_configs_string_display, # Изменено
+            active_button_config_id_display,      # Изменено
+            current_button_keywords_display,      # Изменено
+            available_config_ids_display,         # Добавлено
+            deep_link_status_display, 
             lynch_target_marker_display,
             game_join_trigger_phrases_display,
             lynch_trigger_phrases_display,
@@ -677,19 +667,8 @@ Mafia Combat Premium <code>1634167847</code>""",
         current_chat_id = message.chat_id
         configured_bot_ids = self.config["bot_ids"]
 
-        # Re-parse if config string has changed
-        if self.config["button_keywords_config_string"] != self._last_parsed_config_string:
-            self._parsed_keyword_profiles = self._parse_button_keywords_config(
-                self.config["button_keywords_config_string"]
-            )
-            self._last_parsed_config_string = self.config["button_keywords_config_string"]
-
-        # Get active keywords for test
-        active_profile_name = self.config["active_button_profile_name"]
-        raw_keywords_for_test = self._parsed_keyword_profiles.get(active_profile_name, [])
-        # Normalize keywords for comparison in test
-        keywords_to_check_for_test = [self._normalize_for_comparison(kw) for kw in raw_keywords_for_test]
-
+        keywords_to_check_for_test = self._current_button_keywords_to_use # Используем активные ключевые слова
+        
         deep_link_status_test_display = "🟢 Активен (автоматически обрабатывает Deep-Link URL, если они есть у подходящих кнопок)"
 
         game_join_phrases_for_test = self.config["game_join_trigger_phrases"]
@@ -700,7 +679,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         trigger_phrases_str = ", ".join(all_trigger_phrases_for_test) if all_trigger_phrases_for_test else "Не указаны"
 
-        await utils.answer(message, f"<emoji document_id=5874960879434338403>🔎</emoji> Ищу сообщения, содержащие одну из фраз: \"{trigger_phrases_str}\" (регистронезависимо) в последних 500 сообщениях в текущем чате (ID: <code>{current_chat_id}</code>) от ботов/пользователя.\nРежим Deep-Link: {deep_link_status_test_display}...")
+        await utils.answer(message, f"<emoji document_id=5874960879434338403>🔎</emoji> Ищу сообщения, содержащие одну из фраз: \"{trigger_phrases_str}\" (регистронезависимо) в последних 500 сообщениях в текущем чате (ID: <code>{current_chat_id}</code>) от ботов/пользователя.\nРежим Deep-Link: {deep_link_status_test_display}...") 
 
         try:
             results = []
@@ -744,7 +723,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                     not configured_bot_ids or sender_id in configured_bot_ids
                 )
 
-                if not is_general_bot_message:
+                if not is_general_bot_message: 
                     continue
                 
                 msg_text_lower = msg.text.lower() 
@@ -752,8 +731,8 @@ Mafia Combat Premium <code>1634167847</code>""",
                 is_game_join_test_message = any(phrase.lower() in msg_text_lower for phrase in game_join_phrases_for_test)
                 is_general_lynch_test_message = any(phrase.lower() in msg_text_lower for phrase in lynch_phrases_for_test)
                 is_player_voting_test_message = (
-                    self.config["player_to_lynch_user_id"] != 0 and
-                    is_general_bot_message and
+                    self.config["player_to_lynch_user_id"] != 0 and 
+                    is_general_bot_message and 
                     any(phrase.lower() in msg_text_lower for phrase in player_lynch_phrases_for_test)
                 )
 
@@ -768,7 +747,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                         info_msg += "Список кнопок:\n"
                         button_matched_in_test = False
                         
-                        if is_player_voting_test_message:
+                        if is_player_voting_test_message: 
                             if temp_player_nickname_for_test:
                                 info_msg += f"  <emoji document_id=5935968647901089910>🔫</emoji> (Режим голосования за игрока: ищу ник <code>{temp_player_nickname_for_test}</code>)\n"
                                 for row_idx, row in enumerate(msg.buttons):
@@ -804,17 +783,15 @@ Mafia Combat Premium <code>1634167847</code>""",
                                 for btn_idx, btn in enumerate(row):
                                     try:
                                         btn_text = str(getattr(btn, 'text', f'Кнопка {btn_idx}'))
-                                        # Normalize button text for comparison
-                                        normalized_btn_text = self._normalize_for_comparison(btn_text)
-                                        
+                                        btn_url = getattr(btn, 'url', None)
+
                                         match_indicator = ""
-                                        if any(keyword in normalized_btn_text for keyword in keywords_to_check_for_test):
+                                        if any(keyword in btn_text.lower() for keyword in keywords_to_check_for_test): # Используем активные ключевые слова
                                             match_indicator = " (✅ ПОДХОДИТ!)"
                                             button_matched_in_test = True
 
                                         info_msg += f"  • <code>{btn_text}</code>{match_indicator}"
-                                        if getattr(btn, 'url', None): # Check for URL
-                                            btn_url = btn.url
+                                        if btn_url:
                                             parsed_url = urllib.parse.urlparse(btn_url)
                                             query_params = urllib.parse.parse_qs(parsed_url.query)
                                             start_param = query_params.get('start', [None])[0]
@@ -830,7 +807,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
                                             url_display = f" (URL: <code>{btn_url[:50]}...</code>)" if len(btn_url) > 50 else f" (URL: <code>{btn_url}</code>)"
 
-                                            if start_param and bot_username:
+                                            if bot_username and start_param: 
                                                 info_msg += f"{url_display} (Действие Deep-Link: *была бы* отправлена <code>/start {start_param}</code> боту @{bot_username})"
                                             else:
                                                 info_msg += url_display
@@ -841,9 +818,9 @@ Mafia Combat Premium <code>1634167847</code>""",
                                         logger.warning(f"Error processing button in ajgtest: {btn_ex}")
                                         info_msg += f"  • Кнопка {btn_idx} (не удалось получить текст/URL: {btn_ex})\n"
                             if not button_matched_in_test and keywords_to_check_for_test:
-                                info_msg += f"\n⚠️ Ни одна кнопка не соответствует настроенным ключевым словам активного профиля.\n"
+                                info_msg += "\n⚠️ Ни одна кнопка не соответствует настроенным ключевым словам.\n"
                             elif not keywords_to_check_for_test:
-                                info_msg += "\n⚠️ Список ключевых слов для кнопок активного профиля пуст. Ни одна кнопка не будет активирована.\n"
+                                info_msg += "\n⚠️ Список ключевых слов для кнопок пуст. Ни одна кнопка не будет активирована.\n"
                     else:
                         info_msg += "🔘 Есть кнопки: Нет\n"
                     
@@ -1045,14 +1022,14 @@ Mafia Combat Premium <code>1634167847</code>""",
                 not self.config["bot_ids"] or sender_id in self.config["bot_ids"]
             )
 
-            if not is_general_game_bot:
+            if not is_general_game_bot: 
                 logger.debug(f"AutoJoinGame: Сообщение {message.id} от бота {sender_id}, но его ID не в списке разрешенных ботов. Пропускаю.")
                 return
             
             # Логика голосования за конкретного игрока
-            if (self.config["player_to_lynch_user_id"] != 0 and
+            if (self.config["player_to_lynch_user_id"] != 0 and 
                 self._player_nickname_to_lynch and 
-                any(phrase.lower() in msg_text_lower for phrase in self.config["lynch_player_voting_trigger_phrases"])):
+                any(phrase.lower() in msg_text_lower for phrase in self.config["lynch_player_voting_trigger_phrases"])): 
                 
                 if not getattr(message, 'buttons', None):
                     logger.warning(f"⚠️ AutoJoinGame: Запрос на голосование за игрока найден (msg_id: {message.id}), но кнопок нет. Пропускаю.")
@@ -1166,18 +1143,10 @@ Mafia Combat Premium <code>1634167847</code>""",
                 logger.info(f"⏳ AutoJoinGame: Ожидание {chosen_delay} секунд перед обработкой сообщения {message.id} (выбрано из {delays})...")
                 await asyncio.sleep(chosen_delay)
 
-                # Re-parse if config string has changed
-                if self.config["button_keywords_config_string"] != self._last_parsed_config_string:
-                    self._parsed_keyword_profiles = self._parse_button_keywords_config(
-                        self.config["button_keywords_config_string"]
-                    )
-                    self._last_parsed_config_string = self.config["button_keywords_config_string"]
-
-                active_profile_name = self.config["active_button_profile_name"]
-                raw_keywords = self._parsed_keyword_profiles.get(active_profile_name, [])
-                # Normalize configured keywords for comparison
-                normalized_keywords_for_comparison = [self._normalize_for_comparison(kw) for kw in raw_keywords]
-
+                keywords_to_check = self._current_button_keywords_to_use # Используем активные ключевые слова
+                if not keywords_to_check: # Проверка на случай пустого списка ключевых слов
+                    logger.warning(f"⚠️ AutoJoinGame: Список активных ключевых слов для кнопок пуст. Ни одна кнопка не будет активирована для сообщения {message.id}.")
+                    return
 
                 button_found = False
                 for row in message.buttons:
@@ -1189,12 +1158,9 @@ Mafia Combat Premium <code>1634167847</code>""",
                             button_text = ''
 
                         logger.debug(f"🔍 AutoJoinGame: Проверка кнопки: '{button_text}'")
-                        
-                        # Normalize button text for comparison
-                        normalized_btn_text = self._normalize_for_comparison(button_text)
 
-                        if any(keyword in normalized_btn_text for keyword in normalized_keywords_for_comparison):
-                            logger.info(f"✅ AutoJoinGame: Найдена кнопка присоединения: '{button_text}' (Нормализованный текст: '{normalized_btn_text}')")
+                        if any(keyword in button_text.lower() for keyword in keywords_to_check):
+                            logger.info(f"✅ AutoJoinGame: Найдена кнопка присоединения: '{button_text}'")
 
                             if getattr(button, 'url', None):
                                 button_url = button.url
@@ -1214,7 +1180,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                                 query_params = urllib.parse.parse_qs(parsed_url.query)
                                 start_param = query_params.get('start', [None])[0]
 
-                                if bot_username and start_param:
+                                if bot_username and start_param: 
                                     logger.info(f"📤 AutoJoinGame: Deep-Link URL обнаружен. Отправка /start {start_param} боту @{bot_username}")
 
                                     try:
