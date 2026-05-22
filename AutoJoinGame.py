@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.5.0 # Версия обновлена
+# meta version: 2.5.1 # Версия обновлена
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 0100000101010100010011110100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000101
@@ -97,10 +97,10 @@ class AutoJoinGameMod(loader.Module):
 Можно указать список ID ботов, от которых ожидать сообщение о наборе.
 <b>Обновление:</b> Теперь параметр <code>bot_ids</code> включает в себя все боты, от которых ожидаются триггеры, включая ботов для голосования за игроков. Если список пуст, модуль будет работать со всеми ботами.
 Можно указать список ID чатов, в которых модуль будет активен. Если список пуст, модуль будет работать во всех чатах.
-<b>Настройка:</b> <code>button_keywords_profiles</code> - Словарь профилей ключевых слов для кнопок. Ключ - название профиля (например, "Баку", "Мафиосо"), значение - список ключевых слов. Регистр не учитывается, цифры и скобки игнорируются при сравнении.
-    Пример: <code>{"default": ["присоединиться", "🙋", "🎮", "✅"], "baku": ["🔴", "🔵"], "mafioso": ["🔵", "🟠"]}</code>
-<b>Настройка:</b> <code>active_button_keywords_profile</code> - Имя активного профиля ключевых слов для кнопок. По умолчанию: <code>"default"</code>.
-<b>Обновление: Если кнопка содержит URL вида <code>t.me/bot_username?start=param</code>, модуль автоматически отправит команду <code>/start &lt;param&gt;</code> соответствующему боту. Этот режим теперь активен для любого совпадения по <code>active_button_keywords_profile</code> с Deep-Link URL.</b>
+<b>Настройка:</b> <code>button_keywords_config_string</code> - Строка, содержащая определения профилей ключевых слов для кнопок. Каждый профиль определяется как "ИМЯ_ПРОФИЛЯ: КЛЮЧЕВОЕ_СЛОВО1, КЛЮЧЕВОЕ_СЛОВО2;". Профили разделяются точкой с запятой. Регистр не учитывается, цифры и скобки игнорируются при сравнении.
+    Пример: <code>default: присоединиться, играть, 🙋, 🎮, ✅; baku: 🔴, 🔵; mafioso: 🔵, 🟠</code>
+<b>Настройка:</b> <code>active_button_profile_name</code> - Имя активного профиля ключевых слов для кнопок. По умолчанию: <code>"default"</code>.
+<b>Обновление: Если кнопка содержит URL вида <code>t.me/bot_username?start=param</code>, модуль автоматически отправит команду <code>/start &lt;param&gt;</code> соответствующему боту. Этот режим теперь активен для любого совпадения по <code>active_button_profile_name</code> с Deep-Link URL.</b>
 <b>Настройка:</b> <code>lynch_target_marker</code> - Строка-маркер, которая, если присутствует в сообщении-триггере для голосования, заставит модуль нажать кнопку '👎'. Если отсутствует или маркер не указан (пустая строка), нажимается '👍'. По умолчанию: "".
 <b>Настройка:</b> <code>game_join_trigger_phrases</code> - Список фраз, которые модуль будет искать в сообщениях для активации автовхода в игру. По умолчанию: <code>[\"Ведётся набор в игру\", \"Регистрация началась!\"]</code>.
 <b>Настройка:</b> <code>lynch_trigger_phrases</code> - Список фраз, которые модуль будет искать в сообщениях для активации автолинчевания. По умолчанию: <code>[\"Вы точно хотите линчевать\"]</code>.
@@ -140,11 +140,11 @@ Mafia Combat Premium <code>1634167847</code>""",
 Для Мафиосо
 
 <b>Для настройки кнопок турниров используйте:</b>
-<code>.cfg AutoJoinGame button_keywords_profiles</code>
+<code>.cfg AutoJoinGame button_keywords_config_string</code>
 Создайте профили, например:
-<code>{"default": ["присоединиться", "🙋", "🎮", "✅"], "baku": ["🔴", "🔵"], "mafioso": ["🔵", "🟠", "🌚", "🌝"]}</code>
+<code>default: присоединиться, играть, 🙋, 🎮, ✅; baku: 🔴, 🔵; mafioso: 🔵, 🟠</code>
 Затем активируйте нужный профиль командой: <code>.ajgsetprofile baku</code> или <code>.ajgsetprofile mafioso</code>.
-""", # Updated tournaments text
+""", # Updated tournaments text and help
         "lynch_triggered_positive": "<emoji document_id=5935968647901089910>🔫</emoji> Обнаружен запрос на линчевание/повешение. Нажимаю '👍'.",
         "lynch_button_not_found_positive": "⚠️ Запрос на линчевание/повешение обнаружен, но кнопка '👍' не найдена.",
         "lynch_triggered_negative": "<emoji document_id=5935968647901089910>🔫</emoji> Обнаружен запрос на линчевание/повешение с маркером '{marker}'. Нажимаю '👎'.",
@@ -195,6 +195,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         "profile_not_found": "⚠️ Профиль ключевых слов '<code>{profile_name}</code>' не найден. Доступные профили: {available_profiles}.",
         "profile_set_success": "✅ Активный профиль ключевых слов установлен на '<code>{profile_name}</code>'.",
         "set_profile_usage": "⚠️ Использование: <code>.ajgsetprofile &lt;имя_профиля&gt;</code>",
+        "config_string_parse_error": "❌ Ошибка при парсинге 'button_keywords_config_string': {error}. Использован профиль по умолчанию.",
     }
 
     def __init__(self):
@@ -229,14 +230,14 @@ Mafia Combat Premium <code>1634167847</code>""",
                 lambda: "Список ID чатов, в которых модуль будет активен. Если список пуст, модуль будет работать во всех чатах.",
                 validator=loader.validators.Series(loader.validators.Integer())
             ),
-            loader.ConfigValue( # NEW: button_keywords_profiles
-                "button_keywords_profiles",
-                {"default": ["присоединиться", "играть", "🙋", "🎮", "✅"]}, # Default profile
-                lambda: "Словарь профилей ключевых слов для кнопок. Ключ - название профиля, значение - список ключевых слов (регистронезависимо). Цифры и скобки игнорируются при сравнении.",
-                # validator=loader.validators.Object() # <-- УДАЛЕНО: Вызывает AttributeError, поэтому оставлено без явного валидатора для сложных объектов.
+            loader.ConfigValue( # NEW: button_keywords_config_string
+                "button_keywords_config_string",
+                "default: присоединиться, играть, 🙋, 🎮, ✅", # Default profile definition in a string
+                lambda: "Строка, содержащая определения профилей ключевых слов для кнопок. Каждый профиль определяется как 'ИМЯ_ПРОФИЛЯ: КЛЮЧЕВОЕ_СЛОВО1, КЛЮЧЕВОЕ_СЛОВО2;'. Профили разделяются точкой с запятой. Регистр не учитывается, цифры и скобки игнорируются при сравнении.",
+                validator=loader.validators.String()
             ),
-            loader.ConfigValue( # NEW: active_button_keywords_profile
-                "active_button_keywords_profile",
+            loader.ConfigValue( # NEW: active_button_profile_name
+                "active_button_profile_name",
                 "default",
                 lambda: "Имя активного профиля ключевых слов для кнопок.",
                 validator=loader.validators.String()
@@ -262,7 +263,7 @@ Mafia Combat Premium <code>1634167847</code>""",
             loader.ConfigValue(
                 "lynch_hang_trigger_phrases",
                 ["Вы точно хотите повесить"],
-                lambda: "Список фраз, которые указывают на сообщение для голосования за повешение игрока (без маркера).",
+                lambda: "Список фраз, которые модуль будет искать в сообщениях для активации автоповешения. По умолчанию: <code>[\"Вы точно хотите повесить\"]</code>.",
                 validator=loader.validators.Series(loader.validators.String())
             ),
             loader.ConfigValue(
@@ -359,6 +360,38 @@ Mafia Combat Premium <code>1634167847</code>""",
         self._processed_messages = set() 
         self._processed_messages_cleanup_task = None 
         self._send_tracked_roles_task = None
+        self._parsed_keyword_profiles = {} # Internal storage for parsed profiles
+        self._last_parsed_config_string = None # To track changes in config string
+
+
+    def _parse_button_keywords_config(self, config_string: str) -> dict:
+        """Parses the button_keywords_config_string into a dictionary of profiles."""
+        profiles = {}
+        if not isinstance(config_string, str):
+            logger.error(f"AutoJoinGame: Ожидалась строка для button_keywords_config_string, получено {type(config_string)}. Использую профиль по умолчанию.")
+            return {"default": ["присоединиться", "играть", "🙋", "🎮", "✅"]}
+
+        profile_definitions = [p.strip() for p in config_string.split(';') if p.strip()]
+        
+        for p_def in profile_definitions:
+            if ':' in p_def:
+                profile_name, keywords_str = p_def.split(':', 1)
+                profile_name = profile_name.strip()
+                keywords = [kw.strip() for kw in keywords_str.split(',') if kw.strip()]
+                profiles[profile_name] = keywords
+            else:
+                logger.warning(f"AutoJoinGame: Некорректное определение профиля в button_keywords_config_string: '{p_def}'. Пропускаю.")
+
+        if not profiles:
+            logger.warning("AutoJoinGame: Не удалось распарсить ни одного профиля из button_keywords_config_string. Использую профиль по умолчанию.")
+            return {"default": ["присоединиться", "играть", "🙋", "🎮", "✅"]}
+        
+        if "default" not in profiles:
+            profiles["default"] = ["присоединиться", "играть", "🙋", "🎮", "✅"]
+            logger.info("AutoJoinGame: Профиль 'default' не найден, создан по умолчанию.")
+            
+        return profiles
+
 
     async def client_ready(self, client, _):
         self._client = client
@@ -366,20 +399,15 @@ Mafia Combat Premium <code>1634167847</code>""",
         if self._processed_messages_cleanup_task is None:
             self._processed_messages_cleanup_task = asyncio.create_task(self._cleanup_processed_messages_loop())
         
-        # Ensure button_keywords_profiles is a dictionary at startup
-        if not isinstance(self.config["button_keywords_profiles"], dict):
-            logger.warning(
-                "AutoJoinGame: button_keywords_profiles в конфиге не является словарем. "
-                "Инициализация со значением по умолчанию."
-            )
-            self.config["button_keywords_profiles"] = {"default": ["присоединиться", "играть", "🙋", "🎮", "✅"]}
+        # Parse button keywords config string at startup
+        self._parsed_keyword_profiles = self._parse_button_keywords_config(
+            self.config["button_keywords_config_string"]
+        )
+        self._last_parsed_config_string = self.config["button_keywords_config_string"]
 
-        # Ensure 'default' profile exists if not already present
-        if "default" not in self.config["button_keywords_profiles"]:
-            self.config["button_keywords_profiles"]["default"] = ["присоединиться", "играть", "🙋", "🎮", "✅"]
-        # Ensure active_button_keywords_profile points to an existing profile
-        if self.config["active_button_keywords_profile"] not in self.config["button_keywords_profiles"]:
-            self.config["active_button_keywords_profile"] = "default"
+        # Ensure active_button_profile_name points to an existing profile
+        if self.config["active_button_profile_name"] not in self._parsed_keyword_profiles:
+            self.config["active_button_profile_name"] = "default"
             logger.warning("AutoJoinGame: Активный профиль ключевых слов не найден, установлен 'default'.")
 
 
@@ -407,10 +435,13 @@ Mafia Combat Premium <code>1634167847</code>""",
             except asyncio.CancelledError:
                 logger.debug("AutoJoinGame: Задача отправки списка отслеживаемых ролей отменена при выгрузке.")
 
-    def _normalize_text(self, text: str) -> str:
-        """Удаляет цифры, скобки и преобразует текст в нижний регистр для сравнения."""
+    def _normalize_for_comparison(self, text: str) -> str:
+        """Удаляет цифры, скобки и преобразует текст в нижний регистр для сравнения.
+        Используется как для текста кнопки, так и для ключевых слов из конфига."""
         # Удаляем цифры, открывающие и закрывающие скобки, и лишние пробелы
-        text = re.sub(r"[0-9\(\)]", "", text)
+        # Изменено для более полного игнорирования содержимого скобок, включая слова/цифры.
+        text = re.sub(r"[\(\[][^\]\)]*[\)\]]", "", text) # Удаляет содержимое любых скобок
+        text = re.sub(r"[0-9]", "", text) # Удаляет оставшиеся цифры
         return text.strip().lower()
 
     def _get_user_nickname(self, user: User) -> str:
@@ -519,26 +550,18 @@ Mafia Combat Premium <code>1634167847</code>""",
             await utils.answer(message, self.strings("set_profile_usage"))
             return
 
-        # Ensure button_keywords_profiles is a dictionary before accessing
-        current_profiles = self.config["button_keywords_profiles"]
-        if not isinstance(current_profiles, dict):
-            logger.error(
-                "AutoJoinGame: button_keywords_profiles в конфиге не является словарем в ajgsetprofile. "
-                "Инициализация со значением по умолчанию."
+        # Re-parse if config string has changed
+        if self.config["button_keywords_config_string"] != self._last_parsed_config_string:
+            self._parsed_keyword_profiles = self._parse_button_keywords_config(
+                self.config["button_keywords_config_string"]
             )
-            self.config["button_keywords_profiles"] = {"default": ["присоединиться", "играть", "🙋", "🎮", "✅"]}
-            current_profiles = self.config["button_keywords_profiles"] # Update local variable
-            # Also reset active profile if it points to a non-existent one after reinit
-            if self.config["active_button_keywords_profile"] not in current_profiles:
-                self.config["active_button_keywords_profile"] = "default"
+            self._last_parsed_config_string = self.config["button_keywords_config_string"]
 
-        if profile_name in current_profiles: # Use current_profiles
-            self.config["active_button_keywords_profile"] = profile_name
+        if profile_name in self._parsed_keyword_profiles:
+            self.config["active_button_profile_name"] = profile_name
             await utils.answer(message, self.strings("profile_set_success").format(profile_name=profile_name))
         else:
-            # Ensure keys() is called on a dictionary
-            available_profiles_keys = current_profiles.keys() if isinstance(current_profiles, dict) else []
-            available_profiles = ", ".join([f"<code>{p}</code>" for p in available_profiles_keys])
+            available_profiles = ", ".join([f"<code>{p}</code>" for p in self._parsed_keyword_profiles.keys()])
             await utils.answer(message, self.strings("profile_not_found").format(
                 profile_name=profile_name,
                 available_profiles=available_profiles
@@ -550,7 +573,6 @@ Mafia Combat Premium <code>1634167847</code>""",
         status = "🟢 Включен" if self.config["enabled"] else "🔴 Выключен"
         
         delays = self.config["delays"]
-        # Исправлено: убран лишний '.' в ', '.'.join'
         delay_display = f"[{', '.join(map(str, delays))}]" if len(delays) > 1 else str(delays[0])
 
         lynch_delays = self.config["lynch_delay"]
@@ -559,23 +581,18 @@ Mafia Combat Premium <code>1634167847</code>""",
         bot_ids_display = ", ".join(map(str, self.config["bot_ids"])) if self.config["bot_ids"] else "Не указаны (любой бот)"
 
         allowed_chats_display = ", ".join(map(str, self.config["allowed_chats"])) if self.config["allowed_chats"] else "Все чаты"
-
-        # NEW: Ensure button_keywords_profiles is a dictionary before accessing
-        current_profiles = self.config["button_keywords_profiles"]
-        if not isinstance(current_profiles, dict):
-            logger.error(
-                "AutoJoinGame: button_keywords_profiles в конфиге не является словарем в ajgstatus. "
-                "Инициализация со значением по умолчанию."
+        
+        # Re-parse if config string has changed
+        if self.config["button_keywords_config_string"] != self._last_parsed_config_string:
+            self._parsed_keyword_profiles = self._parse_button_keywords_config(
+                self.config["button_keywords_config_string"]
             )
-            self.config["button_keywords_profiles"] = {"default": ["присоединиться", "играть", "🙋", "🎮", "✅"]}
-            current_profiles = self.config["button_keywords_profiles"]
-            if self.config["active_button_keywords_profile"] not in current_profiles:
-                self.config["active_button_keywords_profile"] = "default"
+            self._last_parsed_config_string = self.config["button_keywords_config_string"]
 
         # Display for button keywords profiles
-        active_profile_name = self.config["active_button_keywords_profile"]
-        active_keywords = current_profiles.get(active_profile_name, []) # Use current_profiles
-        keywords_display = ", ".join(active_keywords) if active_keywords else "(пусто)"
+        active_profile_name = self.config["active_button_profile_name"]
+        active_keywords_list = self._parsed_keyword_profiles.get(active_profile_name, [])
+        keywords_display = ", ".join(active_keywords_list) if active_keywords_list else "(пусто)"
 
         deep_link_status_display = "🟢 Активен (автоматически обрабатывает Deep-Link URL, если они есть у подходящих кнопок)"
 
@@ -660,23 +677,18 @@ Mafia Combat Premium <code>1634167847</code>""",
         current_chat_id = message.chat_id
         configured_bot_ids = self.config["bot_ids"]
 
-        # NEW: Ensure button_keywords_profiles is a dictionary before accessing
-        current_profiles = self.config["button_keywords_profiles"]
-        if not isinstance(current_profiles, dict):
-            logger.error(
-                "AutoJoinGame: button_keywords_profiles в конфиге не является словарем в ajgtest. "
-                "Инициализация со значением по умолчанию."
+        # Re-parse if config string has changed
+        if self.config["button_keywords_config_string"] != self._last_parsed_config_string:
+            self._parsed_keyword_profiles = self._parse_button_keywords_config(
+                self.config["button_keywords_config_string"]
             )
-            self.config["button_keywords_profiles"] = {"default": ["присоединиться", "играть", "🙋", "🎮", "✅"]}
-            current_profiles = self.config["button_keywords_profiles"]
-            if self.config["active_button_keywords_profile"] not in current_profiles:
-                self.config["active_button_keywords_profile"] = "default"
+            self._last_parsed_config_string = self.config["button_keywords_config_string"]
 
         # Get active keywords for test
-        active_profile_name = self.config["active_button_keywords_profile"]
-        raw_keywords_for_test = current_profiles.get(active_profile_name, []) # Use current_profiles
+        active_profile_name = self.config["active_button_profile_name"]
+        raw_keywords_for_test = self._parsed_keyword_profiles.get(active_profile_name, [])
         # Normalize keywords for comparison in test
-        keywords_to_check_for_test = [self._normalize_text(kw) for kw in raw_keywords_for_test]
+        keywords_to_check_for_test = [self._normalize_for_comparison(kw) for kw in raw_keywords_for_test]
 
         deep_link_status_test_display = "🟢 Активен (автоматически обрабатывает Deep-Link URL, если они есть у подходящих кнопок)"
 
@@ -742,7 +754,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                 is_player_voting_test_message = (
                     self.config["player_to_lynch_user_id"] != 0 and
                     is_general_bot_message and
-                    any(phrase.lower() in msg_text_lower for phrase in self.config["lynch_player_voting_trigger_phrases"]) # Corrected: used self.config directly, so it's safe if it's a list.
+                    any(phrase.lower() in msg_text_lower for phrase in player_lynch_phrases_for_test)
                 )
 
 
@@ -791,22 +803,16 @@ Mafia Combat Premium <code>1634167847</code>""",
                             for row_idx, row in enumerate(msg.buttons):
                                 for btn_idx, btn in enumerate(row):
                                     try:
-                                        button_text = str(getattr(btn, 'text', f'Кнопка {btn_idx}')) # Use local variable
+                                        btn_text = str(getattr(btn, 'text', f'Кнопка {btn_idx}'))
                                         # Normalize button text for comparison
-                                        normalized_btn_text = self._normalize_text(button_text)
+                                        normalized_btn_text = self._normalize_for_comparison(btn_text)
                                         
-                                        # Get and normalize active keywords for test (using local current_profiles)
-                                        active_profile_name_test = self.config["active_button_keywords_profile"]
-                                        raw_keywords_test = current_profiles.get(active_profile_name_test, [])
-                                        normalized_keywords_test = [self._normalize_text(kw) for kw in raw_keywords_test]
-
-
                                         match_indicator = ""
-                                        if any(keyword in normalized_btn_text for keyword in normalized_keywords_test):
+                                        if any(keyword in normalized_btn_text for keyword in keywords_to_check_for_test):
                                             match_indicator = " (✅ ПОДХОДИТ!)"
                                             button_matched_in_test = True
 
-                                        info_msg += f"  • <code>{button_text}</code>{match_indicator}" # Use original button_text for display
+                                        info_msg += f"  • <code>{btn_text}</code>{match_indicator}"
                                         if getattr(btn, 'url', None): # Check for URL
                                             btn_url = btn.url
                                             parsed_url = urllib.parse.urlparse(btn_url)
@@ -834,9 +840,9 @@ Mafia Combat Premium <code>1634167847</code>""",
                                     except Exception as btn_ex:
                                         logger.warning(f"Error processing button in ajgtest: {btn_ex}")
                                         info_msg += f"  • Кнопка {btn_idx} (не удалось получить текст/URL: {btn_ex})\n"
-                            if not button_matched_in_test and normalized_keywords_test:
-                                info_msg += f"\n⚠️ Ни одна кнопка не соответствует настроенным ключевым словам активного профиля '{active_profile_name_test}'.\n"
-                            elif not normalized_keywords_test:
+                            if not button_matched_in_test and keywords_to_check_for_test:
+                                info_msg += f"\n⚠️ Ни одна кнопка не соответствует настроенным ключевым словам активного профиля.\n"
+                            elif not keywords_to_check_for_test:
                                 info_msg += "\n⚠️ Список ключевых слов для кнопок активного профиля пуст. Ни одна кнопка не будет активирована.\n"
                     else:
                         info_msg += "🔘 Есть кнопки: Нет\n"
@@ -1160,22 +1166,17 @@ Mafia Combat Premium <code>1634167847</code>""",
                 logger.info(f"⏳ AutoJoinGame: Ожидание {chosen_delay} секунд перед обработкой сообщения {message.id} (выбрано из {delays})...")
                 await asyncio.sleep(chosen_delay)
 
-                # NEW: Ensure button_keywords_profiles is a dictionary before accessing
-                current_profiles = self.config["button_keywords_profiles"]
-                if not isinstance(current_profiles, dict):
-                    logger.error(
-                        "AutoJoinGame: button_keywords_profiles в конфиге не является словарем в watcher (is_game_join). "
-                        "Инициализация со значением по умолчанию."
+                # Re-parse if config string has changed
+                if self.config["button_keywords_config_string"] != self._last_parsed_config_string:
+                    self._parsed_keyword_profiles = self._parse_button_keywords_config(
+                        self.config["button_keywords_config_string"]
                     )
-                    self.config["button_keywords_profiles"] = {"default": ["присоединиться", "играть", "🙋", "🎮", "✅"]}
-                    current_profiles = self.config["button_keywords_profiles"]
-                    if self.config["active_button_keywords_profile"] not in current_profiles:
-                        self.config["active_button_keywords_profile"] = "default"
+                    self._last_parsed_config_string = self.config["button_keywords_config_string"]
 
-                # Get active keywords and normalize them
-                active_profile_name = self.config["active_button_keywords_profile"]
-                raw_keywords = current_profiles.get(active_profile_name, []) # Use current_profiles
-                normalized_keywords = [self._normalize_text(kw) for kw in raw_keywords]
+                active_profile_name = self.config["active_button_profile_name"]
+                raw_keywords = self._parsed_keyword_profiles.get(active_profile_name, [])
+                # Normalize configured keywords for comparison
+                normalized_keywords_for_comparison = [self._normalize_for_comparison(kw) for kw in raw_keywords]
 
 
                 button_found = False
@@ -1190,9 +1191,9 @@ Mafia Combat Premium <code>1634167847</code>""",
                         logger.debug(f"🔍 AutoJoinGame: Проверка кнопки: '{button_text}'")
                         
                         # Normalize button text for comparison
-                        normalized_btn_text = self._normalize_text(button_text)
+                        normalized_btn_text = self._normalize_for_comparison(button_text)
 
-                        if any(keyword in normalized_btn_text for keyword in normalized_keywords):
+                        if any(keyword in normalized_btn_text for keyword in normalized_keywords_for_comparison):
                             logger.info(f"✅ AutoJoinGame: Найдена кнопка присоединения: '{button_text}' (Нормализованный текст: '{normalized_btn_text}')")
 
                             if getattr(button, 'url', None):
