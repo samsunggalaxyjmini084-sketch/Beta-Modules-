@@ -1,7 +1,3 @@
-
-Вот обновленный код модуля:
-
-```python
 # meta developer: @hdjsfzbxm
 # meta name: AutoMafiaTournamentsGame 
 # meta version: 2.5.0 # Версия обновлена для добавления функционала PinChatList
