@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.4.9 # Версия обновлена для добавления команд .pinchat и .unpinchat
+# meta version: 2.4.10 # Версия обновлена для удаления сообщений об успешном добавлении/удалении чата
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 0100000101010100010011110100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000111
@@ -208,8 +208,6 @@ Mafia Combat Premium <code>1634167847</code>""",
         "switch_keywords_usage": "ℹ️ Текущая активная конфигурация: <code>{current_id}</code>. Ключевые слова: {current_keywords}\nДоступные ID: {available_ids}.\nИспользуйте <code>.ajgset &lt;ID_конфига&gt;</code> для переключения.",
         "pinchat_doc": "Добавить ID чата в список разрешенных чатов (allowed_chats).",
         "unpinchat_doc": "Удалить ID чата из списка разрешенных чатов (allowed_chats).",
-        "pinchat_success": "✅ Чат <code>{chat_id}</code> успешно добавлен в список разрешенных.",
-        "unpinchat_success": "✅ Чат <code>{chat_id}</code> успешно удален из списка разрешенных.",
         "invalid_chat_id": "❌ Неверный ID чата. Пожалуйста, укажите числовой ID.",
         "chat_already_pinned": "⚠️ Чат <code>{chat_id}</code> уже находится в списке разрешенных чатов.",
         "chat_not_found": "⚠️ Чат <code>{chat_id}</code> не найден в списке разрешенных чатов.",
@@ -636,7 +634,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         current_allowed_chats.append(chat_id_to_manage)
         self.set("allowed_chats", current_allowed_chats)
         self.config["allowed_chats"] = current_allowed_chats 
-        await utils.answer(message, self.strings("pinchat_success").format(chat_id=chat_id_to_manage))
+        # await utils.answer(message, self.strings("pinchat_success").format(chat_id=chat_id_to_manage)) # УДАЛЕНО
 
     @loader.command(ru_doc="Удалить ID чата из списка разрешенных чатов (allowed_chats).")
     async def unpinchat(self, message: Message):
@@ -668,7 +666,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         current_allowed_chats.remove(chat_id_to_manage)
         self.set("allowed_chats", current_allowed_chats)
         self.config["allowed_chats"] = current_allowed_chats 
-        await utils.answer(message, self.strings("unpinchat_success").format(chat_id=chat_id_to_manage))
+        # await utils.answer(message, self.strings("unpinchat_success").format(chat_id=chat_id_to_manage)) # УДАЛЕНО
 
 
     @loader.command(ru_doc="Показать статус автовхода и автолинчевания")
