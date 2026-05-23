@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.4.7 # Версия обновлена
+# meta version: 2.4.7 # Версия обновлена для новой логики приоритета кнопок
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 0100000101010100010011110100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000111
@@ -92,7 +92,7 @@ class AutoJoinGameMod(loader.Module):
 <b>Новая функция:</b> Модуль может автоматически включать отслеживание ролей при получении сообщения, содержащего определенные фразы, от указанных ботов.
 <b>Новая функция:</b> Модуль может автоматически <b>выключать</b> отслеживание ролей при получении сообщения, содержащего определенные фразы, от указанных ботов.
 <b>Улучшение:</b> Теперь модуль более точно определяет роли, включая составные фразы, и позволяет помечать роли как 'неактивные' с помощью суффикса <code>(н)</code> для раздельного отображения.
-<b>Улучшение 2.4.7:</b> Модуль теперь **просматривает все кнопки** в сообщении, чтобы найти те, что соответствуют *любому* ключевому слову из активной конфигурации, прежде чем нажать на первую подходящую кнопку. Это гарантирует, что все ключевые слова учитываются, а не только те, что совпали с первыми попавшимися кнопками.
+<b>Приоритет кнопок:</b> Теперь модуль отдает предпочтение кнопкам, содержащим <b>другие ключевые слова</b> из активной конфигурации, если на кнопке также есть слово "присоединиться". Кнопка с только "присоединиться" будет нажата только в том случае, если других подходящих кнопок не найдено.
 
 <emoji document_id=5843843420468024653>⭐️</emoji> Настройки:
 В конфиге модуля можно изменить задержку(и) перед нажатием. Если указано несколько значений, будет выбрано случайное.
@@ -257,7 +257,7 @@ Mafia Combat Premium <code>1634167847</code>""",
             loader.ConfigValue(
                 "game_join_trigger_phrases",
                 ["Ведётся набор в игру", "Регистрация началась!"],
-                lambda: "Список фраз, которые указывают на сообщение о наборе в игру.",
+                lambda: "Список фраз, которые модуль будет искать в сообщениях для активации автовхода в игру.",
                 validator=loader.validators.Series(loader.validators.String())
             ),
             loader.ConfigValue(
@@ -600,7 +600,8 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         bot_ids_display = ", ".join(map(str, self.config["bot_ids"])) if self.config["bot_ids"] else "Не указаны (любой бот)"
 
-        allowed_chats_display = ", ".join(map(str, self.config["allowed_chats"])) if self.config["allowed_chats"] else "Все чаты"
+        allowed_chats = self.config["allowed_chats"]
+        allowed_chats_display = ", ".join(map(str, allowed_chats)) if allowed_chats else "Все чаты"
 
         button_keyword_configs_string_display = self.config["button_keyword_configs_string"] if self.config["button_keyword_configs_string"] else "(пусто)"
         active_button_config_id_display = self.config["active_button_config_id"] if self.config["active_button_config_id"] else "(не задан)"
@@ -770,24 +771,20 @@ Mafia Combat Premium <code>1634167847</code>""",
                     if getattr(msg, 'buttons', None):
                         info_msg += "🔘 Есть кнопки: Да\n"
                         info_msg += "Список кнопок:\n"
+                        button_matched_in_test = False
                         
-                        # --- Обновленная логика для ajgtest ---
                         if is_player_voting_test_message: 
                             if temp_player_nickname_for_test:
                                 info_msg += f"  <emoji document_id=5935968647901089910>🔫</emoji> (Режим голосования за игрока: ищу ник <code>{temp_player_nickname_for_test}</code>)\n"
-                                player_lynch_matched_buttons = []
                                 for row_idx, row in enumerate(msg.buttons):
                                     for btn_idx, btn in enumerate(row):
                                         btn_text = str(getattr(btn, 'text', f'Кнопка {btn_idx}'))
                                         if temp_player_nickname_for_test.lower() in btn_text.lower():
-                                            player_lynch_matched_buttons.append(btn_text)
-                                            info_msg += f"  • <code>{btn_text}</code> (✅ ПОДХОДИТ!)\n"
+                                            info_msg += f"  • <code>{btn_text}</code> (✅ ПОДХОДИТ! Действие: *была бы* нажата кнопка с ником <code>{temp_player_nickname_for_test}</code>)\n"
+                                            button_matched_in_test = True
                                         else:
                                             info_msg += f"  • <code>{btn_text}</code>\n"
-                                
-                                if player_lynch_matched_buttons:
-                                    info_msg += f"\n  Действие: *была бы* нажата кнопка <code>{player_lynch_matched_buttons[0]}</code> (первая подходящая).\n"
-                                else:
+                                if not button_matched_in_test:
                                     info_msg += f"\n⚠️ Кнопка с ником <code>{temp_player_nickname_for_test}</code> не найдена.\n"
                             else:
                                 info_msg += self.strings("ajgtest_player_nickname_not_set_yet") + "\n"
@@ -796,95 +793,97 @@ Mafia Combat Premium <code>1634167847</code>""",
                             lynch_marker = self.config["lynch_target_marker"]
                             target_emoji = "👎" if lynch_marker and lynch_marker in msg.text else "👍"
                             info_msg += f"  <emoji document_id=5935968647901089910>🔫</emoji> (Режим линчевания/повешения: ищу '{target_emoji}')\n"
-                            general_lynch_matched_buttons = []
                             for row_idx, row in enumerate(msg.buttons):
                                 for btn_idx, btn in enumerate(row):
                                     btn_text = str(getattr(btn, 'text', f'Кнопка {btn_idx}'))
                                     if target_emoji in btn_text:
-                                        general_lynch_matched_buttons.append(btn_text)
-                                        info_msg += f"  • <code>{btn_text}</code> (✅ ПОДХОДИТ!)\n"
+                                        info_msg += f"  • <code>{btn_text}</code> (✅ ПОДХОДИТ! Действие: *была бы* нажата '{target_emoji}')\n"
+                                        button_matched_in_test = True
                                     else:
                                         info_msg += f"  • <code>{btn_text}</code>\n"
-                            
-                            if general_lynch_matched_buttons:
-                                info_msg += f"\n  Действие: *была бы* нажата кнопка <code>{general_lynch_matched_buttons[0]}</code> (первая подходящая).\n"
-                            else:
+                            if not button_matched_in_test:
                                 info_msg += f"\n⚠️ Кнопка '{target_emoji}' не найдена.\n"
                         elif is_game_join_test_message:
-                            info_msg += "  <emoji document_id=5935847413859225147>🏀</emoji> (Режим входа в игру: ищу ключевые слова)\n"
-                            game_join_matched_buttons = []
-                            for row_idx, row in enumerate(msg.buttons):
-                                for btn_idx, btn in enumerate(row):
-                                    try:
-                                        btn_text = str(getattr(btn, 'text', f'Кнопка {btn_idx}'))
-                                        btn_url = getattr(btn, 'url', None)
-
-                                        match_indicator = ""
-                                        if any(keyword in btn_text.lower() for keyword in keywords_to_check_for_test):
-                                            match_indicator = " (✅ ПОДХОДИТ!)"
-                                            game_join_matched_buttons.append(btn) # Собираем все подходящие кнопки
-
-                                        info_msg += f"  • <code>{btn_text}</code>{match_indicator}"
-                                        if btn_url:
-                                            parsed_url = urllib.parse.urlparse(btn_url)
-                                            query_params = urllib.parse.parse_qs(parsed_url.query)
-                                            start_param = query_params.get('start', [None])[0]
-
-                                            bot_username = None
-                                            if parsed_url.hostname in ['t.me', 'telegram.me'] and parsed_url.path:
-                                                path_parts = parsed_url.path.lstrip('/').split('/')
-                                                if path_parts and path_parts[0]:
-                                                    bot_username = path_parts[0]
-                                            elif parsed_url.scheme == 'tg' and parsed_url.netloc == 'resolve':
-                                                query_params_tg = urllib.parse.parse_qs(parsed_url.query)
-                                                bot_username = query_params_tg.get('domain', [None])[0]
-
-                                            url_display = f" (URL: <code>{btn_url[:50]}...</code>)" if len(btn_url) > 50 else f" (URL: <code>{btn_url}</code>)"
-
-                                            if bot_username and start_param: 
-                                                info_msg += f"{url_display}"
-                                            else:
-                                                info_msg += url_display
-                                        else:
-                                            info_msg += " (URL: Нет, это Callback кнопка.)"
-                                        info_msg += "\n"
-                                    except Exception as btn_ex:
-                                        logger.warning(f"Error processing button in ajgtest: {btn_ex}")
-                                        info_msg += f"  • Кнопка {btn_idx} (не удалось получить текст/URL: {btn_ex})\n"
+                            info_msg += "  <emoji document_id=5935847413859225147>🏀</emoji> (Режим входа в игру: ищу ключевые слова с приоритетом)\n"
                             
-                            if game_join_matched_buttons:
-                                first_matched_button = game_join_matched_buttons[0]
-                                btn_text_first = str(getattr(first_matched_button, 'text', ''))
-                                btn_url_first = getattr(first_matched_button, 'url', None)
-                                
-                                action_details = ""
-                                if btn_url_first:
-                                    parsed_url_first = urllib.parse.urlparse(btn_url_first)
-                                    query_params_first = urllib.parse.parse_qs(parsed_url_first.query)
-                                    start_param_first = query_params_first.get('start', [None])[0]
+                            deprioritized_keyword_test = "присоединиться"
+                            high_priority_keywords_test = [k for k in keywords_to_check_for_test if k.lower() != deprioritized_keyword_test.lower()]
+                            low_priority_keywords_test = [k for k in keywords_to_check_for_test if k.lower() == deprioritized_keyword_test.lower()]
+
+                            temp_target_button_text = None
+                            temp_target_button_url = None
+                            temp_action_description = ""
+
+                            all_buttons_info = []
+
+                            # Simulate priority check for testing
+                            found_high_priority = False
+                            for row in msg.buttons:
+                                for btn in row:
+                                    btn_text_test = str(getattr(btn, 'text', ''))
+                                    btn_url_test = getattr(btn, 'url', None)
                                     
-                                    bot_username_first = None
-                                    if parsed_url_first.hostname in ['t.me', 'telegram.me'] and parsed_url_first.path:
-                                        path_parts_first = parsed_url_first.path.lstrip('/').split('/')
-                                        if path_parts_first and path_parts_first[0]:
-                                            bot_username_first = path_parts_first[0]
-                                    elif parsed_url_first.scheme == 'tg' and parsed_url_first.netloc == 'resolve':
-                                        query_params_tg_first = urllib.parse.parse_qs(parsed_url_first.query)
-                                        bot_username_first = query_params_tg_first.get('domain', [None])[0]
+                                    button_info = {
+                                        "text": btn_text_test,
+                                        "url": btn_url_test,
+                                        "match_type": "нет",
+                                        "action": ""
+                                    }
 
-                                    if bot_username_first and start_param_first:
-                                        action_details = f"*была бы* отправлена <code>/start {start_param_first}</code> боту @{bot_username_first}"
+                                    if any(keyword in btn_text_test.lower() for keyword in high_priority_keywords_test):
+                                        button_info["match_type"] = "✅ ВЫСОКИЙ ПРИОРИТЕТ!"
+                                        if not found_high_priority: # Capture the first high-priority match
+                                            temp_target_button_text = btn_text_test
+                                            temp_target_button_url = btn_url_test
+                                            found_high_priority = True
+                                            button_matched_in_test = True # Overall match for the test
+                                    
+                                    all_buttons_info.append(button_info)
+                            
+                            if not found_high_priority and low_priority_keywords_test:
+                                for btn_info in all_buttons_info:
+                                    if any(keyword in btn_info["text"].lower() for keyword in low_priority_keywords_test):
+                                        btn_info["match_type"] = "✅ НИЗКИЙ ПРИОРИТЕТ (присоединиться)"
+                                        if not temp_target_button_text: # Capture the first low-priority match if no high-priority was found
+                                            temp_target_button_text = btn_info["text"]
+                                            temp_target_button_url = btn_info["url"]
+                                            button_matched_in_test = True # Overall match for the test
+                                    
+                            
+                            for btn_info in all_buttons_info:
+                                url_display = f" (URL: <code>{btn_info['url'][:50]}...</code>)" if btn_info['url'] and len(btn_info['url']) > 50 else (f" (URL: <code>{btn_info['url']}</code>)" if btn_info['url'] else " (URL: Нет, Callback кнопка)")
+
+                                action_suffix = ""
+                                if btn_info['text'] == temp_target_button_text and btn_info['url'] == temp_target_button_url and button_matched_in_test:
+                                    # This is the button that would be clicked
+                                    if btn_info['url']:
+                                        parsed_url = urllib.parse.urlparse(btn_info['url'])
+                                        query_params = urllib.parse.parse_qs(parsed_url.query)
+                                        start_param = query_params.get('start', [None])[0]
+
+                                        bot_username = None
+                                        if parsed_url.hostname in ['t.me', 'telegram.me'] and parsed_url.path:
+                                            path_parts = parsed_url.path.lstrip('/').split('/')
+                                            if path_parts and path_parts[0]:
+                                                bot_username = path_parts[0]
+                                        elif parsed_url.scheme == 'tg' and parsed_url.netloc == 'resolve':
+                                            query_params_tg = urllib.parse.parse_qs(parsed_url.query)
+                                            bot_username = query_params_tg.get('domain', [None])[0]
+                                        
+                                        if bot_username and start_param: 
+                                            action_suffix = f" (Действие Deep-Link: *была бы* отправлена <code>/start {start_param}</code> боту @{bot_username})"
+                                        else:
+                                            action_suffix = " (Действие: *была бы* нажата URL кнопка)"
                                     else:
-                                        action_details = f"*был бы* открыт URL <code>{btn_url_first[:50]}...</code>"
-                                else:
-                                    action_details = "*была бы* нажата Callback кнопка."
-                                
-                                info_msg += f"\n  Действие: {action_details} для кнопки <code>{btn_text_first}</code> (первая подходящая).\n"
+                                        action_suffix = " (Действие: *была бы* нажата Callback кнопка)"
 
+                                info_msg += f"  • <code>{btn_info['text']}</code>{url_display} ({btn_info['match_type']}){action_suffix}\n"
+                            
+                            if not button_matched_in_test and keywords_to_check_for_test:
+                                info_msg += "\n⚠️ Ни одна кнопка не соответствует настроенным ключевым словам.\n"
                             elif not keywords_to_check_for_test:
                                 info_msg += "\n⚠️ Список ключевых слов для кнопок пуст. Ни одна кнопка не будет активирована.\n"
-                            else:
-                                info_msg += "\n⚠️ Ни одна кнопка не соответствует настроенным ключевым словам.\n"
+
                     else:
                         info_msg += "🔘 Есть кнопки: Нет\n"
                     
@@ -1173,7 +1172,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
                 lynch_button_found = False
                 for row in message.buttons:
-                    for button in row:
+                    for button in row: 
                         try:
                             button_text = str(getattr(button, 'text', ''))
                         except Exception as e:
@@ -1215,24 +1214,52 @@ Mafia Combat Premium <code>1634167847</code>""",
                     logger.warning(f"⚠️ AutoJoinGame: Список активных ключевых слов для кнопок пуст. Ни одна кнопка не будет активирована для сообщения {message.id}.")
                     return
 
-                # --- ОБНОВЛЕННАЯ ЛОГИКА ПОИСКА КНОПОК ---
-                matching_buttons = []
+                # Define the keyword to deprioritize as per user request
+                deprioritized_keyword = "присоединиться"
+
+                # Separate keywords into high-priority (any other) and low-priority (the deprioritized one)
+                high_priority_keywords = [k for k in keywords_to_check if k.lower() != deprioritized_keyword.lower()]
+                low_priority_keywords = [k for k in keywords_to_check if k.lower() == deprioritized_keyword.lower()]
+
+                target_button = None
+                
+                # First pass: Try to find a button matching high-priority keywords
+                # Iterate over buttons, if multiple high-priority match, the first one encountered will be selected.
                 for row in message.buttons:
                     for button in row:
                         try:
                             button_text = str(getattr(button, 'text', ''))
-                            if any(keyword in button_text.lower() for keyword in keywords_to_check):
-                                logger.debug(f"🔍 AutoJoinGame: Найдена потенциальная кнопка: '{button_text}'")
-                                matching_buttons.append(button)
                         except Exception as e:
                             logger.warning(f"Error getting button text for message {message.id}: {e}")
-                            # Продолжаем поиск, чтобы не пропустить другие кнопки
+                            button_text = ''
+                        
+                        if any(keyword in button_text.lower() for keyword in high_priority_keywords):
+                            target_button = button
+                            logger.info(f"✅ AutoJoinGame: Найдена высокоприоритетная кнопка: '{button_text}'")
+                            break
+                    if target_button:
+                        break
+                
+                # Second pass: If no high-priority button found, try low-priority (deprioritized_keyword)
+                # This ensures "присоединиться" is only chosen if no other matching keyword is present in *any* button.
+                if not target_button and low_priority_keywords:
+                    for row in message.buttons:
+                        for button in row:
+                            try:
+                                button_text = str(getattr(button, 'text', ''))
+                            except Exception as e:
+                                logger.warning(f"Error getting button text for message {message.id}: {e}")
+                                button_text = ''
+                            
+                            if any(keyword in button_text.lower() for keyword in low_priority_keywords):
+                                target_button = button
+                                logger.info(f"✅ AutoJoinGame: Найдена низкоприоритетная кнопка (только '{deprioritized_keyword}'): '{button_text}'")
+                                break
+                        if target_button:
+                            break
 
-                if matching_buttons:
-                    target_button = matching_buttons[0] # Всегда берем первую найденную
+                if target_button:
                     button_text = str(getattr(target_button, 'text', ''))
-                    logger.info(f"✅ AutoJoinGame: Выбрана кнопка присоединения: '{button_text}' (из {len(matching_buttons)} подходящих)")
-
                     if getattr(target_button, 'url', None):
                         button_url = target_button.url
                         logger.info(f"🔗 AutoJoinGame: URL кнопки: {button_url}")
