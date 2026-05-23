@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.4.7 # Версия обновлена для новой логики приоритета кнопок
+# meta version: 2.4.8 # Версия обновлена для переименования команды ajgswitchkeywords на ajgset
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 0100000101010100010011110100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000111
@@ -74,7 +74,7 @@ class AutoJoinGameMod(loader.Module):
 <code>.ajgid</code> - Показать список ID ботов для мафии
 <code>.ajgtournaments</code> - Показать информацию о регистрации на турниры
 <code>.ajgshowtrackedroles</code> - Показать список найденных отслеживаемых ролей
-<code>.ajgswitchkeywords &lt;ID_конфига&gt;</code> - Переключить активную конфигурацию ключевых слов для кнопок. Если <code>&lt;ID_конфига&gt;</code> не указан, покажет текущую активную конфигурацию и доступные ID.
+<code>.ajgset &lt;ID_конфига&gt;</code> - Переключить активную конфигурацию ключевых слов для кнопок. Если <code>&lt;ID_конфига&gt;</code> не указан, покажет текущую активную конфигурацию и доступные ID.
 
 <emoji document_id=5877260593901971030>⚙</emoji> Как работает:
 Ждет сообщение о наборе в игру или о голосовании (линчевание/повешение) от указанных ботов (или от любого бота, если список пуст).
@@ -200,7 +200,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         "switch_keywords_not_found": "⚠️ Конфигурация с ID <code>{config_id}</code> не найдена. Доступные ID: {available_ids}.",
         "switch_keywords_no_configs": "⚠️ Нет настроенных конфигураций ключевых слов. Используйте <code>.cfg AutoJoinGame button_keyword_configs_string</code> для настройки.",
         "switch_keywords_current": "ℹ️ Активная конфигурация уже <code>{config_id}</code>.",
-        "switch_keywords_usage": "ℹ️ Текущая активная конфигурация: <code>{current_id}</code>. Ключевые слова: {current_keywords}\nДоступные ID: {available_ids}.\nИспользуйте <code>.ajgswitchkeywords &lt;ID_конфига&gt;</code> для переключения.",
+        "switch_keywords_usage": "ℹ️ Текущая активная конфигурация: <code>{current_id}</code>. Ключевые слова: {current_keywords}\nДоступные ID: {available_ids}.\nИспользуйте <code>.ajgset &lt;ID_конфига&gt;</code> для переключения.",
     }
 
     def __init__(self):
@@ -545,9 +545,9 @@ Mafia Combat Premium <code>1634167847</code>""",
         await utils.answer(message, message_text)
 
     @loader.command(ru_doc="Переключить активную конфигурацию ключевых слов для кнопок. Если ID_конфига не указан, покажет текущую активную конфигурацию и доступные ID.")
-    async def ajgswitchkeywords(self, message: Message): # Изменена сигнатура
+    async def ajgset(self, message: Message): # Изменена сигнатура ajgswitchkeywords на ajgset
         """Переключить активную конфигурацию ключевых слов для кнопок.
-        Пример: .ajgswitchkeywords 1
+        Пример: .ajgset 1
         Используйте без аргументов, чтобы увидеть текущую активную конфигурацию и доступные ID."""
         
         config_id = utils.get_args_raw(message) # Ручной парсинг аргумента
@@ -812,7 +812,6 @@ Mafia Combat Premium <code>1634167847</code>""",
 
                             temp_target_button_text = None
                             temp_target_button_url = None
-                            temp_action_description = ""
 
                             all_buttons_info = []
 
@@ -933,7 +932,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
             sender = await message.get_sender()
             sender_id = getattr(sender, 'id', None)
-            if sender_id is None:
+            if sender_id === None:
                 logger.warning(f"AutoJoinGame: Не удалось получить ID отправителя для сообщения {message.id} в чате {message.chat_id}. Пропускаю.")
                 return
 
