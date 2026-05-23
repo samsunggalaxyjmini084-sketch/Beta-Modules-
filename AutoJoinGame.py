@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.4.9 # Версия обновлена для добавления динамического управления чатами
+# meta version: 2.4.10 # Версия обновлена для добавления улучшенного логирования управления чатами
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 0100000101010100010011110100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000111
@@ -999,6 +999,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
             # --- Логика управления allowed_chats ---
             if self.config["chat_management_enabled"]:
+                logger.debug(f"AutoJoinGame: Chat management is enabled. Checking message {message.id} from sender {sender_id}.")
                 is_allowed_manager = (
                     not self.config["chat_management_user_ids"] or
                     sender_id in self.config["chat_management_user_ids"]
@@ -1013,13 +1014,16 @@ Mafia Combat Premium <code>1634167847</code>""",
                     # Check for pinchat triggers
                     for phrase in self.config["pinchat_trigger_phrases"]:
                         if msg_text_lower.startswith(phrase.lower()):
+                            logger.debug(f"AutoJoinGame: Matched pinchat trigger phrase '{phrase}' in message {message.id}.")
                             try:
                                 chat_id_str = message.text[len(phrase):].strip()
                                 chat_id_to_manage = int(chat_id_str)
                                 action = "pin"
                                 original_trigger_phrase = phrase
+                                logger.debug(f"AutoJoinGame: Parsed chat ID {chat_id_to_manage} for pin action.")
                                 break
                             except ValueError:
+                                logger.warning(f"AutoJoinGame: Invalid chat ID format after '{phrase}' in message {message.id}. Text: '{message.text}'")
                                 await self._client.send_message(message.chat_id, self.strings("invalid_chat_id_format").format(phrase=phrase))
                                 return # Don't process further for this message if parsing fails
 
@@ -1027,13 +1031,16 @@ Mafia Combat Premium <code>1634167847</code>""",
                     if action is None:
                         for phrase in self.config["unpinchat_trigger_phrases"]:
                             if msg_text_lower.startswith(phrase.lower()):
+                                logger.debug(f"AutoJoinGame: Matched unpinchat trigger phrase '{phrase}' in message {message.id}.")
                                 try:
                                     chat_id_str = message.text[len(phrase):].strip()
                                     chat_id_to_manage = int(chat_id_str)
                                     action = "unpin"
                                     original_trigger_phrase = phrase
+                                    logger.debug(f"AutoJoinGame: Parsed chat ID {chat_id_to_manage} for unpin action.")
                                     break
                                 except ValueError:
+                                    logger.warning(f"AutoJoinGame: Invalid chat ID format after '{phrase}' in message {message.id}. Text: '{message.text}'")
                                     await self._client.send_message(message.chat_id, self.strings("invalid_chat_id_format").format(phrase=phrase))
                                     return # Don't process further for this message if parsing fails
 
@@ -1048,6 +1055,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                                 await self._client.send_message(message.chat_id, self.strings("chat_id_added").format(chat_id=chat_id_to_manage))
                                 logger.info(f"AutoJoinGame: Chat {chat_id_to_manage} added to allowed_chats by user {sender_id} via '{original_trigger_phrase}'.")
                             else:
+                                logger.debug(f"AutoJoinGame: Chat {chat_id_to_manage} already in allowed_chats. No action taken for message {message.id}.")
                                 await self._client.send_message(message.chat_id, self.strings("chat_id_already_in_list").format(chat_id=chat_id_to_manage))
                             return # Message handled, no further processing needed for this message
                         
@@ -1059,8 +1067,15 @@ Mafia Combat Premium <code>1634167847</code>""",
                                 await self._client.send_message(message.chat_id, self.strings("chat_id_removed").format(chat_id=chat_id_to_manage))
                                 logger.info(f"AutoJoinGame: Chat {chat_id_to_manage} removed from allowed_chats by user {sender_id} via '{original_trigger_phrase}'.")
                             else:
+                                logger.debug(f"AutoJoinGame: Chat {chat_id_to_manage} not in allowed_chats. No action taken for message {message.id}.")
                                 await self._client.send_message(message.chat_id, self.strings("chat_id_not_in_list").format(chat_id=chat_id_to_manage))
                             return # Message handled, no further processing needed for this message
+                    else:
+                        logger.debug(f"AutoJoinGame: Message {message.id} from sender {sender_id} did not match any chat management trigger phrases or chat_id parsing failed.")
+                else:
+                    logger.debug(f"AutoJoinGame: Sender {sender_id} is not an allowed manager for chat management in message {message.id}. Configured managers: {self.config['chat_management_user_ids']}.")
+            else:
+                logger.debug(f"AutoJoinGame: Chat management is disabled. Skipping message {message.id}.")
             
             # Continue with existing watcher logic if chat management was not triggered or handled
             
