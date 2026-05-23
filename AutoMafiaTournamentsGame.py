@@ -1,6 +1,6 @@
 # meta developer: @hdjsfzbxm
 # meta name: AutoMafiaTournamentsGame 
-# meta version: 2.5.0 # Версия обновлена для добавления функционала PinChatList
+# meta version: 2.5.1 # Версия обновлена для исправления ошибки валидатора Dict и рефакторинга статуса
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 0100000101010100010011110100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000111
@@ -9,7 +9,7 @@ import asyncio
 import random
 import urllib.parse
 from datetime import datetime, timedelta
-from telethon.tl.types import Message, User, Channel, Chat, User # Added Channel, Chat for type hinting and correct entity handling
+from telethon.tl.types import Message, User, Channel, Chat
 from telethon import events
 import re
 from collections import defaultdict
@@ -20,12 +20,12 @@ logger = logging.getLogger(__name__)
 
 
 @loader.tds
-class AutoJoinGameMod(loader.Module): # Keep the class name as AutoJoinGameMod for now, as renaming the class itself could break some internal loader mechanisms if not handled carefully. The meta name is the user-facing name.
-    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Также включает управление закрепленными чатами.""" # Updated _cls_doc to reflect new functionality
+class AutoJoinGameMod(loader.Module): 
+    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Также включает управление закрепленными чатами.""" 
 
     strings = {
         "name": "AutoMafiaTournamentsGame", 
-        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Также включает управление закрепленными чатами.", # Updated _cls_doc here as well
+        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Также включает управление закрепленными чатами.", 
         "enabled": "✅ Автовход в игру и автолинчевание включены.",
         "disabled": "❌ Автовход в игру и автолинчевание выключены.",
         "status": "<emoji document_id=5875291072225087249>📊</emoji> Статус автовхода и автолинчевания:\n"
@@ -61,9 +61,7 @@ class AutoJoinGameMod(loader.Module): # Keep the class name as AutoJoinGameMod f
                   "Автоматическое включение отслеживания ролей (боты): {}\n"
                   "Автоматическое выключение отслеживания ролей (фразы): {}\n"
                   "Автоматическое выключение отслеживания ролей (боты): {}\n"
-                  "\n<emoji document_id=5944122171441618396>📌</emoji> Статус закрепленных чатов:\n" # New section for pinning status
-                  "Управление папкой 'Все чаты': {}\n"
-                  "Закрепленные чаты: {}",
+                  "{}\n", # Placeholder for pinned chats status from _get_pinned_chats_status_display
         "error": "❌ Ошибка при нажатии кнопки: {}",
         "no_button": "⚠️ Кнопка не найдена под сообщением",
         "help_text": """<emoji document_id=5931415565955503486>🤖</emoji> AutoMafiaTournamentsGame - Помощь
@@ -131,7 +129,7 @@ class AutoJoinGameMod(loader.Module): # Keep the class name as AutoJoinGameMod f
 <b>Новая настройка:</b> <code>auto_track_roles_bot_ids</code> - Список ID ботов, от которых ожидается сообщение с фразами для автоматического включения отслеживания ролей. Если список пуст, сообщения будут отслеживаться от любого бота. По умолчанию: <code>[]</code>.
 <b>Новая настройка:</b> <code>auto_disable_track_roles_trigger_phrases</code> - Список фраз, которые модуль будет искать в сообщениях для автоматического выключения отслеживания ролей. По умолчанию: <code>[]</code>.
 <b>Новая настройка:</b> <code>auto_disable_track_roles_bot_ids</code> - Список ID ботов, от которых ожидается сообщение с фразами для автоматического выключения отслеживания ролей. Если список пуст, сообщения будут отслеживаться от любого бота. По умолчанию: <code>[]</code>.
-<b>Новая настройка:</b> <code>pinned_chats_order</code> - Список закрепленных чатов и их позиций. Формат: <code>[{"chat_id": 12345, "pin_position": 1}, {"chat_id": 67890, "pin_position": 2}]</code>.
+<b>Новая настройка (обновлена):</b> <code>pinned_chats_order</code> - Список закрепленных чатов и их позиций. Формат: <code>[{"chat_id": 12345, "pin_position": 1}, {"chat_id": 67890, "pin_position": 2}]</code>.
 <b>Новая настройка:</b> <code>manage_all_chats_folder</code> - Включено ли управление закреплением чатов в папке "Все чаты". Если False, чаты закрепляются в архиве. По умолчанию: False.
 """,
         "ajgid_bots_list": """<emoji document_id=5771887475421090729>👤</emoji> Список ID ботов для мафии:
@@ -223,7 +221,9 @@ Mafia Combat Premium <code>1634167847</code>""",
         "unpin_chat_not_found": "⚠️ Чат с ID <code>{chat_id}</code> не найден в списке закрепленных или недоступен.",
         "unpin_chat_error": "❌ Ошибка при откреплении чата <code>{chat_id}</code>: {error}",
         "no_pinned_chats": "ℹ️ Нет закрепленных чатов.",
-        "pinned_chats_list_header": "<emoji document_id=5944122171441618396>📌</emoji> Текущие закрепленные чаты:\n",
+        "pinned_chats_list_header": "\n<emoji document_id=5944122171441618396>📌</emoji> Статус закрепленных чатов:\n" # Changed to start with newline
+                                    "Управление папкой 'Все чаты': {}\n"
+                                    "Закрепленные чаты:\n",
         "pinned_chat_entry": "• <code>{chat_name}</code> (ID: <code>{chat_id}</code>) на позиции {position}",
         "pin_invalid_position": "⚠️ Неверный номер позиции. Позиция должна быть числом больше 0.",
         "manage_all_chats_set": "✅ Управление закреплением чатов в папке 'Все чаты' установлено на <code>{value}</code>.",
@@ -383,19 +383,12 @@ Mafia Combat Premium <code>1634167847</code>""",
                 lambda: "Список ID ботов, от которых ожидается сообщение с фразами для автоматического выключения отслеживания ролей. Если список пуст, сообщения будут отслеживаться от любого бота.",
                 validator=loader.validators.Series(loader.validators.Integer())
             ),
-            # New config for PinChatList functionality
+            # New config for PinChatList functionality, changed to Raw for compatibility
             loader.ConfigValue(
                 "pinned_chats_order",
                 [],
                 lambda: "Список закрепленных чатов и их позиций. Формат: [{'chat_id': 12345, 'pin_position': 1}, {'chat_id': 67890, 'pin_position': 2}].",
-                validator=loader.validators.Series(
-                    loader.validators.Dict(
-                        dict_validator={
-                            "chat_id": loader.validators.Integer(),
-                            "pin_position": loader.validators.Integer(minimum=1),
-                        }
-                    )
-                )
+                validator=loader.validators.Raw() # Changed to Raw() for broader compatibility
             ),
             loader.ConfigValue(
                 "manage_all_chats_folder",
@@ -413,7 +406,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         self._processed_messages = set() 
         self._processed_messages_cleanup_task = None 
         self._send_tracked_roles_task = None
-        self._pinned_chats_task = None # New task for initial pinning
+        self._pinned_chats_task = None 
 
         self._parsed_button_keywords: dict[str, list[str]] = {}
         self._current_button_keywords_to_use: list[str] = []
@@ -424,10 +417,8 @@ Mafia Combat Premium <code>1634167847</code>""",
         if self._processed_messages_cleanup_task is None:
             self._processed_messages_cleanup_task = asyncio.create_task(self._cleanup_processed_messages_loop())
         
-        # Инициализация при запуске, важно, чтобы всегда были актуальные keywords
         self._update_button_keywords_from_config()
         
-        # Initial pinning setup
         if self._pinned_chats_task is None:
             self._pinned_chats_task = asyncio.create_task(self._initial_pin_setup())
 
@@ -456,7 +447,7 @@ Mafia Combat Premium <code>1634167847</code>""",
             except asyncio.CancelledError:
                 logger.debug("AutoMafiaTournamentsGame: Задача отправки списка отслеживаемых ролей отменена при выгрузке.")
 
-        if self._pinned_chats_task: # Cancel pinning task on unload
+        if self._pinned_chats_task: 
             self._pinned_chats_task.cancel()
             try:
                 await self._pinned_chats_task
@@ -470,7 +461,6 @@ Mafia Combat Premium <code>1634167847</code>""",
         entries = [e.strip() for e in config_string.split(',')]
 
         for entry in entries:
-            # Убеждаемся, что парсим только ключевое слово и ID, игнорируя остальное
             match = re.match(r"(.+?)\s*\(([\w\d]+)\)", entry)
             if match:
                 keyword_part = match.group(1).strip()
@@ -490,17 +480,15 @@ Mafia Combat Premium <code>1634167847</code>""",
             self._current_button_keywords_to_use = self._parsed_button_keywords[active_id]
             logger.info(f"AutoMafiaTournamentsGame: Активная конфигурация ключевых слов кнопок установлена на '{active_id}'. Используются ключевые слова: {self._current_button_keywords_to_use}") 
         elif self._parsed_button_keywords:
-            # Если активный ID не задан или не найден, пробуем использовать первый доступный
             first_id = next(iter(self._parsed_button_keywords))
-            # Используем self.set() для сохранения изменения в конфиг, и обновляем self.config
             self.set("active_button_config_id", first_id) 
-            self.config["active_button_config_id"] = first_id # Явно обновляем in-memory config
+            self.config["active_button_config_id"] = first_id 
             self._current_button_keywords_to_use = self._parsed_button_keywords[first_id]
             logger.warning(f"AutoMafiaTournamentsGame: Активная конфигурация ключевых слов кнопок '{active_id}' не найдена или не установлена. Установлено на первую доступную: '{first_id}'.") 
         else:
             self._current_button_keywords_to_use = []
-            self.set("active_button_config_id", "") # Очищаем, если нет конфигов
-            self.config["active_button_config_id"] = "" # Явно обновляем in-memory config
+            self.set("active_button_config_id", "") 
+            self.config["active_button_config_id"] = "" 
             logger.warning("AutoMafiaTournamentsGame: Нет настроенных конфигураций ключевых слов кнопок. Модуль не будет активировать кнопки по ключевым словам.") 
 
 
@@ -558,10 +546,30 @@ Mafia Combat Premium <code>1634167847</code>""",
         """Initial setup for pinning chats based on config."""
         try:
             logger.debug("AutoMafiaTournamentsGame: Выполняется начальная настройка закрепленных чатов.")
+            
+            # Validate config before use
+            valid_pinned_chats_config = []
+            pinned_chats_raw = self.config["pinned_chats_order"]
+            if not isinstance(pinned_chats_raw, list):
+                logger.warning("AutoMafiaTournamentsGame: 'pinned_chats_order' в конфиге не является списком. Использую пустой список.")
+                pinned_chats_raw = []
+
+            for item in pinned_chats_raw:
+                if isinstance(item, dict) and \
+                   "chat_id" in item and isinstance(item["chat_id"], int) and \
+                   "pin_position" in item and isinstance(item["pin_position"], int) and \
+                   item["pin_position"] >= 1:
+                    valid_pinned_chats_config.append(item)
+                else:
+                    logger.warning(f"AutoMafiaTournamentsGame: Обнаружен неверный элемент в 'pinned_chats_order' конфиге: {item}. Пропускаю.")
+            
+            # Update config with only valid entries
+            self.set("pinned_chats_order", valid_pinned_chats_config)
+            self.config["pinned_chats_order"] = valid_pinned_chats_config
+
             for chat_data in self.config["pinned_chats_order"]:
                 chat_id = chat_data["chat_id"]
                 pin_position = chat_data["pin_position"]
-                # Pass message=None for initial setup since there's no original message to reply to
                 await self._pin_chat_list_actual(chat_id, pin_position, message=None, initial_setup=True)
             logger.debug("AutoMafiaTournamentsGame: Начальная настройка закрепленных чатов завершена.")
         except asyncio.CancelledError:
@@ -575,19 +583,17 @@ Mafia Combat Premium <code>1634167847</code>""",
             entity = await self._client.get_entity(chat_id)
             chat_name = getattr(entity, 'title', getattr(entity, 'first_name', str(chat_id)))
 
-            # Determine if it's a private chat (User) vs. group/channel (Chat/Channel)
             is_private = isinstance(entity, User) and not getattr(entity, 'bot', False) and not getattr(entity, 'is_self', False)
             
-            # If manage_all_chats_folder is False AND it's not a private chat, then pin to archive
             archive_mode = not self.config["manage_all_chats_folder"] and not is_private
 
             await self._client.pin_chat(
                 entity=chat_id,
                 pin_position=pin_position,
                 archive=archive_mode,
-                silent=True # Always pin silently
+                silent=True 
             )
-            if not initial_setup and message: # Only send feedback if not initial setup and message is provided
+            if not initial_setup and message: 
                 if archive_mode:
                     await utils.answer(message, self.strings("pin_chat_success_archived").format(chat_name=chat_name, chat_id=chat_id, position=pin_position))
                 else:
@@ -596,10 +602,10 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         except Exception as e:
             logger.error(f"AutoMafiaTournamentsGame: Ошибка при закреплении чата {chat_id}: {e}")
-            if not initial_setup and message: # Only send feedback if not initial setup and message is provided
+            if not initial_setup and message: 
                 await utils.answer(message, self.strings("pin_chat_error").format(chat_id=chat_id, error=e))
 
-    async def _unpin_chat_list_actual(self, chat_id: int, message: Message): # Added message arg for feedback
+    async def _unpin_chat_list_actual(self, chat_id: int, message: Message):
         """Actual logic to unpin a chat."""
         try:
             entity = await self._client.get_entity(chat_id)
@@ -620,36 +626,99 @@ Mafia Combat Premium <code>1634167847</code>""",
 
     def _update_pinned_chats_config(self, chat_id: int, pin_position: Optional[int] = None, action: str = "add"):
         """Adds, updates, or removes chat from pinned_chats_order in config."""
-        pinned_chats = list(self.config["pinned_chats_order"]) # Create a mutable copy
+        
+        # Validate current config before modifying
+        pinned_chats_raw = self.config["pinned_chats_order"]
+        if not isinstance(pinned_chats_raw, list):
+            logger.warning("AutoMafiaTournamentsGame: 'pinned_chats_order' в конфиге не является списком. Использую пустой список.")
+            pinned_chats_raw = []
+
+        valid_current_pinned_chats = []
+        for item in pinned_chats_raw:
+            if isinstance(item, dict) and \
+               "chat_id" in item and isinstance(item["chat_id"], int) and \
+               "pin_position" in item and isinstance(item["pin_position"], int) and \
+               item["pin_position"] >= 1:
+                valid_current_pinned_chats.append(item)
+            else:
+                logger.warning(f"AutoMafiaTournamentsGame: Обнаружен неверный элемент в 'pinned_chats_order' конфиге: {item}. Пропускаю.")
+
+        pinned_chats = list(valid_current_pinned_chats) # Create a mutable copy of validated list
 
         if action == "add":
-            # Remove existing entry for this chat_id if it exists, to prevent duplicates and handle updates
             pinned_chats = [c for c in pinned_chats if c["chat_id"] != chat_id]
             
-            # Determine the actual insert position (0-based for list operations)
             if pin_position is not None and 1 <= pin_position <= len(pinned_chats) + 1:
                 insert_index = pin_position - 1
             else:
-                # If no position or invalid, add to the end
                 insert_index = len(pinned_chats) 
 
-            # Insert the new chat data
-            new_chat_data = {"chat_id": chat_id, "pin_position": 0} # position will be re-numbered
+            new_chat_data = {"chat_id": chat_id, "pin_position": 0} 
             pinned_chats.insert(insert_index, new_chat_data)
             
-            # Re-number all pins to ensure consecutive order
             for i, chat_data in enumerate(pinned_chats):
                 chat_data["pin_position"] = i + 1
 
         elif action == "remove":
-            # Filter out the chat to be removed
             pinned_chats = [c for c in pinned_chats if c["chat_id"] != chat_id]
-            # Re-number remaining pins
             for i, chat_data in enumerate(pinned_chats):
                 chat_data["pin_position"] = i + 1
 
         self.set("pinned_chats_order", pinned_chats)
-        self.config["pinned_chats_order"] = pinned_chats # Update in-memory config
+        self.config["pinned_chats_order"] = pinned_chats 
+
+    async def _get_pinned_chats_status_display(self) -> str:
+        """Helper to generate the pinned chats status string."""
+        manage_all_chats_display = "✅ Включено" if self.config["manage_all_chats_folder"] else "❌ Выключено"
+        
+        pinned_chats_display_list = []
+        
+        # Validate config before use
+        pinned_chats_raw = self.config["pinned_chats_order"]
+        if not isinstance(pinned_chats_raw, list):
+            logger.warning("AutoMafiaTournamentsGame: 'pinned_chats_order' в конфиге не является списком. Использую пустой список для отображения.")
+            pinned_chats_raw = []
+
+        valid_pinned_chats_for_display = []
+        for item in pinned_chats_raw:
+            if isinstance(item, dict) and \
+               "chat_id" in item and isinstance(item["chat_id"], int) and \
+               "pin_position" in item and isinstance(item["pin_position"], int) and \
+               item["pin_position"] >= 1:
+                valid_pinned_chats_for_display.append(item)
+            else:
+                logger.warning(f"AutoMafiaTournamentsGame: Обнаружен неверный элемент в 'pinned_chats_order' конфиге: {item}. Пропускаю для отображения.")
+
+        if valid_pinned_chats_for_display:
+            sorted_pinned_chats = sorted(valid_pinned_chats_for_display, key=lambda x: x["pin_position"])
+            for chat_data in sorted_pinned_chats:
+                chat_id = chat_data["chat_id"]
+                pin_position = chat_data["pin_position"]
+                chat_name = str(chat_id) 
+                try:
+                    entity = await self._client.get_entity(chat_id)
+                    chat_name = getattr(entity, 'title', getattr(entity, 'first_name', str(chat_id)))
+                except Exception as e:
+                    logger.warning(f"AutoMafiaTournamentsGame: Не удалось получить сущность для чата ID {chat_id} при отображении: {e}")
+                
+                pinned_chats_display_list.append(self.strings("pinned_chat_entry").format(chat_name=chat_name, chat_id=chat_id, position=pin_position))
+            
+            # Use the "pinned_chats_list_header" string format, passing manage_all_chats_display
+            return self.strings("pinned_chats_list_header").format(manage_all_chats_display) + "\n".join(pinned_chats_display_list)
+        else:
+            return self.strings("pinned_chats_list_header").format(manage_all_chats_display) + self.strings("no_pinned_chats") # Ensure "No pinned chats" is also under the header
+
+    # Helper function for general status command to format time
+    def _get_time_remaining_display(self) -> str:
+        if self._role_tracking_active and self._role_tracking_start_time:
+            time_elapsed = datetime.now() - self._role_tracking_start_time
+            remaining_seconds = self.config["role_tracking_duration"] - time_elapsed.total_seconds()
+            if remaining_seconds > 0:
+                minutes, seconds = divmod(int(remaining_seconds), 60)
+                return self.strings("time_remaining_format").format(minutes=minutes, seconds=seconds)
+            else:
+                return "Истекло"
+        return self.strings("no_time_remaining")
 
     # --- PinChatList commands start ---
 
@@ -682,28 +751,30 @@ Mafia Combat Premium <code>1634167847</code>""",
             entity = await self._client.get_entity(chat_id)
             chat_name = getattr(entity, 'title', getattr(entity, 'first_name', str(chat_id)))
 
-            current_pinned = [c for c in self.config["pinned_chats_order"] if c["chat_id"] == chat_id]
-            if current_pinned:
-                # If already pinned, just update position if specified, otherwise inform
-                if pin_position is not None and current_pinned[0]["pin_position"] != pin_position:
-                    self._update_pinned_chats_config(chat_id, pin_position, "add") # "add" action re-inserts and re-numbers
+            # Validate current config state before checking for existing pins
+            pinned_chats_raw = self.config["pinned_chats_order"]
+            if not isinstance(pinned_chats_raw, list):
+                pinned_chats_raw = []
+            current_pinned_chats = [item for item in pinned_chats_raw if isinstance(item, dict) and "chat_id" in item and isinstance(item["chat_id"], int)]
+
+            current_pinned_entry = next((c for c in current_pinned_chats if c["chat_id"] == chat_id), None)
+
+            if current_pinned_entry:
+                if pin_position is not None and current_pinned_entry["pin_position"] != pin_position:
+                    self._update_pinned_chats_config(chat_id, pin_position, "add")
                     await self._pin_chat_list_actual(chat_id, pin_position, message)
-                    return # Exit after updating
+                    return 
                 else:
-                    await utils.answer(message, self.strings("pin_chat_already_pinned").format(chat_name=chat_name, chat_id=chat_id, position=current_pinned[0]["pin_position"]))
+                    await utils.answer(message, self.strings("pin_chat_already_pinned").format(chat_name=chat_name, chat_id=chat_id, position=current_pinned_entry["pin_position"]))
                     return
             
-            # If not pinned, add it
             if pin_position is None:
-                # Default to top if no position provided and it's a new pin
                 pin_position = 1 
 
             self._update_pinned_chats_config(chat_id, pin_position, "add")
-            # The actual pinning should happen *after* config is updated and position determined
-            # The _pin_chat_list_actual handles sending success/error messages to the user
             await self._pin_chat_list_actual(chat_id, pin_position, message, initial_setup=False)
             
-        except ValueError: # get_entity might raise ValueError if ID is invalid or not found
+        except ValueError: 
             await utils.answer(message, self.strings("pin_chat_not_found").format(chat_id=chat_id))
         except Exception as e:
             logger.error(f"AutoMafiaTournamentsGame: Ошибка при выполнении .pinit для чата {chat_id}: {e}")
@@ -722,90 +793,27 @@ Mafia Combat Premium <code>1634167847</code>""",
         except ValueError:
             await utils.answer(message, self.strings("unpin_chat_error").format(chat_id=args[0], error="Неверный формат ID чата. Ожидается число."))
             return
+        
+        # Validate current config state before checking
+        pinned_chats_raw = self.config["pinned_chats_order"]
+        if not isinstance(pinned_chats_raw, list):
+            pinned_chats_raw = []
+        valid_current_pinned_chats = [item for item in pinned_chats_raw if isinstance(item, dict) and "chat_id" in item and isinstance(item["chat_id"], int)]
 
-        found_in_config = any(c["chat_id"] == chat_id for c in self.config["pinned_chats_order"])
+        found_in_config = any(c["chat_id"] == chat_id for c in valid_current_pinned_chats)
         if not found_in_config:
             await utils.answer(message, self.strings("unpin_chat_not_found").format(chat_id=chat_id))
             return
         
         self._update_pinned_chats_config(chat_id, action="remove")
-        await self._unpin_chat_list_actual(chat_id, message) # Pass message here
+        await self._unpin_chat_list_actual(chat_id, message) 
 
 
     @loader.command(ru_doc="Показать текущий статус закрепленных чатов.")
     async def pinstatus(self, message: Message):
         """Show current pinned chats status."""
-        manage_all_chats_display = "✅ Включено" if self.config["manage_all_chats_folder"] else "❌ Выключено"
-        
-        pinned_chats_display_list = []
-        if self.config["pinned_chats_order"]:
-            # Sort by pin_position before displaying
-            sorted_pinned_chats = sorted(self.config["pinned_chats_order"], key=lambda x: x["pin_position"])
-            for chat_data in sorted_pinned_chats:
-                chat_id = chat_data["chat_id"]
-                pin_position = chat_data["pin_position"]
-                chat_name = str(chat_id) # Default name
-                try:
-                    entity = await self._client.get_entity(chat_id)
-                    chat_name = getattr(entity, 'title', getattr(entity, 'first_name', str(chat_id)))
-                except Exception as e:
-                    logger.warning(f"AutoMafiaTournamentsGame: Не удалось получить сущность для чата ID {chat_id}: {e}")
-                
-                pinned_chats_display_list.append(self.strings("pinned_chat_entry").format(chat_name=chat_name, chat_id=chat_id, position=pin_position))
-            
-            pinned_chats_display = self.strings("pinned_chats_list_header") + "\n".join(pinned_chats_display_list)
-        else:
-            pinned_chats_display = self.strings("no_pinned_chats")
-
-        # Construct the full status message, including all fields
-        status_text = self.strings("status").format(
-            "🟢 Включен" if self.config["enabled"] else "🔴 Выключен", 
-            f"[{', '.join(map(str, self.config['delays']))}]" if len(self.config['delays']) > 1 else str(self.config['delays'][0]), 
-            f"[{', '.join(map(str, self.config['lynch_delay']))}]" if len(self.config['lynch_delay']) > 1 else str(self.config['lynch_delay'][0]),
-            ", ".join(map(str, self.config["bot_ids"])) if self.config["bot_ids"] else "Не указаны (любой бот)", 
-            ", ".join(map(str, self.config["allowed_chats"])) if self.config["allowed_chats"] else "Все чаты", 
-            self.config["button_keyword_configs_string"] if self.config["button_keyword_configs_string"] else "(пусто)",
-            self.config["active_button_config_id"] if self.config["active_button_config_id"] else "(не задан)",
-            ", ".join(self._current_button_keywords_to_use) if self._current_button_keywords_to_use else "(пусто)",
-            ", ".join(self._parsed_button_keywords.keys()) if self._parsed_button_keywords else "(нет)",
-            "🟢 Активен (автоматически обрабатывает Deep-Link URL, если они есть у подходящих кнопок)", 
-            self.config["lynch_target_marker"] if self.config["lynch_target_marker"] else "(пусто)",
-            ", ".join(self.config["game_join_trigger_phrases"]) if self.config["game_join_trigger_phrases"] else "(пусто)",
-            ", ".join(self.config["lynch_trigger_phrases"]) if self.config["lynch_trigger_phrases"] else "(пусто)",
-            ", ".join(self.config["lynch_hang_trigger_phrases"]) if self.config["lynch_hang_trigger_phrases"] else "(пусто)",
-            str(self.config["player_to_lynch_user_id"]) if self.config["player_to_lynch_user_id"] else "Отключено (0)",
-            ", ".join(self.config["lynch_player_voting_trigger_phrases"]) if self.config["lynch_player_voting_trigger_phrases"] else "(пусто)",
-            self._player_nickname_to_lynch if self._player_nickname_to_lynch else "(нет)",
-            str(self.config["role_forward_chat_id"]) if self.config["role_forward_chat_id"] else self.strings("role_forward_chat_id_display"),
-            ", ".join(self.config["role_trigger_phrases"]) if self.config["role_trigger_phrases"] else self.strings("role_forward_trigger_phrases_display"),
-            self.strings("role_tracking_status_active") if self.config["role_tracking_enabled"] and self._role_tracking_active else self.strings("role_tracking_status_inactive"),
-            str(self.config["role_tracking_duration"]),
-            ", ".join(self.config["tracked_roles_to_monitor"]) if self.config["tracked_roles_to_monitor"] else "(пусто)",
-            ", ".join(self.config["role_announcement_phrases"]) if self.config["role_announcement_phrases"] else "(пусто)",
-            len(self._tracked_roles_list),
-            self._get_time_remaining_display(), # Helper function to format time
-            str(self.config["send_tracked_roles_chat_id"]) if self.config["send_tracked_roles_chat_id"] else self.strings("send_tracked_roles_chat_id_display"),
-            str(self.config["send_tracked_roles_delay"]) if self.config["send_tracked_roles_delay"] > 0 else self.strings("send_tracked_roles_delay_display"),
-            ", ".join(self.config["auto_track_roles_trigger_phrases"]) if self.config["auto_track_roles_trigger_phrases"] else self.strings("auto_track_roles_trigger_phrases_display"),
-            ", ".join(map(str, self.config["auto_track_roles_bot_ids"])) if self.config["auto_track_roles_bot_ids"] else self.strings("auto_track_roles_bot_ids_display"),
-            ", ".join(self.config["auto_disable_track_roles_trigger_phrases"]) if self.config["auto_disable_track_roles_trigger_phrases"] else self.strings("auto_disable_track_roles_trigger_phrases_display"),
-            ", ".join(map(str, self.config["auto_disable_track_roles_bot_ids"])) if self.config["auto_disable_track_roles_bot_ids"] else self.strings("auto_disable_track_roles_bot_ids_display"),
-            manage_all_chats_display, # New arg
-            pinned_chats_display # New arg
-        )
-        await utils.answer(message, status_text)
-
-    # Helper function for status command to avoid repetition
-    def _get_time_remaining_display(self) -> str:
-        if self._role_tracking_active and self._role_tracking_start_time:
-            time_elapsed = datetime.now() - self._role_tracking_start_time
-            remaining_seconds = self.config["role_tracking_duration"] - time_elapsed.total_seconds()
-            if remaining_seconds > 0:
-                minutes, seconds = divmod(int(remaining_seconds), 60)
-                return self.strings("time_remaining_format").format(minutes=minutes, seconds=seconds)
-            else:
-                return "Истекло"
-        return self.strings("no_time_remaining")
+        pinned_status_display = await self._get_pinned_chats_status_display()
+        await utils.answer(message, pinned_status_display)
 
 
     @loader.command(ru_doc="Включить/выключить управление закреплением чатов в папке 'Все чаты' (True/False). По умолчанию: False (управляется только в архиве).")
@@ -819,11 +827,11 @@ Mafia Combat Premium <code>1634167847</code>""",
         value = args.lower()
         if value == "true":
             self.set("manage_all_chats_folder", True)
-            self.config["manage_all_chats_folder"] = True # Update in-memory
+            self.config["manage_all_chats_folder"] = True 
             await utils.answer(message, self.strings("manage_all_chats_set").format(value="True"))
         elif value == "false":
             self.set("manage_all_chats_folder", False)
-            self.config["manage_all_chats_folder"] = False # Update in-memory
+            self.config["manage_all_chats_folder"] = False 
             await utils.answer(message, self.strings("manage_all_chats_set").format(value="False"))
         else:
             await utils.answer(message, self.strings("manage_all_chats_invalid_value"))
@@ -928,8 +936,93 @@ Mafia Combat Premium <code>1634167847</code>""",
     @loader.command(ru_doc="Показать статус автовхода и автолинчевания")
     async def ajgstatus(self, message: Message):
         """Показать статус автовхода и автолинчевания"""
-        # Delegating to pinstatus to avoid code duplication in status generation
-        await self.pinstatus(message)
+        # Get pinned chats status separately
+        pinned_status_display = await self._get_pinned_chats_status_display()
+
+        status = "🟢 Включен" if self.config["enabled"] else "🔴 Выключен"
+        
+        delays = self.config["delays"]
+        delay_display = f"[{', '.join(map(str, delays))}]" if len(delays) > 1 else str(delays[0])
+
+        lynch_delays = self.config["lynch_delay"]
+        lynch_delay_display = f"[{', '.join(map(str, lynch_delays))}]" if len(lynch_delays) > 1 else str(lynch_delays[0])
+
+        bot_ids_display = ", ".join(map(str, self.config["bot_ids"])) if self.config["bot_ids"] else "Не указаны (любой бот)"
+
+        allowed_chats = self.config["allowed_chats"]
+        allowed_chats_display = ", ".join(map(str, allowed_chats)) if allowed_chats else "Все чаты"
+
+        button_keyword_configs_string_display = self.config["button_keyword_configs_string"] if self.config["button_keyword_configs_string"] else "(пусто)"
+        active_button_config_id_display = self.config["active_button_config_id"] if self.config["active_button_config_id"] else "(не задан)"
+        current_button_keywords_display = ", ".join(self._current_button_keywords_to_use) if self._current_button_keywords_to_use else "(пусто)"
+        available_config_ids_display = ", ".join(self._parsed_button_keywords.keys()) if self._parsed_button_keywords else "(нет)"
+
+        deep_link_status_display = "🟢 Активен (автоматически обрабатывает Deep-Link URL, если они есть у подходящих кнопок)"
+
+        lynch_target_marker_display = self.config["lynch_target_marker"] if self.config["lynch_target_marker"] else "(пусто)"
+
+        game_join_trigger_phrases_display = ", ".join(self.config["game_join_trigger_phrases"]) if self.config["game_join_trigger_phrases"] else "(пусто)"
+        lynch_trigger_phrases_display = ", ".join(self.config["lynch_trigger_phrases"]) if self.config["lynch_trigger_phrases"] else "(пусто)"
+        lynch_hang_trigger_phrases_display = ", ".join(self.config["lynch_hang_trigger_phrases"]) if self.config["lynch_hang_trigger_phrases"] else "(пусто)"
+        
+        player_to_lynch_user_id_display = str(self.config["player_to_lynch_user_id"]) if self.config["player_to_lynch_user_id"] else "Отключено (0)"
+        lynch_player_voting_trigger_phrases_display = ", ".join(self.config["lynch_player_voting_trigger_phrases"]) if self.config["lynch_player_voting_trigger_phrases"] else "(пусто)"
+        current_player_nickname_display = self._player_nickname_to_lynch if self._player_nickname_to_lynch else "(нет)"
+
+        role_forward_chat_id_display = str(self.config["role_forward_chat_id"]) if self.config["role_forward_chat_id"] else self.strings("role_forward_chat_id_display")
+        role_trigger_phrases_display = ", ".join(self.config["role_trigger_phrases"]) if self.config["role_trigger_phrases"] else self.strings("role_forward_trigger_phrases_display")
+
+        role_tracking_status = self.strings("role_tracking_status_active") if self.config["role_tracking_enabled"] and self._role_tracking_active else self.strings("role_tracking_status_inactive")
+        role_tracking_duration_display = str(self.config["role_tracking_duration"])
+        tracked_roles_to_monitor_display = ", ".join(self.config["tracked_roles_to_monitor"]) if self.config["tracked_roles_to_monitor"] else "(пусто)"
+        role_announcement_phrases_display = ", ".join(self.config["role_announcement_phrases"]) if self.config["role_announcement_phrases"] else "(пусто)"
+        tracked_roles_count = len(self._tracked_roles_list)
+
+        time_remaining_display = self._get_time_remaining_display()
+        
+        send_tracked_roles_chat_id_display = str(self.config["send_tracked_roles_chat_id"]) if self.config["send_tracked_roles_chat_id"] else self.strings("send_tracked_roles_chat_id_display")
+        send_tracked_roles_delay_display = str(self.config["send_tracked_roles_delay"]) if self.config["send_tracked_roles_delay"] > 0 else self.strings("send_tracked_roles_delay_display")
+        
+        auto_track_roles_trigger_phrases_display = ", ".join(self.config["auto_track_roles_trigger_phrases"]) if self.config["auto_track_roles_trigger_phrases"] else self.strings("auto_track_roles_trigger_phrases_display")
+        auto_track_roles_bot_ids_display = ", ".join(map(str, self.config["auto_track_roles_bot_ids"])) if self.config["auto_track_roles_bot_ids"] else self.strings("auto_track_roles_bot_ids_display")
+        
+        auto_disable_track_roles_trigger_phrases_display = ", ".join(self.config["auto_disable_track_roles_trigger_phrases"]) if self.config["auto_disable_track_roles_trigger_phrases"] else self.strings("auto_disable_track_roles_trigger_phrases_display")
+        auto_disable_track_roles_bot_ids_display = ", ".join(map(str, self.config["auto_disable_track_roles_bot_ids"])) if self.config["auto_disable_track_roles_bot_ids"] else self.strings("auto_disable_track_roles_bot_ids_display")
+
+        await utils.answer(message, self.strings("status").format(
+            status, 
+            delay_display, 
+            lynch_delay_display,
+            bot_ids_display, 
+            allowed_chats_display, 
+            button_keyword_configs_string_display,
+            active_button_config_id_display,
+            current_button_keywords_display,
+            available_config_ids_display,
+            deep_link_status_display, 
+            lynch_target_marker_display,
+            game_join_trigger_phrases_display,
+            lynch_trigger_phrases_display,
+            lynch_hang_trigger_phrases_display,
+            player_to_lynch_user_id_display,
+            lynch_player_voting_trigger_phrases_display,
+            current_player_nickname_display,
+            role_forward_chat_id_display,
+            role_trigger_phrases_display,
+            role_tracking_status,
+            role_tracking_duration_display,
+            tracked_roles_to_monitor_display,
+            role_announcement_phrases_display,
+            tracked_roles_count,
+            time_remaining_display,
+            send_tracked_roles_chat_id_display,
+            send_tracked_roles_delay_display,
+            auto_track_roles_trigger_phrases_display,
+            auto_track_roles_bot_ids_display,
+            auto_disable_track_roles_trigger_phrases_display,
+            auto_disable_track_roles_bot_ids_display,
+            pinned_status_display # Added the full pinned status string here
+        ))
 
 
     @loader.command(ru_doc="Показать справку")
@@ -1065,7 +1158,6 @@ Mafia Combat Premium <code>1634167847</code>""",
 
                             all_buttons_info = []
 
-                            # Simulate priority check for testing
                             found_high_priority = False
                             for row in msg.buttons:
                                 for btn in row:
@@ -1081,11 +1173,11 @@ Mafia Combat Premium <code>1634167847</code>""",
 
                                     if any(keyword in btn_text_test.lower() for keyword in high_priority_keywords_test):
                                         button_info["match_type"] = "✅ ВЫСОКИЙ ПРИОРИТЕТ!"
-                                        if not found_high_priority: # Capture the first high-priority match
+                                        if not found_high_priority: 
                                             temp_target_button_text = btn_text_test
                                             temp_target_button_url = btn_url_test
                                             found_high_priority = True
-                                            button_matched_in_test = True # Overall match for the test
+                                            button_matched_in_test = True 
                                     
                                     all_buttons_info.append(button_info)
                             
@@ -1093,10 +1185,10 @@ Mafia Combat Premium <code>1634167847</code>""",
                                 for btn_info in all_buttons_info:
                                     if any(keyword in btn_info["text"].lower() for keyword in low_priority_keywords_test):
                                         btn_info["match_type"] = "✅ НИЗКИЙ ПРИОРИТЕТ (присоединиться)"
-                                        if not temp_target_button_text: # Capture the first low-priority match if no high-priority was found
+                                        if not temp_target_button_text: 
                                             temp_target_button_text = btn_info["text"]
                                             temp_target_button_url = btn_info["url"]
-                                            button_matched_in_test = True # Overall match for the test
+                                            button_matched_in_test = True 
                                     
                             
                             for btn_info in all_buttons_info:
@@ -1104,7 +1196,6 @@ Mafia Combat Premium <code>1634167847</code>""",
 
                                 action_suffix = ""
                                 if btn_info['text'] == temp_target_button_text and btn_info['url'] == temp_target_button_url and button_matched_in_test:
-                                    # This is the button that would be clicked
                                     if btn_info['url']:
                                         parsed_url = urllib.parse.urlparse(btn_info['url'])
                                         query_params = urllib.parse.parse_qs(parsed_url.query)
@@ -1146,7 +1237,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                 await utils.answer(message, final_output)
 
         except Exception as e:
-            logger.exception(f"❌ AutoMafiaTournamentsGame: Критическая ошибка в ajgtest: {e}") # Updated module name
+            logger.exception(f"❌ AutoMafiaTournamentsGame: Критическая ошибка в ajgtest: {e}") 
             error_text = str(e) if str(e) else "Неизвестная ошибка"
             await utils.answer(message, self.strings("ajgtest_error").format(error=error_text))
 
@@ -1182,7 +1273,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
             sender = await message.get_sender()
             sender_id = getattr(sender, 'id', None)
-            if sender_id is None: # Corrected '===' to 'is'
+            if sender_id is None: 
                 logger.warning(f"AutoMafiaTournamentsGame: Не удалось получить ID отправителя для сообщения {message.id} в чате {message.chat_id}. Пропускаю.") 
                 return
 
@@ -1463,17 +1554,13 @@ Mafia Combat Premium <code>1634167847</code>""",
                     logger.warning(f"⚠️ AutoMafiaTournamentsGame: Список активных ключевых слов для кнопок пуст. Ни одна кнопка не будет активирована для сообщения {message.id}.") 
                     return
 
-                # Define the keyword to deprioritize as per user request
                 deprioritized_keyword = "присоединиться"
 
-                # Separate keywords into high-priority (any other) and low-priority (the deprioritized one)
                 high_priority_keywords = [k for k in keywords_to_check if k.lower() != deprioritized_keyword.lower()]
                 low_priority_keywords = [k for k in keywords_to_check if k.lower() == deprioritized_keyword.lower()]
 
                 target_button = None
                 
-                # First pass: Try to find a button matching high-priority keywords
-                # Iterate over buttons, if multiple high-priority match, the first one encountered will be selected.
                 for row in message.buttons:
                     for button in row:
                         try:
@@ -1489,8 +1576,6 @@ Mafia Combat Premium <code>1634167847</code>""",
                     if target_button:
                         break
                 
-                # Second pass: If no high-priority button found, try low-priority (deprioritized_keyword)
-                # This ensures "присоединиться" is only chosen if no other matching keyword is present in *any* button.
                 if not target_button and low_priority_keywords:
                     for row in message.buttons:
                         for button in row:
