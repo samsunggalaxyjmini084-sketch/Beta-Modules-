@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.4.3 # Версия обновлена
+# meta version: 2.4.4 # Версия обновлена
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 0100000101010100010011110100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000111
@@ -13,7 +13,7 @@ from telethon.tl.types import Message, User
 from telethon import events
 import re
 from collections import defaultdict
-from typing import Optional # Добавлен импорт Optional
+from typing import Optional
 from .. import loader, utils
 
 logger = logging.getLogger(__name__)
@@ -199,7 +199,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         "switch_keywords_not_found": "⚠️ Конфигурация с ID <code>{config_id}</code> не найдена. Доступные ID: {available_ids}.",
         "switch_keywords_no_configs": "⚠️ Нет настроенных конфигураций ключевых слов. Используйте <code>.cfg AutoJoinGame button_keyword_configs_string</code> для настройки.",
         "switch_keywords_current": "ℹ️ Активная конфигурация уже <code>{config_id}</code>.",
-        "switch_keywords_usage": "ℹ️ Текущая активная конфигурация: <code>{current_id}</code>. Ключевые слова: {current_keywords}\nДоступные ID: {available_ids}.\nИспользуйте <code>.ajgswitchkeywords &lt;ID_конфига&gt;</code> для переключения.", # Добавлено для вывода при отсутствии аргумента
+        "switch_keywords_usage": "ℹ️ Текущая активная конфигурация: <code>{current_id}</code>. Ключевые слова: {current_keywords}\nДоступные ID: {available_ids}.\nИспользуйте <code>.ajgswitchkeywords &lt;ID_конфига&gt;</code> для переключения.",
     }
 
     def __init__(self):
@@ -375,6 +375,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         if self._processed_messages_cleanup_task is None:
             self._processed_messages_cleanup_task = asyncio.create_task(self._cleanup_processed_messages_loop())
         
+        # Инициализация при запуске, важно, чтобы всегда были актуальные keywords
         self._update_button_keywords_from_config()
 
     async def _cleanup_processed_messages_loop(self):
@@ -407,6 +408,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         entries = [e.strip() for e in config_string.split(',')]
 
         for entry in entries:
+            # Убеждаемся, что парсим только ключевое слово и ID, игнорируя остальное
             match = re.match(r"(.+?)\s*\(([\w\d]+)\)", entry)
             if match:
                 keyword_part = match.group(1).strip()
@@ -424,10 +426,12 @@ Mafia Combat Premium <code>1634167847</code>""",
         
         if active_id and active_id in self._parsed_button_keywords:
             self._current_button_keywords_to_use = self._parsed_button_keywords[active_id]
-            logger.debug(f"AutoJoinGame: Активная конфигурация ключевых слов кнопок установлена на '{active_id}'. Использованы ключевые слова: {self._current_button_keywords_to_use}")
+            logger.info(f"AutoJoinGame: Активная конфигурация ключевых слов кнопок установлена на '{active_id}'. Используются ключевые слова: {self._current_button_keywords_to_use}")
         elif self._parsed_button_keywords:
+            # Если активный ID не задан или не найден, пробуем использовать первый доступный
             first_id = next(iter(self._parsed_button_keywords))
-            self.config["active_button_config_id"] = first_id
+            # Используем self.set() для сохранения изменения в конфиг
+            self.set("active_button_config_id", first_id) 
             self._current_button_keywords_to_use = self._parsed_button_keywords[first_id]
             logger.warning(f"AutoJoinGame: Активная конфигурация ключевых слов кнопок '{active_id}' не найдена или не установлена. Установлено на первую доступную: '{first_id}'.")
         else:
@@ -487,14 +491,14 @@ Mafia Combat Premium <code>1634167847</code>""",
     @loader.command(ru_doc="Включить автовход в игру и автолинчевание")
     async def ajgon(self, message: Message):
         """Включить автовход в игру и автолинчевание"""
-        self.config["enabled"] = True
+        self.set("enabled", True) # Используем self.set()
         await utils.answer(message, self.strings("enabled"))
 
     @loader.command(ru_doc="Выключить автовход в игру и автолинчевание")
     async def ajgoff(self, message: Message):
         """Выключить автовход в игру и автолинчевание"""
-        self.config["enabled"] = False
-        self.config["role_tracking_enabled"] = False
+        self.set("enabled", False) # Используем self.set()
+        self.set("role_tracking_enabled", False) # Используем self.set()
         self._player_nickname_to_lynch = None 
         self._role_tracking_active = False 
         self._role_tracking_start_time = None
@@ -559,8 +563,8 @@ Mafia Combat Premium <code>1634167847</code>""",
             return
 
         if config_id in self._parsed_button_keywords:
-            self.config["active_button_config_id"] = config_id
-            self._update_button_keywords_from_config()
+            self.set("active_button_config_id", config_id) # Используем self.set() для явного сохранения
+            self._update_button_keywords_from_config() # Обновить активные ключевые слова и логирование
             await utils.answer(message, self.strings("switch_keywords_success").format(
                 config_id=config_id,
                 keywords=", ".join(self._current_button_keywords_to_use)
@@ -904,7 +908,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                 if is_auto_track_trigger_bot and any(p.lower() in msg_text_lower for p in auto_track_phrases):
                     logger.info(f"AutoJoinGame: Обнаружен триггер для автоматического включения отслеживания ролей в сообщении {message.id} от бота {sender_id}.")
                     
-                    self.config["role_tracking_enabled"] = True
+                    self.set("role_tracking_enabled", True) # Используем self.set()
                     self._role_tracking_active = True
                     self._role_tracking_start_time = datetime.now()
                     self._tracked_roles_list = []
@@ -942,7 +946,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                 if is_auto_disable_trigger_bot and any(p.lower() in msg_text_lower for p in auto_disable_phrases):
                     logger.info(f"AutoJoinGame: Обнаружен триггер для автоматического выключения отслеживания ролей в сообщении {message.id} от бота {sender_id}.")
                     
-                    self.config["role_tracking_enabled"] = False
+                    self.set("role_tracking_enabled", False) # Используем self.set()
                     self._role_tracking_active = False
                     self._role_tracking_start_time = None
                     self._tracked_roles_list = []
@@ -958,7 +962,7 @@ Mafia Combat Premium <code>1634167847</code>""",
             if self.config["role_tracking_enabled"] and self._role_tracking_active:
                 if self._role_tracking_start_time and (datetime.now() - self._role_tracking_start_time).total_seconds() > self.config["role_tracking_duration"]:
                     logger.info(self.strings("role_tracking_expired"))
-                    self.config["role_tracking_enabled"] = False
+                    self.set("role_tracking_enabled", False) # Используем self.set()
                     self._role_tracking_active = False
                     self._role_tracking_start_time = None
                     if self._send_tracked_roles_task:
