@@ -1,8 +1,8 @@
 # meta developer: @hdjsfzbxm
 # meta name: PinChat 
-# meta version: 1.0.5 # Версия обновлена: убрано сообщение о задержке
+# meta version: 1.0.5 # Версия обновлена
 import logging
-import asyncio 
+import asyncio # Импортируем asyncio для задержки
 from telethon.tl.types import Message
 from telethon.errors import RPCError
 from telethon import functions
@@ -28,7 +28,6 @@ class PinChatMod(loader.Module):
         "unpin_success": "✅ Чат <code>{chat_id}</code> успешно откреплен из вашего списка чатов.",
         "unpin_not_pinned": "ℹ️ Чат <code>{chat_id}</code> не закреплен в вашем списке чатов.",
         "unpin_fail": "❌ Не удалось открепить чат <code>{chat_id}</code>: {error}",
-        # "delay_message": "⏳ Ожидание {delay} секунд перед попыткой {action_text} чата <code>{chat_id}</code>..." # Эта строка удалена/закомментирована
     }
 
     def __init__(self):
@@ -63,11 +62,11 @@ class PinChatMod(loader.Module):
         # --- Применение задержки ---
         delay = self.config["action_delay"]
         if delay > 0:
-            logger.debug(f"PinChat: Ожидание {delay} секунд перед попыткой {action_text_verb} чата {target_chat_id}...")
+            # Сообщение о задержке удалено по запросу пользователя.
+            # Задержка по-прежнему будет применяться.
             await asyncio.sleep(delay)
         # --- Конец применения задержки ---
 
-        # Это сообщение останется, так как оно информирует о начале попытки после задержки
         await utils.answer(message, f"⏳ Пытаюсь {action_text_verb} чат <code>{target_chat_id}</code> в вашем списке чатов...")
 
         try:
