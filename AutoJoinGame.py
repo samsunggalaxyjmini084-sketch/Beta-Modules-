@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.4.10 # Версия обновлена для удаления сообщений об успешном добавлении/удалении чата
+# meta version: 2.4.9 # Версия обновлена для добавления динамического управления чатами
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 0100000101010100010011110100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000111
@@ -21,11 +21,11 @@ logger = logging.getLogger(__name__)
 
 @loader.tds
 class AutoJoinGameMod(loader.Module):
-    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Добавлены команды для управления разрешенными чатами: .pinchat и .unpinchat."""
+    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Дополнительно: поддерживает динамическое управление списком разрешенных чатов (`allowed_chats`) через специальные фразы-триггеры."""
 
     strings = {
         "name": "AutoJoinGame",
-        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Добавлены команды для управления разрешенными чатами: .pinchat и .unpinchat.",
+        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Дополнительно: поддерживает динамическое управление списком разрешенных чатов (`allowed_chats`) через специальные фразы-триггеры.",
         "enabled": "✅ Автовход в игру и автолинчевание включены.",
         "disabled": "❌ Автовход в игру и автолинчевание выключены.",
         "status": "<emoji document_id=5875291072225087249>📊</emoji> Статус автовхода и автолинчевания:\n"
@@ -34,7 +34,6 @@ class AutoJoinGameMod(loader.Module):
                   "Задержка линчевания (секунды): {}\n"
                   "Боты для отслеживания: {}\n"
                   "Разрешенные чаты: {}\n"
-                  "Пользователи, разрешенные для настройки чатов: {}\n" 
                   "Конфигурации ключевых слов кнопок (сырые): {}\n"
                   "Активная конфигурация ключевых слов: {} (Ключевые слова: {})\n"
                   "Доступные ID конфигураций: {}\n"
@@ -61,7 +60,12 @@ class AutoJoinGameMod(loader.Module):
                   "Автоматическое включение отслеживания ролей (фразы): {}\n"
                   "Автоматическое включение отслеживания ролей (боты): {}\n"
                   "Автоматическое выключение отслеживания ролей (фразы): {}\n"
-                  "Автоматическое выключение отслеживания ролей (боты): {}",
+                  "Автоматическое выключение отслеживания ролей (боты): {}\n"
+                  "\n<emoji document_id=5931415565955503486>💬</emoji> Управление чатами:\n"
+                  "Управление чатами: {}\n"
+                  "Пользователи для управления чатами: {}\n"
+                  "Фразы-триггеры добавления чата: {}\n"
+                  "Фразы-триггеры удаления чата: {}",
         "error": "❌ Ошибка при нажатии кнопки: {}",
         "no_button": "⚠️ Кнопка не найдена под сообщением",
         "help_text": """<emoji document_id=5931415565955503486>🤖</emoji> AutoJoinGame - Помощь
@@ -76,8 +80,6 @@ class AutoJoinGameMod(loader.Module):
 <code>.ajgtournaments</code> - Показать информацию о регистрации на турниры
 <code>.ajgshowtrackedroles</code> - Показать список найденных отслеживаемых ролей
 <code>.ajgset &lt;ID_конфига&gt;</code> - Переключить активную конфигурацию ключевых слов для кнопок. Если <code>&lt;ID_конфига&gt;</code> не указан, покажет текущую активную конфигурацию и доступные ID.
-<code>.pinchat &lt;chat_id&gt;</code> - Добавить ID чата в список разрешенных чатов (allowed_chats).
-<code>.unpinchat &lt;chat_id&gt;</code> - Удалить ID чата из списка разрешенных чатов (allowed_chats).
 
 <emoji document_id=5877260593901971030>⚙</emoji> Как работает:
 Ждет сообщение о наборе в игру или о голосовании (линчевание/повешение) от указанных ботов (или от любого бота, если список пуст).
@@ -94,16 +96,15 @@ class AutoJoinGameMod(loader.Module):
 <b>Новая функция:</b> Модуль может автоматически отправлять список отслеживаемых ролей в указанный чат через заданное время после активации отслеживания ролей.
 <b>Новая функция:</b> Модуль может автоматически включать отслеживание ролей при получении сообщения, содержащего определенные фразы, от указанных ботов.
 <b>Новая функция:</b> Модуль может автоматически <b>выключать</b> отслеживание ролей при получении сообщения, содержащего определенные фразы, от указанных ботов.
+<b>Новая функция:</b> Модуль может динамически управлять списком разрешенных чатов (<code>allowed_chats</code>) через специальные фразы-триггеры <code>.pinchat &lt;ID_чата&gt;</code> и <code>.unpinchat &lt;ID_чата&gt;</code>, отправленные указанными пользователями.
 <b>Улучшение:</b> Теперь модуль более точно определяет роли, включая составные фразы, и позволяет помечать роли как 'неактивные' с помощью суффикса <code>(н)</code> для раздельного отображения.
 <b>Приоритет кнопок:</b> Теперь модуль отдает предпочтение кнопкам, содержащим <b>другие ключевые слова</b> из активной конфигурации, если на кнопке также есть слово "присоединиться". Кнопка с только "присоединиться" будет нажата только в том случае, если других подходящих кнопок не найдено.
-<b>Новая функция:</b> Команды <code>.pinchat &lt;chat_id&gt;</code> и <code>.unpinchat &lt;chat_id&gt;</code> позволяют управлять списком разрешенных чатов (<code>allowed_chats</code>) без редактирования конфига напрямую. Эти команды могут быть ограничены для использования определенными пользователями через настройку <code>pin_unpin_allowed_user_ids</code>.
 
 <emoji document_id=5843843420468024653>⭐️</emoji> Настройки:
 В конфиге модуля можно изменить задержку(и) перед нажатием. Если указано несколько значений, будет выбрано случайное.
 Можно указать список ID ботов, от которых ожидать сообщение о наборе.
 <b>Обновление:</b> Теперь параметр <code>bot_ids</code> включает в себя все боты, от которых ожидаются триггеры, включая ботов для голосования за игроков. Если список пуст, модуль будет работать со всеми ботами.
 Можно указать список ID чатов, в которых модуль будет активен. Если список пуст, модуль будет работать во всех чатах.
-<b>Новая настройка:</b> <code>pin_unpin_allowed_user_ids</code> - Список ID пользователей, которым разрешено использовать команды <code>.pinchat</code> и <code>.unpinchat</code>. Если список пуст, эти команды могут использовать все пользователи. По умолчанию: <code>[]</code>.
 <b>Настройка:</b> <code>button_keyword_configs_string</code> - строка с конфигурациями ключевых слов кнопок. Формат: <code>"Ключевое слово 1 (ID_конфига), Ключевое слово 2 (Другой_ID)"</code>. Например: <code>"присоединиться (1), играть (1), 🙋 (2), 🎮 (2)"</code>. Ключевые слова регистронезависимы. <b>Скобки с ID не учитываются при поиске кнопок.</b>
 <b>Новая настройка:</b> <code>active_button_config_id</code> - ID активной конфигурации ключевых слов из <code>button_keyword_configs_string</code>. Например: <code>"1"</code> или <code>"default"</code>.
 <b>Обновление: Если кнопка содержит URL вида <code>t.me/bot_username?start=param</code>, модуль автоматически отправит команду <code>/start &lt;param&gt;</code> соответствующему боту. Этот режим теперь активен для любого совпадения по <code>button_keywords</code> с Deep-Link URL.</b>
@@ -126,6 +127,13 @@ class AutoJoinGameMod(loader.Module):
 <b>Новая настройка:</b> <code>auto_track_roles_bot_ids</code> - Список ID ботов, от которых ожидается сообщение с фразами для автоматического включения отслеживания ролей. Если список пуст, сообщения будут отслеживаться от любого бота. По умолчанию: <code>[]</code>.
 <b>Новая настройка:</b> <code>auto_disable_track_roles_trigger_phrases</code> - Список фраз, которые модуль будет искать в сообщениях для автоматического выключения отслеживания ролей. По умолчанию: <code>[]</code>.
 <b>Новая настройка:</b> <code>auto_disable_track_roles_bot_ids</code> - Список ID ботов, от которых ожидается сообщение с фразами для автоматического выключения отслеживания ролей. Если список пуст, сообщения будут отслеживаться от любого бота. По умолчанию: <code>[]</code>.
+<b>Новая настройка:</b> <code>chat_management_enabled</code> - Включено ли управление списком разрешенных чатов через сообщения <code>.pinchat/.unpinchat</code>. По умолчанию: <code>False</code>.
+<b>Новая настройка:</b> <code>chat_management_user_ids</code> - Список ID пользователей, которым разрешено управлять <code>allowed_chats</code> через <code>.pinchat/.unpinchat</code>. Если список пуст, разрешено всем. По умолчанию: <code>[]</code>.
+<b>Новая настройка:</b> <code>pinchat_trigger_phrases</code> - Список фраз, которые будут использоваться для добавления chat_id в <code>allowed_chats</code>. (Например: <code>[\".pinchat\"]</code>).
+<b>Новая настройка:</b> <code>unpinchat_trigger_phrases</code> - Список фраз, которые будут использоваться для удаления chat_id из <code>allowed_chats</code>. (Например: <code>[\".unpinchat\"]</code>).
+
+<emoji document_id=5931415565955503486>💬</emoji> Управление чатами:
+Если <code>chat_management_enabled</code> включено, пользователи из <code>chat_management_user_ids</code> (или любой, если список пуст) могут отправлять сообщения вида <code>.pinchat &lt;ID_чата&gt;</code> или <code>.unpinchat &lt;ID_чата&gt;</code>. Это позволит динамически добавлять или удалять ID чатов из списка <code>allowed_chats</code>. Эти фразы не будут считаться командами модуля, а будут обрабатываться как триггеры.
 """,
         "ajgid_bots_list": """<emoji document_id=5771887475421090729>👤</emoji> Список ID ботов для мафии:
 
@@ -206,13 +214,17 @@ Mafia Combat Premium <code>1634167847</code>""",
         "switch_keywords_no_configs": "⚠️ Нет настроенных конфигураций ключевых слов. Используйте <code>.cfg AutoJoinGame button_keyword_configs_string</code> для настройки.",
         "switch_keywords_current": "ℹ️ Активная конфигурация уже <code>{config_id}</code>.",
         "switch_keywords_usage": "ℹ️ Текущая активная конфигурация: <code>{current_id}</code>. Ключевые слова: {current_keywords}\nДоступные ID: {available_ids}.\nИспользуйте <code>.ajgset &lt;ID_конфига&gt;</code> для переключения.",
-        "pinchat_doc": "Добавить ID чата в список разрешенных чатов (allowed_chats).",
-        "unpinchat_doc": "Удалить ID чата из списка разрешенных чатов (allowed_chats).",
-        "invalid_chat_id": "❌ Неверный ID чата. Пожалуйста, укажите числовой ID.",
-        "chat_already_pinned": "⚠️ Чат <code>{chat_id}</code> уже находится в списке разрешенных чатов.",
-        "chat_not_found": "⚠️ Чат <code>{chat_id}</code> не найден в списке разрешенных чатов.",
-        "not_allowed_to_configure_chats": "❌ У вас нет разрешения на изменение списка разрешенных чатов.",
-        "pin_unpin_allowed_user_ids_display": "Не указаны (любой пользователь)",
+        # Новые строки для управления чатами
+        "chat_management_status_enabled": "🟢 Включено",
+        "chat_management_status_disabled": "🔴 Выключено",
+        "chat_management_users_display_all": "Любой пользователь",
+        "pinchat_phrases_display": "(пусто)",
+        "unpinchat_phrases_display": "(пусто)",
+        "chat_id_added": "✅ AutoJoinGame: Чат <code>{chat_id}</code> добавлен в список разрешенных чатов.",
+        "chat_id_already_in_list": "ℹ️ AutoJoinGame: Чат <code>{chat_id}</code> уже находится в списке разрешенных чатов.",
+        "chat_id_removed": "✅ AutoJoinGame: Чат <code>{chat_id}</code> удален из списка разрешенных чатов.",
+        "chat_id_not_in_list": "ℹ️ AutoJoinGame: Чат <code>{chat_id}</code> не найден в списке разрешенных чатов.",
+        "invalid_chat_id_format": "⚠️ AutoJoinGame: Неверный формат ID чата после `{phrase}`. Ожидается число.",
     }
 
     def __init__(self):
@@ -246,12 +258,6 @@ Mafia Combat Premium <code>1634167847</code>""",
                 "allowed_chats",
                 [],
                 lambda: "Список ID чатов, в которых модуль будет активен. Если список пуст, модуль будет работать во всех чатах.",
-                validator=loader.validators.Series(loader.validators.Integer())
-            ),
-            loader.ConfigValue(
-                "pin_unpin_allowed_user_ids",
-                [],
-                lambda: "Список ID пользователей, которым разрешено использовать команды .pinchat и .unpinchat. Если список пуст, эти команды могут использовать все пользователи.",
                 validator=loader.validators.Series(loader.validators.Integer())
             ),
             loader.ConfigValue(
@@ -373,6 +379,31 @@ Mafia Combat Premium <code>1634167847</code>""",
                 [],
                 lambda: "Список ID ботов, от которых ожидается сообщение с фразами для автоматического выключения отслеживания ролей. Если список пуст, сообщения будут отслеживаться от любого бота.",
                 validator=loader.validators.Series(loader.validators.Integer())
+            ),
+            # Новые параметры конфигурации для управления чатами
+            loader.ConfigValue(
+                "chat_management_enabled",
+                False,
+                lambda: "Включено ли управление списком разрешенных чатов через сообщения .pinchat/.unpinchat",
+                validator=loader.validators.Boolean()
+            ),
+            loader.ConfigValue(
+                "chat_management_user_ids",
+                [],
+                lambda: "Список ID пользователей, которым разрешено управлять allowed_chats через .pinchat/.unpinchat. Если список пуст, разрешено всем.",
+                validator=loader.validators.Series(loader.validators.Integer())
+            ),
+            loader.ConfigValue(
+                "pinchat_trigger_phrases",
+                [".pinchat"],
+                lambda: "Список фраз, которые будут использоваться для добавления chat_id в allowed_chats. (Например: .pinchat)",
+                validator=loader.validators.Series(loader.validators.String())
+            ),
+            loader.ConfigValue(
+                "unpinchat_trigger_phrases",
+                [".unpinchat"],
+                lambda: "Список фраз, которые будут использоваться для удаления chat_id из allowed_chats. (Например: .unpinchat)",
+                validator=loader.validators.Series(loader.validators.String())
             ),
         )
 
@@ -604,70 +635,6 @@ Mafia Combat Premium <code>1634167847</code>""",
                 available_ids=available_ids if available_ids else "нет"
             ))
 
-    @loader.command(ru_doc="Добавить ID чата в список разрешенных чатов (allowed_chats).")
-    async def pinchat(self, message: Message):
-        """Добавить ID чата в список разрешенных чатов."""
-        args = utils.get_args_raw(message)
-        
-        if not args:
-            await utils.answer(message, self.strings("invalid_chat_id"))
-            return
-
-        try:
-            chat_id_to_manage = int(args)
-        except ValueError:
-            await utils.answer(message, self.strings("invalid_chat_id"))
-            return
-
-        sender = await message.get_sender()
-        sender_id = getattr(sender, 'id', None)
-        allowed_users = self.config["pin_unpin_allowed_user_ids"]
-        if allowed_users and sender_id not in allowed_users:
-            await utils.answer(message, self.strings("not_allowed_to_configure_chats"))
-            return
-
-        current_allowed_chats = self.config["allowed_chats"].copy()
-        if chat_id_to_manage in current_allowed_chats:
-            await utils.answer(message, self.strings("chat_already_pinned").format(chat_id=chat_id_to_manage))
-            return
-
-        current_allowed_chats.append(chat_id_to_manage)
-        self.set("allowed_chats", current_allowed_chats)
-        self.config["allowed_chats"] = current_allowed_chats 
-        # await utils.answer(message, self.strings("pinchat_success").format(chat_id=chat_id_to_manage)) # УДАЛЕНО
-
-    @loader.command(ru_doc="Удалить ID чата из списка разрешенных чатов (allowed_chats).")
-    async def unpinchat(self, message: Message):
-        """Удалить ID чата из списка разрешенных чатов."""
-        args = utils.get_args_raw(message)
-        
-        if not args:
-            await utils.answer(message, self.strings("invalid_chat_id"))
-            return
-
-        try:
-            chat_id_to_manage = int(args)
-        except ValueError:
-            await utils.answer(message, self.strings("invalid_chat_id"))
-            return
-        
-        sender = await message.get_sender()
-        sender_id = getattr(sender, 'id', None)
-        allowed_users = self.config["pin_unpin_allowed_user_ids"]
-        if allowed_users and sender_id not in allowed_users:
-            await utils.answer(message, self.strings("not_allowed_to_configure_chats"))
-            return
-
-        current_allowed_chats = self.config["allowed_chats"].copy()
-        if chat_id_to_manage not in current_allowed_chats:
-            await utils.answer(message, self.strings("chat_not_found").format(chat_id=chat_id_to_manage))
-            return
-
-        current_allowed_chats.remove(chat_id_to_manage)
-        self.set("allowed_chats", current_allowed_chats)
-        self.config["allowed_chats"] = current_allowed_chats 
-        # await utils.answer(message, self.strings("unpinchat_success").format(chat_id=chat_id_to_manage)) # УДАЛЕНО
-
 
     @loader.command(ru_doc="Показать статус автовхода и автолинчевания")
     async def ajgstatus(self, message: Message):
@@ -684,8 +651,6 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         allowed_chats = self.config["allowed_chats"]
         allowed_chats_display = ", ".join(map(str, allowed_chats)) if allowed_chats else "Все чаты"
-
-        pin_unpin_allowed_user_ids_display = ", ".join(map(str, self.config["pin_unpin_allowed_user_ids"])) if self.config["pin_unpin_allowed_user_ids"] else self.strings("pin_unpin_allowed_user_ids_display")
 
         button_keyword_configs_string_display = self.config["button_keyword_configs_string"] if self.config["button_keyword_configs_string"] else "(пусто)"
         active_button_config_id_display = self.config["active_button_config_id"] if self.config["active_button_config_id"] else "(не задан)"
@@ -732,13 +697,19 @@ Mafia Combat Premium <code>1634167847</code>""",
         auto_disable_track_roles_trigger_phrases_display = ", ".join(self.config["auto_disable_track_roles_trigger_phrases"]) if self.config["auto_disable_track_roles_trigger_phrases"] else self.strings("auto_disable_track_roles_trigger_phrases_display")
         auto_disable_track_roles_bot_ids_display = ", ".join(map(str, self.config["auto_disable_track_roles_bot_ids"])) if self.config["auto_disable_track_roles_bot_ids"] else self.strings("auto_disable_track_roles_bot_ids_display")
 
+        # Новые параметры для управления чатами
+        chat_management_status = self.strings("chat_management_status_enabled") if self.config["chat_management_enabled"] else self.strings("chat_management_status_disabled")
+        chat_management_user_ids_display = ", ".join(map(str, self.config["chat_management_user_ids"])) if self.config["chat_management_user_ids"] else self.strings("chat_management_users_display_all")
+        pinchat_trigger_phrases_display = ", ".join(self.config["pinchat_trigger_phrases"]) if self.config["pinchat_trigger_phrases"] else self.strings("pinchat_phrases_display")
+        unpinchat_trigger_phrases_display = ", ".join(self.config["unpinchat_trigger_phrases"]) if self.config["unpinchat_trigger_phrases"] else self.strings("unpinchat_phrases_display")
+
+
         await utils.answer(message, self.strings("status").format(
             status, 
             delay_display, 
             lynch_delay_display,
             bot_ids_display, 
             allowed_chats_display, 
-            pin_unpin_allowed_user_ids_display,
             button_keyword_configs_string_display,
             active_button_config_id_display,
             current_button_keywords_display,
@@ -764,7 +735,12 @@ Mafia Combat Premium <code>1634167847</code>""",
             auto_track_roles_trigger_phrases_display,
             auto_track_roles_bot_ids_display,
             auto_disable_track_roles_trigger_phrases_display,
-            auto_disable_track_roles_bot_ids_display
+            auto_disable_track_roles_bot_ids_display,
+            # Новые параметры
+            chat_management_status,
+            chat_management_user_ids_display,
+            pinchat_trigger_phrases_display,
+            unpinchat_trigger_phrases_display
         ))
 
     @loader.command(ru_doc="Показать справку")
@@ -914,7 +890,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                                         "action": ""
                                     }
 
-                                    if any(keyword in btn_text_test.lower() for keyword in high_priority_keywords_test):
+                                    if any(keyword in btn_text_test.lower() for keyword in high_priority_keywords):
                                         button_info["match_type"] = "✅ ВЫСОКИЙ ПРИОРИТЕТ!"
                                         if not found_high_priority: # Capture the first high-priority match
                                             temp_target_button_text = btn_text_test
@@ -1017,10 +993,77 @@ Mafia Combat Premium <code>1634167847</code>""",
 
             sender = await message.get_sender()
             sender_id = getattr(sender, 'id', None)
-            if sender_id is None: 
+            if sender_id is None:
                 logger.warning(f"AutoJoinGame: Не удалось получить ID отправителя для сообщения {message.id} в чате {message.chat_id}. Пропускаю.")
                 return
 
+            # --- Логика управления allowed_chats ---
+            if self.config["chat_management_enabled"]:
+                is_allowed_manager = (
+                    not self.config["chat_management_user_ids"] or
+                    sender_id in self.config["chat_management_user_ids"]
+                )
+
+                if is_allowed_manager:
+                    chat_id_to_manage = None
+                    action = None # "pin" or "unpin"
+                    original_trigger_phrase = None
+                    msg_text_lower = message.text.lower()
+
+                    # Check for pinchat triggers
+                    for phrase in self.config["pinchat_trigger_phrases"]:
+                        if msg_text_lower.startswith(phrase.lower()):
+                            try:
+                                chat_id_str = message.text[len(phrase):].strip()
+                                chat_id_to_manage = int(chat_id_str)
+                                action = "pin"
+                                original_trigger_phrase = phrase
+                                break
+                            except ValueError:
+                                await self._client.send_message(message.chat_id, self.strings("invalid_chat_id_format").format(phrase=phrase))
+                                return # Don't process further for this message if parsing fails
+
+                    # If no pinchat trigger matched, check for unpinchat triggers
+                    if action is None:
+                        for phrase in self.config["unpinchat_trigger_phrases"]:
+                            if msg_text_lower.startswith(phrase.lower()):
+                                try:
+                                    chat_id_str = message.text[len(phrase):].strip()
+                                    chat_id_to_manage = int(chat_id_str)
+                                    action = "unpin"
+                                    original_trigger_phrase = phrase
+                                    break
+                                except ValueError:
+                                    await self._client.send_message(message.chat_id, self.strings("invalid_chat_id_format").format(phrase=phrase))
+                                    return # Don't process further for this message if parsing fails
+
+                    if chat_id_to_manage is not None and action is not None:
+                        current_allowed_chats = self.config["allowed_chats"][:] # Make a copy to modify
+                        
+                        if action == "pin":
+                            if chat_id_to_manage not in current_allowed_chats:
+                                current_allowed_chats.append(chat_id_to_manage)
+                                self.set("allowed_chats", current_allowed_chats)
+                                self.config["allowed_chats"] = current_allowed_chats # Update in-memory config
+                                await self._client.send_message(message.chat_id, self.strings("chat_id_added").format(chat_id=chat_id_to_manage))
+                                logger.info(f"AutoJoinGame: Chat {chat_id_to_manage} added to allowed_chats by user {sender_id} via '{original_trigger_phrase}'.")
+                            else:
+                                await self._client.send_message(message.chat_id, self.strings("chat_id_already_in_list").format(chat_id=chat_id_to_manage))
+                            return # Message handled, no further processing needed for this message
+                        
+                        elif action == "unpin":
+                            if chat_id_to_manage in current_allowed_chats:
+                                current_allowed_chats.remove(chat_id_to_manage)
+                                self.set("allowed_chats", current_allowed_chats)
+                                self.config["allowed_chats"] = current_allowed_chats # Update in-memory config
+                                await self._client.send_message(message.chat_id, self.strings("chat_id_removed").format(chat_id=chat_id_to_manage))
+                                logger.info(f"AutoJoinGame: Chat {chat_id_to_manage} removed from allowed_chats by user {sender_id} via '{original_trigger_phrase}'.")
+                            else:
+                                await self._client.send_message(message.chat_id, self.strings("chat_id_not_in_list").format(chat_id=chat_id_to_manage))
+                            return # Message handled, no further processing needed for this message
+            
+            # Continue with existing watcher logic if chat management was not triggered or handled
+            
             allowed_chats = self.config["allowed_chats"]
             if allowed_chats and message.chat_id not in allowed_chats:
                 logger.debug(f"AutoJoinGame: Чат {message.chat_id} не в списке разрешенных чатов ({allowed_chats}). Пропускаю сообщение {message.id}.")
@@ -1042,7 +1085,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                     logger.info(f"AutoJoinGame: Обнаружен триггер для автоматического включения отслеживания ролей в сообщении {message.id} от бота {sender_id}.")
                     
                     self.set("role_tracking_enabled", True)
-                    self.config["role_tracking_enabled"] = True 
+                    self.config["role_tracking_enabled"] = True # Явно обновляем in-memory config
                     self._role_tracking_active = True
                     self._role_tracking_start_time = datetime.now()
                     self._tracked_roles_list = []
@@ -1081,7 +1124,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                     logger.info(f"AutoJoinGame: Обнаружен триггер для автоматического выключения отслеживания ролей в сообщении {message.id} от бота {sender_id}.")
                     
                     self.set("role_tracking_enabled", False)
-                    self.config["role_tracking_enabled"] = False 
+                    self.config["role_tracking_enabled"] = False # Явно обновляем in-memory config
                     self._role_tracking_active = False
                     self._role_tracking_start_time = None
                     self._tracked_roles_list = []
@@ -1098,7 +1141,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                 if self._role_tracking_start_time and (datetime.now() - self._role_tracking_start_time).total_seconds() > self.config["role_tracking_duration"]:
                     logger.info(self.strings("role_tracking_expired"))
                     self.set("role_tracking_enabled", False)
-                    self.config["role_tracking_enabled"] = False 
+                    self.config["role_tracking_enabled"] = False # Явно обновляем in-memory config
                     self._role_tracking_active = False
                     self._role_tracking_start_time = None
                     if self._send_tracked_roles_task:
@@ -1298,13 +1341,17 @@ Mafia Combat Premium <code>1634167847</code>""",
                     logger.warning(f"⚠️ AutoJoinGame: Список активных ключевых слов для кнопок пуст. Ни одна кнопка не будет активирована для сообщения {message.id}.")
                     return
 
+                # Define the keyword to deprioritize as per user request
                 deprioritized_keyword = "присоединиться"
 
+                # Separate keywords into high-priority (any other) and low-priority (the deprioritized one)
                 high_priority_keywords = [k for k in keywords_to_check if k.lower() != deprioritized_keyword.lower()]
                 low_priority_keywords = [k for k in keywords_to_check if k.lower() == deprioritized_keyword.lower()]
 
                 target_button = None
                 
+                # First pass: Try to find a button matching high-priority keywords
+                # Iterate over buttons, if multiple high-priority match, the first one encountered will be selected.
                 for row in message.buttons:
                     for button in row:
                         try:
@@ -1320,6 +1367,8 @@ Mafia Combat Premium <code>1634167847</code>""",
                     if target_button:
                         break
                 
+                # Second pass: If no high-priority button found, try low-priority (deprioritized_keyword)
+                # This ensures "присоединиться" is only chosen if no other matching keyword is present in *any* button.
                 if not target_button and low_priority_keywords:
                     for row in message.buttons:
                         for button in row:
