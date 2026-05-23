@@ -34,7 +34,8 @@ class AutoJoinGameMod(loader.Module):
                   "Задержка линчевания (секунды): {}\n"
                   "Боты для отслеживания: {}\n"
                   "Разрешенные чаты: {}\n"
-                  "Конфигурации ключевых слов кнопок (сырые): {}\n"
+                  "Настроенные конфигурации ключевых слов кнопок (строка): {}\n" # Изменено здесь
+                  "Разобранные конфигурации ключевых слов кнопок: {}\n" # Добавлено здесь
                   "Активная конфигурация ключевых слов: {} (Ключевые слова: {})\n"
                   "Доступные ID конфигураций: {}\n"
                   "Режим Deep-Link: {}\n"
@@ -601,7 +602,15 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         allowed_chats_display = ", ".join(map(str, self.config["allowed_chats"])) if self.config["allowed_chats"] else "Все чаты"
 
+        # --- Изменения для вывода конфигураций ключевых слов ---
         button_keyword_configs_string_display = self.config["button_keyword_configs_string"] if self.config["button_keyword_configs_string"] else "(пусто)"
+        
+        parsed_configs_display_items = []
+        for config_id, keywords_list in self._parsed_button_keywords.items():
+            parsed_configs_display_items.append(f"<code>{config_id}</code>: {', '.join(keywords_list)}")
+        parsed_configs_display = "; ".join(parsed_configs_display_items) if parsed_configs_display_items else "(нет разобранных конфигов)"
+        # --- Конец изменений для вывода конфигураций ключевых слов ---
+
         active_button_config_id_display = self.config["active_button_config_id"] if self.config["active_button_config_id"] else "(не задан)"
         current_button_keywords_display = ", ".join(self._current_button_keywords_to_use) if self._current_button_keywords_to_use else "(пусто)"
         available_config_ids_display = ", ".join(self._parsed_button_keywords.keys()) if self._parsed_button_keywords else "(нет)"
@@ -652,7 +661,8 @@ Mafia Combat Premium <code>1634167847</code>""",
             lynch_delay_display,
             bot_ids_display, 
             allowed_chats_display, 
-            button_keyword_configs_string_display,
+            button_keyword_configs_string_display, # Сырая строка
+            parsed_configs_display, # Разобранные конфиги
             active_button_config_id_display,
             current_button_keywords_display,
             available_config_ids_display,
@@ -1175,6 +1185,10 @@ Mafia Combat Premium <code>1634167847</code>""",
                     logger.warning(f"⚠️ AutoJoinGame: Список активных ключевых слов для кнопок пуст. Ни одна кнопка не будет активирована для сообщения {message.id}.")
                     return
 
+                # --- Добавлено для отладки ---
+                logger.debug(f"🔍 AutoJoinGame: Для сообщения {message.id}, активные ключевые слова: {keywords_to_check}")
+                # --- Конец добавления ---
+
                 button_found = False
                 for row in message.buttons:
                     for button in row:
@@ -1184,7 +1198,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                             logger.warning(f"Error getting button text for message {message.id}: {e}")
                             button_text = ''
 
-                        logger.debug(f"🔍 AutoJoinGame: Проверка кнопки: '{button_text}'")
+                        logger.debug(f"🔍 AutoJoinGame: Проверка кнопки: '{button_text}' (lower: '{button_text.lower()}')") # --- Добавлено для отладки ---
 
                         if any(keyword in button_text.lower() for keyword in keywords_to_check):
                             logger.info(f"✅ AutoJoinGame: Найдена кнопка присоединения: '{button_text}'")
