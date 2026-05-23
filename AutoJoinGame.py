@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.4.10 # Версия обновлена для добавления улучшенного логирования управления чатами
+# meta version: 2.4.11 # Версия обновлена для изменения логики пустого allowed_chats
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 0100000101010100010011110100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000111
@@ -65,7 +65,8 @@ class AutoJoinGameMod(loader.Module):
                   "Управление чатами: {}\n"
                   "Пользователи для управления чатами: {}\n"
                   "Фразы-триггеры добавления чата: {}\n"
-                  "Фразы-триггеры удаления чата: {}",
+                  "Фразы-триггеры удаления чата: {}\n"
+                  "Пустой список разрешенных чатов означает 'не отслеживать нигде': {}",
         "error": "❌ Ошибка при нажатии кнопки: {}",
         "no_button": "⚠️ Кнопка не найдена под сообщением",
         "help_text": """<emoji document_id=5931415565955503486>🤖</emoji> AutoJoinGame - Помощь
@@ -131,9 +132,11 @@ class AutoJoinGameMod(loader.Module):
 <b>Новая настройка:</b> <code>chat_management_user_ids</code> - Список ID пользователей, которым разрешено управлять <code>allowed_chats</code> через <code>.pinchat/.unpinchat</code>. Если список пуст, разрешено всем. По умолчанию: <code>[]</code>.
 <b>Новая настройка:</b> <code>pinchat_trigger_phrases</code> - Список фраз, которые будут использоваться для добавления chat_id в <code>allowed_chats</code>. (Например: <code>[\".pinchat\"]</code>).
 <b>Новая настройка:</b> <code>unpinchat_trigger_phrases</code> - Список фраз, которые будут использоваться для удаления chat_id из <code>allowed_chats</code>. (Например: <code>[\".unpinchat\"]</code>).
+<b>Новая настройка:</b> <code>interpret_empty_allowed_chats_as_no_chats</code> - Если <code>True</code>, пустой список 'allowed_chats' означает 'не отслеживать ни в каких чатах', а не 'во всех чатах'. По умолчанию: <code>False</code>.
 
 <emoji document_id=5931415565955503486>💬</emoji> Управление чатами:
 Если <code>chat_management_enabled</code> включено, пользователи из <code>chat_management_user_ids</code> (или любой, если список пуст) могут отправлять сообщения вида <code>.pinchat &lt;ID_чата&gt;</code> или <code>.unpinchat &lt;ID_чата&gt;</code>. Это позволит динамически добавлять или удалять ID чатов из списка <code>allowed_chats</code>. Эти фразы не будут считаться командами модуля, а будут обрабатываться как триггеры.
+<b>Новая настройка:</b> <code>interpret_empty_allowed_chats_as_no_chats</code> - по умолчанию, если список <code>allowed_chats</code> пуст, модуль будет работать во всех чатах. Если вы установите эту настройку в <code>True</code>, то пустой список <code>allowed_chats</code> будет означать, что модуль НЕ будет отслеживать сообщения ни в одном чате.
 """,
         "ajgid_bots_list": """<emoji document_id=5771887475421090729>👤</emoji> Список ID ботов для мафии:
 
@@ -257,7 +260,7 @@ Mafia Combat Premium <code>1634167847</code>""",
             loader.ConfigValue(
                 "allowed_chats",
                 [],
-                lambda: "Список ID чатов, в которых модуль будет активен. Если список пуст, модуль будет работать во всех чатах.",
+                lambda: "Список ID чатов, в которых модуль будет активен. Если список пуст, модуль будет работать во всех чатах. См. также 'interpret_empty_allowed_chats_as_no_chats'.", # Updated docstring
                 validator=loader.validators.Series(loader.validators.Integer())
             ),
             loader.ConfigValue(
@@ -404,6 +407,12 @@ Mafia Combat Premium <code>1634167847</code>""",
                 [".unpinchat"],
                 lambda: "Список фраз, которые будут использоваться для удаления chat_id из allowed_chats. (Например: .unpinchat)",
                 validator=loader.validators.Series(loader.validators.String())
+            ),
+            loader.ConfigValue( # NEW CONFIG OPTION
+                "interpret_empty_allowed_chats_as_no_chats",
+                False,
+                lambda: "Если True, пустой список 'allowed_chats' означает 'не отслеживать ни в каких чатах', а не 'во всех чатах'.",
+                validator=loader.validators.Boolean()
             ),
         )
 
@@ -649,8 +658,13 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         bot_ids_display = ", ".join(map(str, self.config["bot_ids"])) if self.config["bot_ids"] else "Не указаны (любой бот)"
 
+        # Updated allowed_chats_display logic
         allowed_chats = self.config["allowed_chats"]
-        allowed_chats_display = ", ".join(map(str, allowed_chats)) if allowed_chats else "Все чаты"
+        if self.config["interpret_empty_allowed_chats_as_no_chats"]:
+            allowed_chats_display = ", ".join(map(str, allowed_chats)) if allowed_chats else "Отключено (пустой список = не отслеживать нигде)"
+        else:
+            allowed_chats_display = ", ".join(map(str, allowed_chats)) if allowed_chats else "Все чаты (пустой список = отслеживать везде)"
+
 
         button_keyword_configs_string_display = self.config["button_keyword_configs_string"] if self.config["button_keyword_configs_string"] else "(пусто)"
         active_button_config_id_display = self.config["active_button_config_id"] if self.config["active_button_config_id"] else "(не задан)"
@@ -702,6 +716,8 @@ Mafia Combat Premium <code>1634167847</code>""",
         chat_management_user_ids_display = ", ".join(map(str, self.config["chat_management_user_ids"])) if self.config["chat_management_user_ids"] else self.strings("chat_management_users_display_all")
         pinchat_trigger_phrases_display = ", ".join(self.config["pinchat_trigger_phrases"]) if self.config["pinchat_trigger_phrases"] else self.strings("pinchat_phrases_display")
         unpinchat_trigger_phrases_display = ", ".join(self.config["unpinchat_trigger_phrases"]) if self.config["unpinchat_trigger_phrases"] else self.strings("unpinchat_phrases_display")
+        
+        interpret_empty_allowed_chats_display = "🟢 True" if self.config["interpret_empty_allowed_chats_as_no_chats"] else "🔴 False"
 
 
         await utils.answer(message, self.strings("status").format(
@@ -709,7 +725,7 @@ Mafia Combat Premium <code>1634167847</code>""",
             delay_display, 
             lynch_delay_display,
             bot_ids_display, 
-            allowed_chats_display, 
+            allowed_chats_display, # Updated display here
             button_keyword_configs_string_display,
             active_button_config_id_display,
             current_button_keywords_display,
@@ -740,7 +756,8 @@ Mafia Combat Premium <code>1634167847</code>""",
             chat_management_status,
             chat_management_user_ids_display,
             pinchat_trigger_phrases_display,
-            unpinchat_trigger_phrases_display
+            unpinchat_trigger_phrases_display,
+            interpret_empty_allowed_chats_display # New status field
         ))
 
     @loader.command(ru_doc="Показать справку")
@@ -1077,12 +1094,24 @@ Mafia Combat Premium <code>1634167847</code>""",
             else:
                 logger.debug(f"AutoJoinGame: Chat management is disabled. Skipping message {message.id}.")
             
-            # Continue with existing watcher logic if chat management was not triggered or handled
+            # --- Continue with existing watcher logic if chat management was not triggered or handled ---
             
             allowed_chats = self.config["allowed_chats"]
-            if allowed_chats and message.chat_id not in allowed_chats:
-                logger.debug(f"AutoJoinGame: Чат {message.chat_id} не в списке разрешенных чатов ({allowed_chats}). Пропускаю сообщение {message.id}.")
-                return
+            
+            # UPDATED LOGIC FOR allowed_chats INTERPRETATION
+            if self.config["interpret_empty_allowed_chats_as_no_chats"]:
+                # If interpreting empty list as "no chats"
+                if not allowed_chats: # List is empty, and user wants it to mean "no chats allowed"
+                    logger.debug(f"AutoJoinGame: `allowed_chats` is empty and `interpret_empty_allowed_chats_as_no_chats` is True. Skipping message {message.id} in chat {message.chat_id}.")
+                    return
+                elif message.chat_id not in allowed_chats: # List is not empty, but current chat is not in it
+                    logger.debug(f"AutoJoinGame: Чат {message.chat_id} не в списке разрешенных чатов ({allowed_chats}). Пропускаю сообщение {message.id}.")
+                    return
+            else:
+                # Old behavior: empty list means "all chats"
+                if allowed_chats and message.chat_id not in allowed_chats:
+                    logger.debug(f"AutoJoinGame: Чат {message.chat_id} не в списке разрешенных чатов ({allowed_chats}). Пропускаю сообщение {message.id}.")
+                    return
 
             msg_text = message.text
             msg_text_lower = msg_text.lower() 
