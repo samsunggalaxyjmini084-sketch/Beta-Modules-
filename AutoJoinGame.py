@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.4.5 # Версия обновлена
+# meta version: 2.4.6 # Версия обновлена
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 0100000101010100010011110100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000111
@@ -76,7 +76,7 @@ class AutoJoinGameMod(loader.Module):
 <code>.ajgshowtrackedroles</code> - Показать список найденных отслеживаемых ролей
 <code>.ajgswitchkeywords &lt;ID_конфига&gt;</code> - Переключить активную конфигурацию ключевых слов для кнопок. Если <code>&lt;ID_конфига&gt;</code> не указан, покажет текущую активную конфигурацию и доступные ID.
 
-<emoji document_id=5877260593903177342>⚙</emoji> Как работает:
+<emoji document_id=5877260593901971030>⚙</emoji> Как работает:
 Ждет сообщение о наборе в игру или о голосовании (линчевание/повешение) от указанных ботов (или от любого бота, если список пуст).
 Автоматически переходит по URL кнопки и отправляет /start для входа в игру.
 Если бот спрашивает "Вы точно хотите линчевать..." или "Вы точно хотите повесить...", модуль автоматически нажмет кнопку.
@@ -430,12 +430,15 @@ Mafia Combat Premium <code>1634167847</code>""",
         elif self._parsed_button_keywords:
             # Если активный ID не задан или не найден, пробуем использовать первый доступный
             first_id = next(iter(self._parsed_button_keywords))
-            # Используем self.set() для сохранения изменения в конфиг
+            # Используем self.set() для сохранения изменения в конфиг, и обновляем self.config
             self.set("active_button_config_id", first_id) 
+            self.config["active_button_config_id"] = first_id # Явно обновляем in-memory config
             self._current_button_keywords_to_use = self._parsed_button_keywords[first_id]
             logger.warning(f"AutoJoinGame: Активная конфигурация ключевых слов кнопок '{active_id}' не найдена или не установлена. Установлено на первую доступную: '{first_id}'.")
         else:
             self._current_button_keywords_to_use = []
+            self.set("active_button_config_id", "") # Очищаем, если нет конфигов
+            self.config["active_button_config_id"] = "" # Явно обновляем in-memory config
             logger.warning("AutoJoinGame: Нет настроенных конфигураций ключевых слов кнопок. Модуль не будет активировать кнопки по ключевым словам.")
 
 
@@ -492,13 +495,16 @@ Mafia Combat Premium <code>1634167847</code>""",
     async def ajgon(self, message: Message):
         """Включить автовход в игру и автолинчевание"""
         self.set("enabled", True) # Используем self.set()
+        self.config["enabled"] = True # Явно обновляем in-memory config
         await utils.answer(message, self.strings("enabled"))
 
     @loader.command(ru_doc="Выключить автовход в игру и автолинчевание")
     async def ajgoff(self, message: Message):
         """Выключить автовход в игру и автолинчевание"""
         self.set("enabled", False) # Используем self.set()
+        self.config["enabled"] = False # Явно обновляем in-memory config
         self.set("role_tracking_enabled", False) # Используем self.set()
+        self.config["role_tracking_enabled"] = False # Явно обновляем in-memory config
         self._player_nickname_to_lynch = None 
         self._role_tracking_active = False 
         self._role_tracking_start_time = None
@@ -567,6 +573,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         if config_id in self._parsed_button_keywords:
             self.set("active_button_config_id", config_id) # Используем self.set() для явного сохранения
+            self.config["active_button_config_id"] = config_id # Явно обновляем in-memory config
             self._update_button_keywords_from_config() # Обновить активные ключевые слова и логирование
             await utils.answer(message, self.strings("switch_keywords_success").format(
                 config_id=config_id,
@@ -912,6 +919,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                     logger.info(f"AutoJoinGame: Обнаружен триггер для автоматического включения отслеживания ролей в сообщении {message.id} от бота {sender_id}.")
                     
                     self.set("role_tracking_enabled", True)
+                    self.config["role_tracking_enabled"] = True # Явно обновляем in-memory config
                     self._role_tracking_active = True
                     self._role_tracking_start_time = datetime.now()
                     self._tracked_roles_list = []
@@ -950,6 +958,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                     logger.info(f"AutoJoinGame: Обнаружен триггер для автоматического выключения отслеживания ролей в сообщении {message.id} от бота {sender_id}.")
                     
                     self.set("role_tracking_enabled", False)
+                    self.config["role_tracking_enabled"] = False # Явно обновляем in-memory config
                     self._role_tracking_active = False
                     self._role_tracking_start_time = None
                     self._tracked_roles_list = []
@@ -966,6 +975,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                 if self._role_tracking_start_time and (datetime.now() - self._role_tracking_start_time).total_seconds() > self.config["role_tracking_duration"]:
                     logger.info(self.strings("role_tracking_expired"))
                     self.set("role_tracking_enabled", False)
+                    self.config["role_tracking_enabled"] = False # Явно обновляем in-memory config
                     self._role_tracking_active = False
                     self._role_tracking_start_time = None
                     if self._send_tracked_roles_task:
@@ -1123,7 +1133,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
                 lynch_button_found = False
                 for row in message.buttons:
-                    for button in button_row:
+                    for button in row: # Исправлена опечатка 'button_row' на 'row'
                         try:
                             button_text = str(getattr(button, 'text', ''))
                         except Exception as e:
