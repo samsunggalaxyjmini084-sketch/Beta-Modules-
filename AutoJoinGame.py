@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.4.4 # Версия обновлена
+# meta version: 2.4.5 # Версия обновлена
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 0100000101010100010011110100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000111
@@ -13,7 +13,7 @@ from telethon.tl.types import Message, User
 from telethon import events
 import re
 from collections import defaultdict
-from typing import Optional
+from typing import Optional 
 from .. import loader, utils
 
 logger = logging.getLogger(__name__)
@@ -538,17 +538,20 @@ Mafia Combat Premium <code>1634167847</code>""",
         await utils.answer(message, message_text)
 
     @loader.command(ru_doc="Переключить активную конфигурацию ключевых слов для кнопок. Если ID_конфига не указан, покажет текущую активную конфигурацию и доступные ID.")
-    async def ajgswitchkeywords(self, message: Message, config_id: Optional[str] = None):
+    async def ajgswitchkeywords(self, message: Message): # Изменена сигнатура
         """Переключить активную конфигурацию ключевых слов для кнопок.
         Пример: .ajgswitchkeywords 1
         Используйте без аргументов, чтобы увидеть текущую активную конфигурацию и доступные ID."""
+        
+        config_id = utils.get_args_raw(message) # Ручной парсинг аргумента
+
         if not self._parsed_button_keywords:
             await utils.answer(message, self.strings("switch_keywords_no_configs"))
             return
 
         available_ids = ", ".join(self._parsed_button_keywords.keys())
 
-        if config_id is None:
+        if not config_id: # Если аргумент не предоставлен
             current_active_id = self.config["active_button_config_id"]
             current_keywords = ", ".join(self._current_button_keywords_to_use)
             await utils.answer(message, self.strings("switch_keywords_usage").format(
@@ -908,7 +911,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                 if is_auto_track_trigger_bot and any(p.lower() in msg_text_lower for p in auto_track_phrases):
                     logger.info(f"AutoJoinGame: Обнаружен триггер для автоматического включения отслеживания ролей в сообщении {message.id} от бота {sender_id}.")
                     
-                    self.set("role_tracking_enabled", True) # Используем self.set()
+                    self.set("role_tracking_enabled", True)
                     self._role_tracking_active = True
                     self._role_tracking_start_time = datetime.now()
                     self._tracked_roles_list = []
@@ -946,7 +949,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                 if is_auto_disable_trigger_bot and any(p.lower() in msg_text_lower for p in auto_disable_phrases):
                     logger.info(f"AutoJoinGame: Обнаружен триггер для автоматического выключения отслеживания ролей в сообщении {message.id} от бота {sender_id}.")
                     
-                    self.set("role_tracking_enabled", False) # Используем self.set()
+                    self.set("role_tracking_enabled", False)
                     self._role_tracking_active = False
                     self._role_tracking_start_time = None
                     self._tracked_roles_list = []
@@ -962,7 +965,7 @@ Mafia Combat Premium <code>1634167847</code>""",
             if self.config["role_tracking_enabled"] and self._role_tracking_active:
                 if self._role_tracking_start_time and (datetime.now() - self._role_tracking_start_time).total_seconds() > self.config["role_tracking_duration"]:
                     logger.info(self.strings("role_tracking_expired"))
-                    self.set("role_tracking_enabled", False) # Используем self.set()
+                    self.set("role_tracking_enabled", False)
                     self._role_tracking_active = False
                     self._role_tracking_start_time = None
                     if self._send_tracked_roles_task:
@@ -1120,7 +1123,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
                 lynch_button_found = False
                 for row in message.buttons:
-                    for button in row:
+                    for button in button_row:
                         try:
                             button_text = str(getattr(button, 'text', ''))
                         except Exception as e:
