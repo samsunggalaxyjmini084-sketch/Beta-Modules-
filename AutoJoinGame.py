@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.4.10 # Версия обновлена для добавления задержки команд
+# meta version: 2.4.11 # Версия обновлена для интеграции функционала PinChat
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 0100000101010100010011110100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000111
@@ -10,7 +10,8 @@ import random
 import urllib.parse
 from datetime import datetime, timedelta
 from telethon.tl.types import Message, User
-from telethon import events
+from telethon.errors import RPCError # Добавлено для обработки ошибок Telethon RPC
+from telethon import events, functions # Добавлено functions для ToggleDialogPinRequest
 import re
 from collections import defaultdict
 from typing import Optional 
@@ -21,21 +22,21 @@ logger = logging.getLogger(__name__)
 
 @loader.tds
 class AutoJoinGameMod(loader.Module):
-    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Добавлены команды для управления разрешенными чатами: .pinchat и .unpinchat. Добавлена настройка задержки выполнения команд."""
+    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Добавлены команды для управления закреплением/откреплением чатов и список разрешенных чатов для модуля."""
 
     strings = {
         "name": "AutoJoinGame",
-        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Добавлены команды для управления разрешенными чатами: .pinchat и .unpinchat. Добавлена настройка задержки выполнения команд.",
+        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Добавлены команды для управления закреплением/откреплением чатов и список разрешенных чатов для модуля.",
         "enabled": "✅ Автовход в игру и автолинчевание включены.",
         "disabled": "❌ Автовход в игру и автолинчевание выключены.",
         "status": "<emoji document_id=5875291072225087249>📊</emoji> Статус автовхода и автолинчевания:\n"
                   "Статус: {}\n"
                   "Задержка входа (секунды): {}\n"
                   "Задержка линчевания (секунды): {}\n"
-                  "Задержка выполнения команд (секунды): {}\n" # NEW LINE
+                  "Задержка выполнения команд (секунды): {}\n"
                   "Боты для отслеживания: {}\n"
-                  "Разрешенные чаты: {}\n"
-                  "Пользователи, разрешенные для настройки чатов: {}\n" 
+                  "Разрешенные чаты для модуля: {}\n" # Изменено для ясности
+                  "Пользователи, разрешенные для настройки чатов и закрепления: {}\n" # Изменено для ясности
                   "Конфигурации ключевых слов кнопок (сырые): {}\n"
                   "Активная конфигурация ключевых слов: {} (Ключевые слова: {})\n"
                   "Доступные ID конфигураций: {}\n"
@@ -77,8 +78,10 @@ class AutoJoinGameMod(loader.Module):
 <code>.ajgtournaments</code> - Показать информацию о регистрации на турниры
 <code>.ajgshowtrackedroles</code> - Показать список найденных отслеживаемых ролей
 <code>.ajgset &lt;ID_конфига&gt;</code> - Переключить активную конфигурацию ключевых слов для кнопок. Если <code>&lt;ID_конфига&gt;</code> не указан, покажет текущую активную конфигурацию и доступные ID.
-<code>.pinchat &lt;chat_id&gt;</code> - Добавить ID чата в список разрешенных чатов (allowed_chats).
-<code>.unpinchat &lt;chat_id&gt;</code> - Удалить ID чата из списка разрешенных чатов (allowed_chats).
+<code>.pinchat &lt;chat_id&gt;</code> - Закрепить чат в вашем списке чатов.
+<code>.unpinchat &lt;chat_id&gt;</code> - Открепить чат из вашего списка чатов.
+<code>.ajgpinchat &lt;chat_id&gt;</code> - Добавить ID чата в список разрешенных чатов для модуля (<code>allowed_chats</code>).
+<code>.ajgunpinchat &lt;chat_id&gt;</code> - Удалить ID чата из списка разрешенных чатов для модуля (<code>allowed_chats</code>).
 
 <emoji document_id=5877260593901971030>⚙</emoji> Как работает:
 Ждет сообщение о наборе в игру или о голосовании (линчевание/повешение) от указанных ботов (или от любого бота, если список пуст).
@@ -97,7 +100,8 @@ class AutoJoinGameMod(loader.Module):
 <b>Новая функция:</b> Модуль может автоматически <b>выключать</b> отслеживание ролей при получении сообщения, содержащего определенные фразы, от указанных ботов.
 <b>Улучшение:</b> Теперь модуль более точно определяет роли, включая составные фразы, и позволяет помечать роли как 'неактивные' с помощью суффикса <code>(н)</code> для раздельного отображения.
 <b>Приоритет кнопок:</b> Теперь модуль отдает предпочтение кнопкам, содержащим <b>другие ключевые слова</b> из активной конфигурации, если на кнопке также есть слово "присоединиться". Кнопка с только "присоединиться" будет нажата только в том случае, если других подходящих кнопок не найдено.
-<b>Новая функция:</b> Команды <code>.pinchat &lt;chat_id&gt;</code> и <code>.unpinchat &lt;chat_id&gt;</code> позволяют управлять списком разрешенных чатов (<code>allowed_chats</code>) без редактирования конфига напрямую. Эти команды могут быть ограничены для использования определенными пользователями через настройку <code>pin_unpin_allowed_user_ids</code>.
+<b>Новая функция:</b> Команды <code>.pinchat &lt;chat_id&gt;</code> и <code>.unpinchat &lt;chat_id&gt;</code> позволяют закреплять/откреплять чаты в вашем списке диалогов.
+<b>Новая функция:</b> Команды <code>.ajgpinchat &lt;chat_id&gt;</code> и <code>.ajgunpinchat &lt;chat_id&gt;</code> позволяют управлять списком разрешенных чатов (<code>allowed_chats</code>) для модуля без редактирования конфига напрямую. Эти команды, как и команды закрепления/открепления чатов, могут быть ограничены для использования определенными пользователями через настройку <code>pin_unpin_allowed_user_ids</code>.
 <b>Новая функция:</b> Настройка <code>command_delay</code> позволяет установить задержку перед выполнением всех команд модуля.
 
 <emoji document_id=5843843420468024653>⭐️</emoji> Настройки:
@@ -106,7 +110,7 @@ class AutoJoinGameMod(loader.Module):
 <b>Обновление:</b> Теперь параметр <code>bot_ids</code> включает в себя все боты, от которых ожидаются триггеры, включая ботов для голосования за игроков. Если список пуст, модуль будет работать со всеми ботами.
 Можно указать список ID чатов, в которых модуль будет активен. Если список пуст, модуль будет работать во всех чатах.
 <b>Новая настройка:</b> <code>command_delay</code> - Задержка в секундах перед выполнением команды. Если 0, задержки нет. Поддерживает дробные значения. По умолчанию: <code>0.0</code>.
-<b>Новая настройка:</b> <code>pin_unpin_allowed_user_ids</code> - Список ID пользователей, которым разрешено использовать команды <code>.pinchat</code> и <code>.unpinchat</code>. Если список пуст, эти команды могут использовать все пользователи. По умолчанию: <code>[]</code>.
+<b>Настройка:</b> <code>pin_unpin_allowed_user_ids</code> - Список ID пользователей, которым разрешено использовать команды <code>.pinchat</code>, <code>.unpinchat</code>, <code>.ajgpinchat</code> и <code>.ajgunpinchat</code>. Если список пуст, эти команды могут использовать все пользователи. По умолчанию: <code>[]</code>.
 <b>Настройка:</b> <code>button_keyword_configs_string</code> - строка с конфигурациями ключевых слов кнопок. Формат: <code>"Ключевое слово 1 (ID_конфига), Ключевое слово 2 (Другой_ID)"</code>. Например: <code>"присоединиться (1), играть (1), 🙋 (2), 🎮 (2)"</code>. Ключевые слова регистронезависимы. <b>Скобки с ID не учитываются при поиске кнопок.</b>
 <b>Новая настройка:</b> <code>active_button_config_id</code> - ID активной конфигурации ключевых слов из <code>button_keyword_configs_string</code>. Например: <code>"1"</code> или <code>"default"</code>.
 <b>Обновление: Если кнопка содержит URL вида <code>t.me/bot_username?start=param</code>, модуль автоматически отправит команду <code>/start &lt;param&gt;</code> соответствующему боту. Этот режим теперь активен для любого совпадения по <code>button_keywords</code> с Deep-Link URL.</b>
@@ -209,14 +213,29 @@ Mafia Combat Premium <code>1634167847</code>""",
         "switch_keywords_no_configs": "⚠️ Нет настроенных конфигураций ключевых слов. Используйте <code>.cfg AutoJoinGame button_keyword_configs_string</code> для настройки.",
         "switch_keywords_current": "ℹ️ Активная конфигурация уже <code>{config_id}</code>.",
         "switch_keywords_usage": "ℹ️ Текущая активная конфигурация: <code>{current_id}</code>. Ключевые слова: {current_keywords}\nДоступные ID: {available_ids}.\nИспользуйте <code>.ajgset &lt;ID_конфига&gt;</code> для переключения.",
-        "pinchat_doc": "Добавить ID чата в список разрешенных чатов (allowed_chats).",
-        "unpinchat_doc": "Удалить ID чата из списка разрешенных чатов (allowed_chats).",
-        "pinchat_success": "✅ Чат <code>{chat_id}</code> успешно добавлен в список разрешенных.",
-        "unpinchat_success": "✅ Чат <code>{chat_id}</code> успешно удален из списка разрешенных.",
-        "invalid_chat_id": "❌ Неверный ID чата. Пожалуйста, укажите числовой ID.",
-        "chat_already_pinned": "⚠️ Чат <code>{chat_id}</code> уже находится в списке разрешенных чатов.",
-        "chat_not_found": "⚠️ Чат <code>{chat_id}</code> не найден в списке разрешенных чатов.",
-        "not_allowed_to_configure_chats": "❌ У вас нет разрешения на изменение списка разрешенных чатов.",
+        
+        # --- Строки из PinChat.py ---
+        "pinchat_no_args": "⚠️ Укажите ID чата для закрепления. Пример: <code>.pinchat -1001234567890</code>", 
+        "unpinchat_no_args": "⚠️ Укажите ID чата для открепления. Пример: <code>.unpinchat -1001234567890</code>", 
+        "chat_id_invalid": "❌ Неверный ID чата. Укажите числовой ID.", # Изменено имя, чтобы не конфликтовать с ajg's invalid_chat_id
+        "chat_not_found_dialog": "❌ Чат с ID <code>{chat_id}</code> не найден или недоступен для закрепления/открепления.", # Изменено имя
+        "pin_success": "✅ Чат <code>{chat_id}</code> успешно закреплен в вашем списке чатов.",
+        "pin_already_pinned": "ℹ️ Чат <code>{chat_id}</code> уже закреплен в вашем списке чатов.",
+        "pin_fail": "❌ Не удалось закрепить чат <code>{chat_id}</code>: {error}",
+        "unpin_success": "✅ Чат <code>{chat_id}</code> успешно откреплен из вашего списка чатов.",
+        "unpin_not_pinned": "ℹ️ Чат <code>{chat_id}</code> не закреплен в вашем списке чатов.",
+        "unpin_fail": "❌ Не удалось открепить чат <code>{chat_id}</code>: {error}",
+        "pin_unpin_start_msg": "⏳ Пытаюсь {action_text_verb} чат <code>{chat_id}</code> в вашем списке чатов...",
+        # --- Конец строк из PinChat.py ---
+
+        # --- Строки для управления allowed_chats модуля ---
+        "ajgpinchat_doc": "Добавить ID чата в список разрешенных чатов для модуля (allowed_chats).",
+        "ajgunpinchat_doc": "Удалить ID чата из списка разрешенных чатов для модуля (allowed_chats).",
+        "ajgpinchat_success": "✅ Чат <code>{chat_id}</code> успешно добавлен в список разрешенных чатов модуля.",
+        "ajgunpinchat_success": "✅ Чат <code>{chat_id}</code> успешно удален из списка разрешенных чатов модуля.",
+        "ajgchat_already_pinned": "⚠️ Чат <code>{chat_id}</code> уже находится в списке разрешенных чатов модуля.",
+        "ajgchat_not_found": "⚠️ Чат <code>{chat_id}</code> не найден в списке разрешенных чатов модуля.",
+        "not_allowed_to_configure_chats": "❌ У вас нет разрешения на изменение списка разрешенных чатов или управление закреплением/откреплением чатов.",
         "pin_unpin_allowed_user_ids_display": "Не указаны (любой пользователь)",
     }
 
@@ -243,7 +262,7 @@ Mafia Combat Premium <code>1634167847</code>""",
             ),
             loader.ConfigValue(
                 "command_delay",
-                0.0, # NEW CONFIG
+                0.0, 
                 lambda: "Задержка в секундах перед выполнением команды. Если 0, задержки нет. Поддерживает дробные значения.",
                 validator=loader.validators.Float(minimum=0.0, maximum=10.0)
             ),
@@ -262,7 +281,7 @@ Mafia Combat Premium <code>1634167847</code>""",
             loader.ConfigValue(
                 "pin_unpin_allowed_user_ids",
                 [],
-                lambda: "Список ID пользователей, которым разрешено использовать команды .pinchat и .unpinchat. Если список пуст, эти команды могут использовать все пользователи.",
+                lambda: "Список ID пользователей, которым разрешено использовать команды .pinchat, .unpinchat, .ajgpinchat и .ajgunpinchat. Если список пуст, эти команды могут использовать все пользователи.",
                 validator=loader.validators.Series(loader.validators.Integer())
             ),
             loader.ConfigValue(
@@ -521,24 +540,127 @@ Mafia Combat Premium <code>1634167847</code>""",
         except Exception as e:
             logger.error(self.strings("tracked_roles_send_error").format(chat_id=chat_id, error=e))
 
+    # --- Начало интегрированных функций PinChat.py ---
+    async def _process_chat_pin_unpin(self, message: Message, pin_action: bool):
+        """Вспомогательная функция для логики закрепления/открепления чатов в списке диалогов."""
+        args = utils.get_args_raw(message)
+        
+        if not args:
+            await utils.answer(message, self.strings("pinchat_no_args") if pin_action else self.strings("unpinchat_no_args"))
+            return
+
+        try:
+            target_chat_id = int(args)
+        except ValueError:
+            await utils.answer(message, self.strings("chat_id_invalid"))
+            return
+
+        sender = await message.get_sender()
+        sender_id = getattr(sender, 'id', None)
+        allowed_users = self.config["pin_unpin_allowed_user_ids"]
+        if allowed_users and sender_id not in allowed_users:
+            await utils.answer(message, self.strings("not_allowed_to_configure_chats"))
+            return
+
+        action_text_verb = "закрепить" if pin_action else "открепить"
+
+        # Применение общей задержки для команд
+        delay = self.config["command_delay"]
+        if delay > 0:
+            await asyncio.sleep(delay)
+
+        await utils.answer(message, self.strings("pin_unpin_start_msg").format(action_text_verb=action_text_verb, chat_id=target_chat_id))
+
+        try:
+            entity = await self._client.get_entity(target_chat_id)
+        except (ValueError, TypeError):
+            logger.error(f"AutoJoinGame: Чат с ID {target_chat_id} не найден для закрепления/открепления.") 
+            await utils.answer(message, self.strings("chat_not_found_dialog").format(chat_id=target_chat_id))
+            return
+        except Exception as e:
+            logger.error(f"AutoJoinGame: Ошибка при получении сущности чата {target_chat_id} для закрепления/открепления: {e}", exc_info=True) 
+            await utils.answer(message, self.strings("chat_not_found_dialog").format(chat_id=target_chat_id))
+            return
+
+        try:
+            target_dialog = None
+            async for dialog in self._client.iter_dialogs():
+                if dialog.id == target_chat_id:
+                    target_dialog = dialog
+                    break
+            
+            if not target_dialog:
+                await utils.answer(message, self.strings("chat_not_found_dialog").format(chat_id=target_chat_id))
+                return
+
+            is_currently_pinned = target_dialog.pinned
+
+            if pin_action: # Закрепляем
+                if is_currently_pinned:
+                    await utils.answer(message, self.strings("pin_already_pinned").format(chat_id=target_chat_id))
+                    return
+                await self._client(functions.messages.ToggleDialogPinRequest(
+                    peer=target_dialog.entity,
+                    pinned=True
+                ))
+                await utils.answer(message, self.strings("pin_success").format(chat_id=target_chat_id))
+                logger.info(f"AutoJoinGame: Чат {target_chat_id} успешно закреплен.") 
+            else: # Открепляем
+                if not is_currently_pinned:
+                    await utils.answer(message, self.strings("unpin_not_pinned").format(chat_id=target_chat_id))
+                    return
+                await self._client(functions.messages.ToggleDialogPinRequest(
+                    peer=target_dialog.entity,
+                    pinned=False
+                ))
+                await utils.answer(message, self.strings("unpin_success").format(chat_id=target_chat_id))
+                logger.info(f"AutoJoinGame: Чат {target_chat_id} успешно откреплен.") 
+
+        except RPCError as e:
+            logger.error(f"AutoJoinGame: Ошибка Telethon RPC при {action_text_verb} чата {target_chat_id}: {e}", exc_info=True) 
+            await utils.answer(message, self.strings("pin_fail").format(chat_id=target_chat_id, error=e) if pin_action else self.strings("unpin_fail").format(chat_id=target_chat_id, error=e))
+        except Exception as e:
+            logger.exception(f"AutoJoinGame: Неожиданная ошибка при {action_text_verb} чата {target_chat_id}: {e}") 
+            await utils.answer(message, self.strings("pin_fail").format(chat_id=target_chat_id, error=e) if pin_action else self.strings("unpin_fail").format(chat_id=target_chat_id, error=e))
+
+    @loader.command(ru_doc="Закрепить чат в вашем списке чатов по его ID.")
+    async def pinchat(self, message: Message): 
+        """
+        Закрепляет чат в вашем списке чатов.
+        Использование: .pinchat <chat_id>
+        Пример: .pinchat -1001234567890
+        """
+        await self._process_chat_pin_unpin(message, True)
+
+    @loader.command(ru_doc="Открепить чат из вашего списка чатов по его ID.")
+    async def unpinchat(self, message: Message): 
+        """
+        Открепляет чат из вашего списка чатов.
+        Использование: .unpinchat <chat_id>
+        Пример: .unpinchat -1001234567890
+        """
+        await self._process_chat_pin_unpin(message, False)
+    # --- Конец интегрированных функций PinChat.py ---
+
+
     @loader.command(ru_doc="Включить автовход в игру и автолинчевание")
     async def ajgon(self, message: Message):
         """Включить автовход в игру и автолинчевание"""
         if self.config["command_delay"] > 0:
-            await asyncio.sleep(self.config["command_delay"]) # NEW
-        self.set("enabled", True) # Используем self.set()
-        self.config["enabled"] = True # Явно обновляем in-memory config
+            await asyncio.sleep(self.config["command_delay"]) 
+        self.set("enabled", True)
+        self.config["enabled"] = True
         await utils.answer(message, self.strings("enabled"))
 
     @loader.command(ru_doc="Выключить автовход в игру и автолинчевание")
     async def ajgoff(self, message: Message):
         """Выключить автовход в игру и автолинчевание"""
         if self.config["command_delay"] > 0:
-            await asyncio.sleep(self.config["command_delay"]) # NEW
-        self.set("enabled", False) # Используем self.set()
-        self.config["enabled"] = False # Явно обновляем in-memory config
-        self.set("role_tracking_enabled", False) # Используем self.set()
-        self.config["role_tracking_enabled"] = False # Явно обновляем in-memory config
+            await asyncio.sleep(self.config["command_delay"])
+        self.set("enabled", False)
+        self.config["enabled"] = False
+        self.set("role_tracking_enabled", False)
+        self.config["role_tracking_enabled"] = False
         self._player_nickname_to_lynch = None 
         self._role_tracking_active = False 
         self._role_tracking_start_time = None
@@ -553,7 +675,7 @@ Mafia Combat Premium <code>1634167847</code>""",
     async def ajgshowtrackedroles(self, message: Message):
         """Показать список найденных отслеживаемых ролей"""
         if self.config["command_delay"] > 0:
-            await asyncio.sleep(self.config["command_delay"]) # NEW
+            await asyncio.sleep(self.config["command_delay"])
         active_roles_display = []
         inactive_roles_display = []
 
@@ -580,14 +702,14 @@ Mafia Combat Premium <code>1634167847</code>""",
         await utils.answer(message, message_text)
 
     @loader.command(ru_doc="Переключить активную конфигурацию ключевых слов для кнопок. Если ID_конфига не указан, покажет текущую активную конфигурацию и доступные ID.")
-    async def ajgset(self, message: Message): # Изменена сигнатура ajgswitchkeywords на ajgset
+    async def ajgset(self, message: Message):
         """Переключить активную конфигурацию ключевых слов для кнопок.
         Пример: .ajgset 1
         Используйте без аргументов, чтобы увидеть текущую активную конфигурацию и доступные ID."""
         if self.config["command_delay"] > 0:
-            await asyncio.sleep(self.config["command_delay"]) # NEW
+            await asyncio.sleep(self.config["command_delay"])
         
-        config_id = utils.get_args_raw(message) # Ручной парсинг аргумента
+        config_id = utils.get_args_raw(message)
 
         if not self._parsed_button_keywords:
             await utils.answer(message, self.strings("switch_keywords_no_configs"))
@@ -595,7 +717,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         available_ids = ", ".join(self._parsed_button_keywords.keys())
 
-        if not config_id: # Если аргумент не предоставлен
+        if not config_id:
             current_active_id = self.config["active_button_config_id"]
             current_keywords = ", ".join(self._current_button_keywords_to_use)
             await utils.answer(message, self.strings("switch_keywords_usage").format(
@@ -610,9 +732,9 @@ Mafia Combat Premium <code>1634167847</code>""",
             return
 
         if config_id in self._parsed_button_keywords:
-            self.set("active_button_config_id", config_id) # Используем self.set() для явного сохранения
-            self.config["active_button_config_id"] = config_id # Явно обновляем in-memory config
-            self._update_button_keywords_from_config() # Обновить активные ключевые слова и логирование
+            self.set("active_button_config_id", config_id)
+            self.config["active_button_config_id"] = config_id
+            self._update_button_keywords_from_config()
             await utils.answer(message, self.strings("switch_keywords_success").format(
                 config_id=config_id,
                 keywords=", ".join(self._current_button_keywords_to_use)
@@ -623,21 +745,21 @@ Mafia Combat Premium <code>1634167847</code>""",
                 available_ids=available_ids if available_ids else "нет"
             ))
 
-    @loader.command(ru_doc="Добавить ID чата в список разрешенных чатов (allowed_chats).")
-    async def pinchat(self, message: Message):
-        """Добавить ID чата в список разрешенных чатов."""
+    @loader.command(ru_doc="Добавить ID чата в список разрешенных чатов для модуля (allowed_chats).")
+    async def ajgpinchat(self, message: Message): # Переименовано из pinchat
+        """Добавить ID чата в список разрешенных чатов модуля."""
         if self.config["command_delay"] > 0:
-            await asyncio.sleep(self.config["command_delay"]) # NEW
+            await asyncio.sleep(self.config["command_delay"])
         args = utils.get_args_raw(message)
         
         if not args:
-            await utils.answer(message, self.strings("invalid_chat_id"))
+            await utils.answer(message, self.strings("chat_id_invalid")) # Используем общую invalid_chat_id
             return
 
         try:
             chat_id_to_manage = int(args)
         except ValueError:
-            await utils.answer(message, self.strings("invalid_chat_id"))
+            await utils.answer(message, self.strings("chat_id_invalid"))
             return
 
         sender = await message.get_sender()
@@ -649,29 +771,29 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         current_allowed_chats = self.config["allowed_chats"].copy()
         if chat_id_to_manage in current_allowed_chats:
-            await utils.answer(message, self.strings("chat_already_pinned").format(chat_id=chat_id_to_manage))
+            await utils.answer(message, self.strings("ajgchat_already_pinned").format(chat_id=chat_id_to_manage))
             return
 
         current_allowed_chats.append(chat_id_to_manage)
         self.set("allowed_chats", current_allowed_chats)
         self.config["allowed_chats"] = current_allowed_chats 
-        await utils.answer(message, self.strings("pinchat_success").format(chat_id=chat_id_to_manage))
+        await utils.answer(message, self.strings("ajgpinchat_success").format(chat_id=chat_id_to_manage))
 
-    @loader.command(ru_doc="Удалить ID чата из списка разрешенных чатов (allowed_chats).")
-    async def unpinchat(self, message: Message):
-        """Удалить ID чата из списка разрешенных чатов."""
+    @loader.command(ru_doc="Удалить ID чата из списка разрешенных чатов для модуля (allowed_chats).")
+    async def ajgunpinchat(self, message: Message): # Переименовано из unpinchat
+        """Удалить ID чата из списка разрешенных чатов модуля."""
         if self.config["command_delay"] > 0:
-            await asyncio.sleep(self.config["command_delay"]) # NEW
+            await asyncio.sleep(self.config["command_delay"])
         args = utils.get_args_raw(message)
         
         if not args:
-            await utils.answer(message, self.strings("invalid_chat_id"))
+            await utils.answer(message, self.strings("chat_id_invalid"))
             return
 
         try:
             chat_id_to_manage = int(args)
         except ValueError:
-            await utils.answer(message, self.strings("invalid_chat_id"))
+            await utils.answer(message, self.strings("chat_id_invalid"))
             return
         
         sender = await message.get_sender()
@@ -683,20 +805,20 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         current_allowed_chats = self.config["allowed_chats"].copy()
         if chat_id_to_manage not in current_allowed_chats:
-            await utils.answer(message, self.strings("chat_not_found").format(chat_id=chat_id_to_manage))
+            await utils.answer(message, self.strings("ajgchat_not_found").format(chat_id=chat_id_to_manage))
             return
 
         current_allowed_chats.remove(chat_id_to_manage)
         self.set("allowed_chats", current_allowed_chats)
         self.config["allowed_chats"] = current_allowed_chats 
-        await utils.answer(message, self.strings("unpinchat_success").format(chat_id=chat_id_to_manage))
+        await utils.answer(message, self.strings("ajgunpinchat_success").format(chat_id=chat_id_to_manage))
 
 
     @loader.command(ru_doc="Показать статус автовхода и автолинчевания")
     async def ajgstatus(self, message: Message):
         """Показать статус автовхода и автолинчевания"""
         if self.config["command_delay"] > 0:
-            await asyncio.sleep(self.config["command_delay"]) # NEW
+            await asyncio.sleep(self.config["command_delay"])
         status = "🟢 Включен" if self.config["enabled"] else "🔴 Выключен"
         
         delays = self.config["delays"]
@@ -705,7 +827,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         lynch_delays = self.config["lynch_delay"]
         lynch_delay_display = f"[{', '.join(map(str, lynch_delays))}]" if len(lynch_delays) > 1 else str(lynch_delays[0])
 
-        command_delay_display = str(self.config["command_delay"]) # NEW
+        command_delay_display = str(self.config["command_delay"])
 
         bot_ids_display = ", ".join(map(str, self.config["bot_ids"])) if self.config["bot_ids"] else "Не указаны (любой бот)"
 
@@ -763,7 +885,7 @@ Mafia Combat Premium <code>1634167847</code>""",
             status, 
             delay_display, 
             lynch_delay_display,
-            command_delay_display, # NEW
+            command_delay_display,
             bot_ids_display, 
             allowed_chats_display, 
             pin_unpin_allowed_user_ids_display,
@@ -799,14 +921,14 @@ Mafia Combat Premium <code>1634167847</code>""",
     async def ajghelp(self, message: Message):
         """Показать справку"""
         if self.config["command_delay"] > 0:
-            await asyncio.sleep(self.config["command_delay"]) # NEW
+            await asyncio.sleep(self.config["command_delay"])
         await utils.answer(message, self.strings("help_text"))
 
     @loader.command(ru_doc="Проверить последнее сообщение с набором")
     async def ajgtest(self, message: Message):
         """Проверить последнее сообщение с набором в текущем чате"""
         if self.config["command_delay"] > 0:
-            await asyncio.sleep(self.config["command_delay"]) # NEW
+            await asyncio.sleep(self.config["command_delay"])
         current_chat_id = message.chat_id
         configured_bot_ids = self.config["bot_ids"]
 
@@ -1022,14 +1144,14 @@ Mafia Combat Premium <code>1634167847</code>""",
     async def ajgid(self, message: Message):
         """Показать список ID ботов для мафии"""
         if self.config["command_delay"] > 0:
-            await asyncio.sleep(self.config["command_delay"]) # NEW
+            await asyncio.sleep(self.config["command_delay"])
         await utils.answer(message, self.strings("ajgid_bots_list"))
 
     @loader.command(ru_doc="Показать информацию о регистрации на турниры")
     async def ajgtournaments(self, message: Message):
         """Показать информацию о регистрации на турниры"""
         if self.config["command_delay"] > 0:
-            await asyncio.sleep(self.config["command_delay"]) # NEW
+            await asyncio.sleep(self.config["command_delay"])
         await utils.answer(message, self.strings("ajgtournaments_text"))
 
     @loader.watcher(incoming=True, outgoing=False)
