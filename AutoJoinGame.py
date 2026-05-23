@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.4.9 # Версия обновлена для добавления команд .pinchat и .unpinchat
+# meta version: 2.4.10 # Версия обновлена для добавления задержки команд
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 0100000101010100010011110100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000111
@@ -21,17 +21,18 @@ logger = logging.getLogger(__name__)
 
 @loader.tds
 class AutoJoinGameMod(loader.Module):
-    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Добавлены команды для управления разрешенными чатами: .pinchat и .unpinchat."""
+    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Добавлены команды для управления разрешенными чатами: .pinchat и .unpinchat. Добавлена настройка задержки выполнения команд."""
 
     strings = {
         "name": "AutoJoinGame",
-        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Добавлены команды для управления разрешенными чатами: .pinchat и .unpinchat.",
+        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Добавлены команды для управления разрешенными чатами: .pinchat и .unpinchat. Добавлена настройка задержки выполнения команд.",
         "enabled": "✅ Автовход в игру и автолинчевание включены.",
         "disabled": "❌ Автовход в игру и автолинчевание выключены.",
         "status": "<emoji document_id=5875291072225087249>📊</emoji> Статус автовхода и автолинчевания:\n"
                   "Статус: {}\n"
                   "Задержка входа (секунды): {}\n"
                   "Задержка линчевания (секунды): {}\n"
+                  "Задержка выполнения команд (секунды): {}\n" # NEW LINE
                   "Боты для отслеживания: {}\n"
                   "Разрешенные чаты: {}\n"
                   "Пользователи, разрешенные для настройки чатов: {}\n" 
@@ -97,12 +98,14 @@ class AutoJoinGameMod(loader.Module):
 <b>Улучшение:</b> Теперь модуль более точно определяет роли, включая составные фразы, и позволяет помечать роли как 'неактивные' с помощью суффикса <code>(н)</code> для раздельного отображения.
 <b>Приоритет кнопок:</b> Теперь модуль отдает предпочтение кнопкам, содержащим <b>другие ключевые слова</b> из активной конфигурации, если на кнопке также есть слово "присоединиться". Кнопка с только "присоединиться" будет нажата только в том случае, если других подходящих кнопок не найдено.
 <b>Новая функция:</b> Команды <code>.pinchat &lt;chat_id&gt;</code> и <code>.unpinchat &lt;chat_id&gt;</code> позволяют управлять списком разрешенных чатов (<code>allowed_chats</code>) без редактирования конфига напрямую. Эти команды могут быть ограничены для использования определенными пользователями через настройку <code>pin_unpin_allowed_user_ids</code>.
+<b>Новая функция:</b> Настройка <code>command_delay</code> позволяет установить задержку перед выполнением всех команд модуля.
 
 <emoji document_id=5843843420468024653>⭐️</emoji> Настройки:
 В конфиге модуля можно изменить задержку(и) перед нажатием. Если указано несколько значений, будет выбрано случайное.
 Можно указать список ID ботов, от которых ожидать сообщение о наборе.
 <b>Обновление:</b> Теперь параметр <code>bot_ids</code> включает в себя все боты, от которых ожидаются триггеры, включая ботов для голосования за игроков. Если список пуст, модуль будет работать со всеми ботами.
 Можно указать список ID чатов, в которых модуль будет активен. Если список пуст, модуль будет работать во всех чатах.
+<b>Новая настройка:</b> <code>command_delay</code> - Задержка в секундах перед выполнением команды. Если 0, задержки нет. Поддерживает дробные значения. По умолчанию: <code>0.0</code>.
 <b>Новая настройка:</b> <code>pin_unpin_allowed_user_ids</code> - Список ID пользователей, которым разрешено использовать команды <code>.pinchat</code> и <code>.unpinchat</code>. Если список пуст, эти команды могут использовать все пользователи. По умолчанию: <code>[]</code>.
 <b>Настройка:</b> <code>button_keyword_configs_string</code> - строка с конфигурациями ключевых слов кнопок. Формат: <code>"Ключевое слово 1 (ID_конфига), Ключевое слово 2 (Другой_ID)"</code>. Например: <code>"присоединиться (1), играть (1), 🙋 (2), 🎮 (2)"</code>. Ключевые слова регистронезависимы. <b>Скобки с ID не учитываются при поиске кнопок.</b>
 <b>Новая настройка:</b> <code>active_button_config_id</code> - ID активной конфигурации ключевых слов из <code>button_keyword_configs_string</code>. Например: <code>"1"</code> или <code>"default"</code>.
@@ -237,6 +240,12 @@ Mafia Combat Premium <code>1634167847</code>""",
                 [0.5],
                 lambda: "Список задержек перед нажатием кнопки '👍' или '👎' при линчевании (секунды). Если указано несколько, будет выбрано случайное.",
                 validator=loader.validators.Series(loader.validators.Float(minimum=0.1, maximum=10.0))
+            ),
+            loader.ConfigValue(
+                "command_delay",
+                0.0, # NEW CONFIG
+                lambda: "Задержка в секундах перед выполнением команды. Если 0, задержки нет. Поддерживает дробные значения.",
+                validator=loader.validators.Float(minimum=0.0, maximum=10.0)
             ),
             loader.ConfigValue(
                 "bot_ids",
@@ -515,6 +524,8 @@ Mafia Combat Premium <code>1634167847</code>""",
     @loader.command(ru_doc="Включить автовход в игру и автолинчевание")
     async def ajgon(self, message: Message):
         """Включить автовход в игру и автолинчевание"""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"]) # NEW
         self.set("enabled", True) # Используем self.set()
         self.config["enabled"] = True # Явно обновляем in-memory config
         await utils.answer(message, self.strings("enabled"))
@@ -522,6 +533,8 @@ Mafia Combat Premium <code>1634167847</code>""",
     @loader.command(ru_doc="Выключить автовход в игру и автолинчевание")
     async def ajgoff(self, message: Message):
         """Выключить автовход в игру и автолинчевание"""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"]) # NEW
         self.set("enabled", False) # Используем self.set()
         self.config["enabled"] = False # Явно обновляем in-memory config
         self.set("role_tracking_enabled", False) # Используем self.set()
@@ -539,6 +552,8 @@ Mafia Combat Premium <code>1634167847</code>""",
     @loader.command(ru_doc="Показать список найденных отслеживаемых ролей")
     async def ajgshowtrackedroles(self, message: Message):
         """Показать список найденных отслеживаемых ролей"""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"]) # NEW
         active_roles_display = []
         inactive_roles_display = []
 
@@ -569,6 +584,8 @@ Mafia Combat Premium <code>1634167847</code>""",
         """Переключить активную конфигурацию ключевых слов для кнопок.
         Пример: .ajgset 1
         Используйте без аргументов, чтобы увидеть текущую активную конфигурацию и доступные ID."""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"]) # NEW
         
         config_id = utils.get_args_raw(message) # Ручной парсинг аргумента
 
@@ -609,6 +626,8 @@ Mafia Combat Premium <code>1634167847</code>""",
     @loader.command(ru_doc="Добавить ID чата в список разрешенных чатов (allowed_chats).")
     async def pinchat(self, message: Message):
         """Добавить ID чата в список разрешенных чатов."""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"]) # NEW
         args = utils.get_args_raw(message)
         
         if not args:
@@ -641,6 +660,8 @@ Mafia Combat Premium <code>1634167847</code>""",
     @loader.command(ru_doc="Удалить ID чата из списка разрешенных чатов (allowed_chats).")
     async def unpinchat(self, message: Message):
         """Удалить ID чата из списка разрешенных чатов."""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"]) # NEW
         args = utils.get_args_raw(message)
         
         if not args:
@@ -674,6 +695,8 @@ Mafia Combat Premium <code>1634167847</code>""",
     @loader.command(ru_doc="Показать статус автовхода и автолинчевания")
     async def ajgstatus(self, message: Message):
         """Показать статус автовхода и автолинчевания"""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"]) # NEW
         status = "🟢 Включен" if self.config["enabled"] else "🔴 Выключен"
         
         delays = self.config["delays"]
@@ -681,6 +704,8 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         lynch_delays = self.config["lynch_delay"]
         lynch_delay_display = f"[{', '.join(map(str, lynch_delays))}]" if len(lynch_delays) > 1 else str(lynch_delays[0])
+
+        command_delay_display = str(self.config["command_delay"]) # NEW
 
         bot_ids_display = ", ".join(map(str, self.config["bot_ids"])) if self.config["bot_ids"] else "Не указаны (любой бот)"
 
@@ -738,6 +763,7 @@ Mafia Combat Premium <code>1634167847</code>""",
             status, 
             delay_display, 
             lynch_delay_display,
+            command_delay_display, # NEW
             bot_ids_display, 
             allowed_chats_display, 
             pin_unpin_allowed_user_ids_display,
@@ -772,11 +798,15 @@ Mafia Combat Premium <code>1634167847</code>""",
     @loader.command(ru_doc="Показать справку")
     async def ajghelp(self, message: Message):
         """Показать справку"""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"]) # NEW
         await utils.answer(message, self.strings("help_text"))
 
     @loader.command(ru_doc="Проверить последнее сообщение с набором")
     async def ajgtest(self, message: Message):
         """Проверить последнее сообщение с набором в текущем чате"""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"]) # NEW
         current_chat_id = message.chat_id
         configured_bot_ids = self.config["bot_ids"]
 
@@ -991,11 +1021,15 @@ Mafia Combat Premium <code>1634167847</code>""",
     @loader.command(ru_doc="Показать список ID ботов для мафии")
     async def ajgid(self, message: Message):
         """Показать список ID ботов для мафии"""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"]) # NEW
         await utils.answer(message, self.strings("ajgid_bots_list"))
 
     @loader.command(ru_doc="Показать информацию о регистрации на турниры")
     async def ajgtournaments(self, message: Message):
         """Показать информацию о регистрации на турниры"""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"]) # NEW
         await utils.answer(message, self.strings("ajgtournaments_text"))
 
     @loader.watcher(incoming=True, outgoing=False)
@@ -1382,4 +1416,4 @@ Mafia Combat Premium <code>1634167847</code>""",
                     logger.warning(f"⚠️ AutoJoinGame: Кнопка присоединения не найдена под сообщением {message.id} после задержки.")
             
         except Exception as e:
-            logger.exception(f"❌ AutoJoinGame: Критическая ошибка в watcher для сообщения {getattr(message, 'id', 'N/A')} в чате {getattr(message, 'chat_id', 'N/A')}: {e}")
+            logger.exception(f"❌ AutoJoinGame: Критическая ошибка в watcher для сообщения {getattr(message, 'id', 'N/A')} в чате {getattr(message, 'chat_id', 'N/A')}: {e}"
