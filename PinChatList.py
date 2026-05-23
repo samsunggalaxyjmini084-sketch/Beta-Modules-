@@ -1,8 +1,8 @@
 # meta developer: @hdjsfzbxm
 # meta name: PinChat 
-# meta version: 1.0.4 # Версия обновлена для добавления настраиваемой задержки
+# meta version: 1.0.5 # Версия обновлена: убрано сообщение о задержке
 import logging
-import asyncio # Импортируем asyncio для задержки
+import asyncio 
 from telethon.tl.types import Message
 from telethon.errors import RPCError
 from telethon import functions
@@ -13,11 +13,11 @@ logger = logging.getLogger(__name__)
 
 @loader.tds
 class PinChatMod(loader.Module): 
-    """Модуль для закрепления (пиннинга) чатов в вашем списке чатов по их ID. Поддерживает настраиваемую задержку перед выполнением действия.""" # Описание модуля обновлено
+    """Модуль для закрепления (пиннинга) чатов в вашем списке чатов по их ID. Поддерживает настраиваемую задержку перед выполнением действия.""" 
 
     strings = {
         "name": "PinChat", 
-        "_cls_doc": "Модуль для закрепления (пиннинга) чатов в вашем списке чатов по их ID. Поддерживает настраиваемую задержку перед выполнением действия.", # Описание модуля обновлено
+        "_cls_doc": "Модуль для закрепления (пиннинга) чатов в вашем списке чатов по их ID. Поддерживает настраиваемую задержку перед выполнением действия.", 
         "no_args": "⚠️ Укажите ID чата для закрепления. Пример: <code>.pinchat -1001234567890</code>", 
         "invalid_chat_id": "❌ Неверный ID чата. Укажите числовой ID.",
         "chat_not_found": "❌ Чат с ID <code>{chat_id}</code> не найден или недоступен.",
@@ -28,7 +28,7 @@ class PinChatMod(loader.Module):
         "unpin_success": "✅ Чат <code>{chat_id}</code> успешно откреплен из вашего списка чатов.",
         "unpin_not_pinned": "ℹ️ Чат <code>{chat_id}</code> не закреплен в вашем списке чатов.",
         "unpin_fail": "❌ Не удалось открепить чат <code>{chat_id}</code>: {error}",
-        "delay_message": "⏳ Ожидание {delay} секунд перед попыткой {action_text} чата <code>{chat_id}</code>..." # Добавлена строка для сообщения о задержке
+        # "delay_message": "⏳ Ожидание {delay} секунд перед попыткой {action_text} чата <code>{chat_id}</code>..." # Эта строка удалена/закомментирована
     }
 
     def __init__(self):
@@ -63,14 +63,11 @@ class PinChatMod(loader.Module):
         # --- Применение задержки ---
         delay = self.config["action_delay"]
         if delay > 0:
-            await utils.answer(message, self.strings("delay_message").format(
-                delay=delay,
-                action_text=action_text_verb,
-                chat_id=target_chat_id
-            ))
+            logger.debug(f"PinChat: Ожидание {delay} секунд перед попыткой {action_text_verb} чата {target_chat_id}...")
             await asyncio.sleep(delay)
         # --- Конец применения задержки ---
 
+        # Это сообщение останется, так как оно информирует о начале попытки после задержки
         await utils.answer(message, f"⏳ Пытаюсь {action_text_verb} чат <code>{target_chat_id}</code> в вашем списке чатов...")
 
         try:
