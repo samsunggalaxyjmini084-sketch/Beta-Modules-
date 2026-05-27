@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.4.13 # Версия обновлена для оптимизации системы отслеживания ролей
+# meta version: 2.4.12 # Версия обновлена для объединения команд pin/unpin
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 0100000101010100010011110100100101001110001000000100011101000001
 # 0100110101000101001000000100110101000100010101010100110001000111
@@ -14,7 +14,7 @@ from telethon.errors import RPCError
 from telethon import events, functions 
 import re
 from collections import defaultdict
-from typing import Optional, List, Tuple 
+from typing import Optional 
 from .. import loader, utils
 
 logger = logging.getLogger(__name__)
@@ -22,11 +22,11 @@ logger = logging.getLogger(__name__)
 
 @loader.tds
 class AutoJoinGameMod(loader.Module):
-    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Добавлены объединенные команды для управления закреплением/откреплением чатов и списком разрешенных чатов для модуля. Оптимизирована система отслеживания ролей для повышения стабильности и скорости.""" # Updated _cls_doc
+    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Добавлены объединенные команды для управления закреплением/откреплением чатов и списком разрешенных чатов для модуля."""
 
     strings = {
         "name": "AutoJoinGame",
-        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Добавлены объединенные команды для управления закреплением/откреплением чатов и списком разрешенных чатов для модуля. Оптимизирована система отслеживания ролей для повышения стабильности и скорости.", # Updated _cls_doc
+        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Добавлены объединенные команды для управления закреплением/откреплением чатов и списком разрешенных чатов для модуля.",
         "enabled": "✅ Автовход в игру и автолинчевание включены.",
         "disabled": "❌ Автовход в игру и автолинчевание выключены.",
         "status": "<emoji document_id=5875291072225087249>📊</emoji> Статус автовхода и автолинчевания:\n"
@@ -103,8 +103,37 @@ class AutoJoinGameMod(loader.Module):
 <b>Объединенные команды:</b> <code>.pinchat &lt;chat_id&gt;</code> и <code>.unpinchat &lt;chat_id&gt;</code> теперь управляют как закреплением/откреплением чатов в вашем списке диалогов, так и списком разрешенных чатов модуля.
 <b>Дополнительные команды:</b> <code>.ajgpinchat &lt;chat_id&gt;</code> и <code>.ajgunpinchat &lt;chat_id&gt;</code> позволяют управлять ТОЛЬКО списком разрешенных чатов (<code>allowed_chats</code>) для модуля без изменения закрепления в Telegram. Эти команды, как и объединенные команды, могут быть ограничены для использования определенными пользователями через настройку <code>pin_unpin_allowed_user_ids</code>.
 <b>Новая функция:</b> Настройка <code>command_delay</code> позволяет установить задержку перед выполнением всех команд модуля.
-<b>Оптимизация отслеживания ролей:</b> Система отслеживания ролей теперь работает более быстро и стабильно, а также добавляет роли сразу после объявления.
-""", # Updated help_text
+
+<emoji document_id=5843843420468024653>⭐️</emoji> Настройки:
+В конфиге модуля можно изменить задержку(и) перед нажатием. Если указано несколько значений, будет выбрано случайное.
+Можно указать список ID ботов, от которых ожидать сообщение о наборе.
+<b>Обновление:</b> Теперь параметр <code>bot_ids</code> включает в себя все боты, от которых ожидаются триггеры, включая ботов для голосования за игроков. Если список пуст, модуль будет работать со всеми ботами.
+Можно указать список ID чатов, в которых модуль будет активен. Если список пуст, модуль будет работать во всех чатах.
+<b>Новая настройка:</b> <code>command_delay</code> - Задержка в секундах перед выполнением команды. Если 0, задержки нет. Поддерживает дробные значения. По умолчанию: <code>0.0</code>.
+<b>Настройка:</b> <code>pin_unpin_allowed_user_ids</code> - Список ID пользователей, которым разрешено использовать команды, связанные с изменением <code>allowed_chats</code> и закреплением/откреплением диалогов. Если список пуст, эти команды могут использовать все пользователи. По умолчанию: <code>[]</code>.
+<b>Настройка:</b> <code>button_keyword_configs_string</code> - строка с конфигурациями ключевых слов кнопок. Формат: <code>"Ключевое слово 1 (ID_конфига), Ключевое слово 2 (Другой_ID)"</code>. Например: <code>"присоединиться (1), играть (1), 🙋 (2), 🎮 (2)"</code>. Ключевые слова регистронезависимы. <b>Скобки с ID не учитываются при поиске кнопок.</b>
+<b>Новая настройка:</b> <code>active_button_config_id</code> - ID активной конфигурации ключевых слов из <code>button_keyword_configs_string</code>. Например: <code>"1"</code> или <code>"default"</code>.
+<b>Обновление: Если кнопка содержит URL вида <code>t.me/bot_username?start=param</code>, модуль автоматически отправит команду <code>/start &lt;param&gt;</code> соответствующему боту. Этот режим теперь активен для любого совпадения по <code>button_keywords</code> с Deep-Link URL.</b>
+<b>Настройка:</b> <code>lynch_target_marker</code> - строка-маркер, которая, если присутствует в сообщении-триггере для голосования, заставит модуль нажать кнопку '👎'. Если отсутствует или маркер не указан (пустая строка), нажимается '👍'. По умолчанию: "" (пусто).
+<b>Настройка:</b> <code>game_join_trigger_phrases</code> - список фраз, которые модуль будет искать в сообщениях для активации автовхода в игру. По умолчанию: <code>[\"Ведётся набор в игру\", \"Регистрация началась!\"]</code>.
+<b>Настройка:</b> <code>lynch_trigger_phrases</code> - список фраз, которые модуль будет искать в сообщениях для активации автолинчевания. По умолчанию: <code>[\"Вы точно хотите линчевать\"]</code>.
+<b>Настройка:</b> <code>lynch_hang_trigger_phrases</code> - список фраз, которые модуль будет искать в сообщениях для активации автоповешения. По умолчанию: <code>[\"Вы точно хотите повесить\"]</code>.
+<b>Настройка:</b> <code>player_to_lynch_user_id</code> - ID пользователя, чье сообщение будет использоваться как ник игрока для линчевания. Если <code>0</code>, то функция отключена.
+<b>Обновление:</b> <code>lynch_voting_bot_id</code> был объединен с <code>bot_ids</code>. Боты, отправляющие сообщения для голосования за конкретного игрока, теперь должны быть включены в список <code>bot_ids</code>.
+<b>Настройка:</b> <code>lynch_player_voting_trigger_phrases</code> - список фраз, которые модуль будет искать в сообщениях от *любого бота из списка* <code>bot_ids</code> для активации голосования за конкретного игрока. По умолчанию: <code>[\"Пришло время искать виноватых!\", \"Кого ты хочешь повесить?\", \"Пришло время определить и наказать виновных\", \"Пришло время искать виноватых! Кого ты хочешь линчевать?\"]</code>.
+<b>Настройка:</b> <code>role_forward_chat_id</code> - ID чата, куда будет пересылаться полученная роль в мафии. Если <code>0</code>, функция отключена.
+<b>Настройка:</b> <code>role_trigger_phrases</code> - список фраз, которые модуль будет искать в сообщениях от бота в ЛС для определения роли. По умолчанию: <code>[\"Ваша роль:\", \"Ты - \", \"Твоя роль:\", \"Ты стал(а) \"]</code>.
+<b>Настройка:</b> <code>role_tracking_enabled</code> - Включено ли отслеживание ролей. По умолчанию: <code>False</code>.
+<b>Настройка:</b> <code>role_tracking_duration</code> - Длительность отслеживания ролей в секундах. По умолчанию: <code>300</code> (5 минут).
+<b>Улучшенная настройка:</b> <code>tracked_roles_to_monitor</code> - Список фраз, указывающих на роли, которые нужно отслеживать. Модуль будет искать эти фразы в объявлениях ролей пользователей. Если роль должна быть "неактивной" (т.е. отображаться в отдельном списке), добавьте к ней суффикса <code>(н)</code>, например: <code>[\"мирный житель\", \"мафия (н)\", \"комиссар\"]</code>.
+<b>Настройка:</b> <code>role_announcement_phrases</code> - Список фраз, которые пользователи могут использовать для объявления своей роли. По умолчанию: <code>[\"Моя роль:\", \"Я - \", \"Моя роль\", \"Я \", \"роль:\", \"моя роль\"]</code>.
+<b>Новая настройка:</b> <code>send_tracked_roles_chat_id</code> - ID чата, куда будет отправлен список отслеживаемых ролей после активации. Если <code>0</code>, функция отключена.
+<b>Новая настройка:</b> <code>send_tracked_roles_delay</code> - Задержка в секундах, через которую будет отправлен список отслеживаемых ролей после активации отслеживания.
+<b>Новая настройка:</b> <code>auto_track_roles_trigger_phrases</code> - Список фраз, которые модуль будет искать в сообщениях для автоматического включения отслеживания ролей. По умолчанию: <code>[]</code>.
+<b>Новая настройка:</b> <code>auto_track_roles_bot_ids</code> - Список ID ботов, от которых ожидается сообщение с фразами для автоматического включения отслеживания ролей. Если список пуст, сообщения будут отслеживаться от любого бота. По умолчанию: <code>[]</code>.
+<b>Новая настройка:</b> <code>auto_disable_track_roles_trigger_phrases</code> - Список фраз, которые модуль будет искать в сообщениях для автоматического выключения отслеживания ролей. По умолчанию: <code>[]</code>.
+<b>Новая настройка:</b> <code>auto_disable_track_roles_bot_ids</code> - Список ID ботов, от которых ожидается сообщение с фразами для автоматического выключения отслеживания ролей. Если список пуст, сообщения будут отслеживаться от любого бота. По умолчанию: <code>[]</code>.
+""",
         "ajgid_bots_list": """<emoji document_id=5771887475421090729>👤</emoji> Список ID ботов для мафии:
 
 🤵🏻 True Mafia <code>468253535</code>
@@ -382,9 +411,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         self._player_nickname_to_lynch = None 
         self._role_tracking_active = False
         self._role_tracking_start_time = None
-        self._tracked_roles_list = [] # Stores (sender_id, nickname, role_text, is_active) for display
-        self._tracked_roles_lookup_set: set[Tuple[int, str]] = set() # Stores (sender_id, role_text) for quick duplicate checks
-        self._compiled_tracked_role_patterns: List[Tuple[re.Pattern, str, bool]] = [] # (compiled_regex, clean_role_text, is_active)
+        self._tracked_roles_list = []
         self._self_id = None 
         self._processed_messages = set() 
         self._processed_messages_cleanup_task = None 
@@ -401,7 +428,6 @@ Mafia Combat Premium <code>1634167847</code>""",
         
         # Инициализация при запуске, важно, чтобы всегда были актуальные keywords
         self._update_button_keywords_from_config()
-        self._update_tracked_roles_patterns() # NEW: Initialize/update role patterns
 
     async def _cleanup_processed_messages_loop(self):
         """Периодически очищает набор обработанных ID сообщений."""
@@ -426,34 +452,6 @@ Mafia Combat Premium <code>1634167847</code>""",
                 await self._send_tracked_roles_task
             except asyncio.CancelledError:
                 logger.debug("AutoJoinGame: Задача отправки списка отслеживаемых ролей отменена при выгрузке.")
-        
-        self._tracked_roles_lookup_set.clear() # NEW: Clear lookup set on unload
-        self._compiled_tracked_role_patterns.clear() # NEW: Clear compiled patterns on unload
-
-    def _update_tracked_roles_patterns(self):
-        """Compiles regex patterns for tracked roles from config for faster lookup."""
-        self._compiled_tracked_role_patterns = []
-        for tracked_role_phrase_raw in self.config["tracked_roles_to_monitor"]:
-            role_to_match_lower = tracked_role_phrase_raw.lower()
-            current_is_active = True
-
-            if role_to_match_lower.endswith("(н)"):
-                current_is_active = False
-                role_to_match_lower = role_to_match_lower[:-3].strip()
-            
-            parts = role_to_match_lower.split()
-            # Use \s+ to match one or more whitespace characters, consistent with original implicit behavior
-            escaped_parts = [re.escape(p) for p in parts]
-            internal_pattern = r"\b" + r"\s+".join(escaped_parts) + r"\b" 
-            
-            try:
-                # Compile once, case-insensitive for robustness
-                compiled_pattern = re.compile(internal_pattern, re.IGNORECASE) 
-                self._compiled_tracked_role_patterns.append((compiled_pattern, role_to_match_lower, current_is_active))
-            except re.error as e:
-                logger.error(f"AutoJoinGame: Ошибка компиляции регулярного выражения для роли '{tracked_role_phrase_raw}': {e}")
-        
-        logger.debug(f"AutoJoinGame: Обновлены шаблоны отслеживаемых ролей. Всего {len(self._compiled_tracked_role_patterns)} шаблонов.")
 
     def _parse_button_keywords_string(self, config_string: str) -> dict[str, list[str]]:
         """Парсит строку конфигурации ключевых слов кнопок в словарь."""
@@ -788,7 +786,6 @@ Mafia Combat Premium <code>1634167847</code>""",
         self._role_tracking_active = False 
         self._role_tracking_start_time = None
         self._tracked_roles_list = []
-        self._tracked_roles_lookup_set.clear() # Clear lookup set
         self._processed_messages.clear() 
         if self._send_tracked_roles_task:
             self._send_tracked_roles_task.cancel()
@@ -1259,8 +1256,6 @@ Mafia Combat Premium <code>1634167847</code>""",
                     self._role_tracking_active = True
                     self._role_tracking_start_time = datetime.now()
                     self._tracked_roles_list = []
-                    self._tracked_roles_lookup_set.clear() # NEW: Clear lookup set on auto-activate
-                    self._update_tracked_roles_patterns() # NEW: Ensure patterns are up-to-date
 
                     send_chat_id = self.config["send_tracked_roles_chat_id"]
                     send_delay = self.config["send_tracked_roles_delay"]
@@ -1300,7 +1295,6 @@ Mafia Combat Premium <code>1634167847</code>""",
                     self._role_tracking_active = False
                     self._role_tracking_start_time = None
                     self._tracked_roles_list = []
-                    self._tracked_roles_lookup_set.clear() # NEW: Clear lookup set on auto-disable
                     if self._send_tracked_roles_task:
                         self._send_tracked_roles_task.cancel()
                         self._send_tracked_roles_task = None
@@ -1317,8 +1311,6 @@ Mafia Combat Premium <code>1634167847</code>""",
                     self.config["role_tracking_enabled"] = False 
                     self._role_tracking_active = False
                     self._role_tracking_start_time = None
-                    self._tracked_roles_list = []
-                    self._tracked_roles_lookup_set.clear() # NEW: Clear lookup set on expiration
                     if self._send_tracked_roles_task:
                         self._send_tracked_roles_task.cancel()
                         self._send_tracked_roles_task = None
@@ -1331,19 +1323,28 @@ Mafia Combat Premium <code>1634167847</code>""",
                         found_tracked_role_clean = None
                         is_role_active = True
 
-                        # Iterate through pre-compiled patterns for faster role matching
-                        for compiled_pattern, clean_role_text, active_status in self._compiled_tracked_role_patterns:
-                            if compiled_pattern.search(msg_text_lower): # Use compiled pattern for search
-                                found_tracked_role_clean = clean_role_text
-                                is_role_active = active_status
-                                break # Found a matching role, no need to check other patterns
+                        for tracked_role_phrase_raw in self.config["tracked_roles_to_monitor"]:
+                            role_to_match_lower = tracked_role_phrase_raw.lower()
+                            current_is_active = True
+
+                            if role_to_match_lower.endswith("(н)"):
+                                current_is_active = False
+                                role_to_match_lower = role_to_match_lower[:-3].strip()
+                            
+                            parts = role_to_match_lower.split()
+                            escaped_parts = [re.escape(p) for p in parts]
+                            internal_pattern = r"\s+".join(escaped_parts)
+                            pattern = r"\b" + internal_pattern + r"\b"
+
+                            if re.search(pattern, msg_text_lower):
+                                found_tracked_role_clean = role_to_match_lower
+                                is_role_active = current_is_active
+                                break
                         
                         if found_tracked_role_clean:
                             nickname = self._get_user_nickname(sender)
-                            # Optimized duplicate check using set
-                            if (sender_id, found_tracked_role_clean) not in self._tracked_roles_lookup_set: 
+                            if not any(entry[0] == sender_id and entry[2] == found_tracked_role_clean for entry in self._tracked_roles_list): 
                                 self._tracked_roles_list.append((sender_id, nickname, found_tracked_role_clean, is_role_active)) 
-                                self._tracked_roles_lookup_set.add((sender_id, found_tracked_role_clean)) # Add to lookup set
                                 status_text = "Активная" if is_role_active else "Неактивная"
                                 logger.info(self.strings("role_tracked_success_with_status").format(nickname=nickname, role=found_tracked_role_clean, status=status_text))
             
@@ -1368,7 +1369,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                     any(phrase.lower() in msg_text_lower for phrase in role_trigger_phrases)):
                 try:
                     await self._client.forward_messages(
-                        entity=role_forward_chat_id, # Fixed typo here from role_forward_chat_chat_id
+                        entity=role_forward_chat_id,
                         messages=message,
                         from_peer=message.chat_id
                     )
