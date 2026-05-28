@@ -220,4 +220,4 @@ class AutoPolesListMod(loader.Module):
             await self._client.send_message(target, res)
             await utils.answer(message, f"✅ Отправлено в {target}")
         else:
-            await utils.answer(message, res)l
+            await utils.answer(message, res)
