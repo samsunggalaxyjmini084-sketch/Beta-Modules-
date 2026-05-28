@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: AutoJoinGame
-# meta version: 2.4.21 # Версия обновлена, подтверждая возможность отрицательного chat_id для send_tracked_roles_chat_id.
+# meta version: 2.4.22 # Версия обновлена, подтверждая унификацию параметров чатов для отслеживания/вывода ролей.
 # 01000001010101000100111101001010010011100010000001000111010000010100110101000101
 # 0100000101010100010011110100100101001110001000000100011101000001
 # 010011010100011001001110001000000100110101000100010101010100110001000111
@@ -22,11 +22,11 @@ logger = logging.getLogger(__name__)
 
 @loader.tds
 class AutoJoinGameMod(loader.Module):
-    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Добавлены объединенные команды для управления закреплением/откреплением чатов и списком разрешенных чатов для модуля. Оптимизирована система отслеживания ролей для повышения стабильности и скорости. Добавлена возможность отправки списка отслеживаемых ролей в заранее указанный чат (положительное или отрицательное ID) по команде, а также возможность указать конкретный чат для отслеживания ролей, где модуль будет слушать объявления ролей вне зависимости от чата активации. Добавлена возможность указать отдельный чат для срабатывания триггеров автоматического включения/выключения отслеживания ролей. Боты для триггеров автоотслеживания теперь определяются общим параметром `bot_ids`.""" # Updated _cls_doc
+    """Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Добавлены объединенные команды для управления закреплением/откреплением чатов и списком разрешенных чатов для модуля. Оптимизирована система отслеживания ролей для повышения стабильности и скорости. Добавлена возможность указать единый чат (положительное или отрицательное ID) для отслеживания объявлений ролей и отправки списков найденных ролей. Добавлена возможность указать отдельный чат для срабатывания триггеров автоматического включения/выключения отслеживания ролей. Боты для триггеров автоотслеживания теперь определяются общим параметром `bot_ids`.""" # Updated _cls_doc
 
     strings = {
         "name": "AutoJoinGame",
-        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Добавлены объединенные команды для управления закреплением/откреплением чатов и списком разрешенных чатов для модуля. Оптимизирована система отслеживания ролей для повышения стабильности и скорости. Добавлена возможность отправки списка отслеживаемых ролей в заранее указанный чат (положительное или отрицательное ID) по команде, а также возможность указать конкретный чат для отслеживания ролей, где модуль будет слушать объявления ролей вне зависимости от чата активации. Добавлена возможность указать отдельный чат для срабатывания триггеров автоматического включения/выключения отслеживания ролей. Боты для триггеров автоотслеживания теперь определяются общим параметром `bot_ids`.", # Updated _cls_doc
+        "_cls_doc": "Модуль для автоматического нажатия кнопки при наборе в игру в ботах мафии, а также подтверждения линчевания и повешения, и голосования за конкретного игрока. Дополнительно: пересылка роли в мафии в указанный чат, отслеживание определенных ролей (с разделением на активные/неактивные) и автоматическая отправка списка отслеживаемых ролей в чат после активации. Поддерживает автоматическую активацию и деактивацию отслеживания ролей по ключевым словам. Добавлены объединенные команды для управления закреплением/откреплением чатов и списком разрешенных чатов для модуля. Оптимизирована система отслеживания ролей для повышения стабильности и скорости. Добавлена возможность указать единый чат (положительное или отрицательное ID) для отслеживания объявлений ролей и отправки списков найденных ролей. Добавлена возможность указать отдельный чат для срабатывания триггеров автоматического включения/выключения отслеживания ролей. Боты для триггеров автоотслеживания теперь определяются общим параметром `bot_ids`.", # Updated _cls_doc
         "enabled": "✅ Автовход в игру и автолинчевание включены.",
         "disabled": "❌ Автовход в игру и автолинчевание выключены.",
         "status": "<emoji document_id=5875291072225087249>📊</emoji> Статус автовхода и автолинчевания:\n"
@@ -58,13 +58,11 @@ class AutoJoinGameMod(loader.Module):
                   "Фразы-триггеры объявления роли: {}\n"
                   "Отслеживаемых ролей найдено: {}\n"
                   "Время до окончания отслеживания: {}\n"
-                  "Чат для отправки списка отслеживаемых ролей: {}\n"
+                  "Чат для отслеживания/вывода ролей: {}\n" # NEW Consolidated parameter display
                   "Задержка отправки списка отслеживаемых ролей (секунды): {}\n"
                   "Автоматическое включение отслеживания ролей (фразы): {}\n"
                   "Автоматическое выключение отслеживания ролей (фразы): {}\n"
-                  "Чат для вывода списка отслеживаемых ролей по команде: {}\n"
-                  "Чат для отслеживания ролей: {}\n"
-                  "Чат для триггеров автоотслеживания ролей: {}",
+                  "Чат для триггеров автоотслеживания ролей: {}", # auto_role_tracking_trigger_chat_id remains separate
         "error": "❌ Ошибка при нажатии кнопки: {}",
         "no_button": "⚠️ Кнопка не найдена под сообщением",
         "help_text": """<emoji document_id=5931415565955503486>🤖</emoji> AutoJoinGame - Помощь
@@ -77,7 +75,7 @@ class AutoJoinGameMod(loader.Module):
 <code>.ajgtest</code> - Проверить последнее сообщение с набором в текущем чате
 <code>.ajgid</code> - Показать список ID ботов для мафии
 <code>.ajgtournaments</code> - Показать информацию о регистрации на турниры
-<code>.ajgshowtrackedroles</code> - Показать список найденных отслеживаемых ролей. Если настроен <code>tracked_roles_display_chat_id</code>, список будет отправлен туда.
+<code>.ajgshowtrackedroles</code> - Показать список найденных отслеживаемых ролей. Если настроен <code>role_tracking_output_chat_id</code>, список будет отправлен туда, иначе - в текущий чат.
 <code>.ajgset &lt;ID_конфига&gt;</code> - Переключить активную конфигурацию ключевых слов для кнопок. Если <code>&lt;ID_конфига&gt;</code> не указан, покажет текущую активную конфигурацию и доступные ID.
 <code>.pinchat &lt;chat_id&gt;</code> - Закрепить чат в вашем списке диалогов И добавить его в разрешенные чаты модуля.
 <code>.unpinchat &lt;chat_id&gt;</code> - Открепить чат из вашего списка диалогов И удалить его из разрешенных чатов модуля.
@@ -96,7 +94,7 @@ class AutoJoinGameMod(loader.Module):
 <b>Новая функция:</b> Модуль может автоматически пересылать сообщения с вашей ролью в мафии в указанный чат. Это работает, когда бот отправляет вам роль в приватном чате, и сообщение содержит одну из настроенных фраз-триггеров.
 <b>Улучшенная функция:</b> Модуль может отслеживать сообщения пользователей, объявляющих свою роль, и сохранять их ники и <b>конкретную объявленную роль</b> в список, если эта роль соответствует одной из настроенных фраз.
 Отслеживание включается/выключается автоматически по настроенным фразам-триггерам от ботов, а его длительность настраивается в конфиге.
-<b>Новая функция:</b> Модуль может автоматически отправлять список отслеживаемых ролей в указанный чат (положительное или отрицательное ID) через заданное время после активации отслеживания ролей.
+<b>Новая функция:</b> Настройка <code>role_tracking_output_chat_id</code> позволяет указать ID чата (положительное или отрицательное), в котором модуль будет отслеживать объявления ролей пользователей <b>И</b> куда будет отправлен список отслеживаемых ролей (автоматически после активации или по команде <code>.ajgshowtrackedroles</code>). Если <code>0</code>, отслеживание будет происходить во всех разрешенных чатах (<code>allowed_chats</code>), а списки будут отправляться в чат активации (для автоматической отправки) или в текущий чат (для команды).
 <b>Новая функция:</b> Модуль может автоматически включать отслеживание ролей при получении сообщения, содержащего определенные фразы, от ботов, указанных в <code>bot_ids</code> (или от любого бота, если список <code>bot_ids</code> пуст).
 <b>Новая функция:</b> Модуль может автоматически <b>выключать</b> отслеживание ролей при получении сообщения, содержащего определенные фразы, от ботов, указанных в <code>bot_ids</code> (или от любого бота, если список <code>bot_ids</code> пуст).
 <b>Улучшение:</b> Теперь модуль более точно определяет роли, включая составные фразы, и позволяет помечать роли как 'неактивные' с помощью суффикса <code>(н)</code> для раздельного отображения.
@@ -105,8 +103,6 @@ class AutoJoinGameMod(loader.Module):
 <b>Дополнительные команды:</b> <code>.ajgpinchat &lt;chat_id&gt;</code> и <code>.ajgunpinchat &lt;chat_id&gt;</code> позволяют управлять ТОЛЬКО списком разрешенных чатов (<code>allowed_chats</code>) для модуля без изменения закрепления в Telegram. Эти команды, как и объединенные команды, могут быть ограничены для использования определенными пользователями через настройку <code>pin_unpin_allowed_user_ids</code>.
 <b>Новая функция:</b> Настройка <code>command_delay</code> позволяет установить задержку перед выполнением всех команд модуля.
 <b>Оптимизация отслеживания ролей:</b> Система отслеживания ролей теперь работает более быстро и стабильно, а также добавляет роли сразу после объявления.
-<b>Новая функция:</b> Настройка <code>tracked_roles_display_chat_id</code> позволяет указать ID чата, куда будет отправлен список отслеживаемых ролей по команде <code>.ajgshowtrackedroles</code>, независимо от того, в каком чате была вызвана команда.
-<b>Новая функция:</b> Настройка <code>role_tracking_monitor_chat_id</code> позволяет указать ID чата (положительное или отрицательное), в котором модуль будет отслеживать объявления ролей пользователей. Если `0`, отслеживание будет происходить во всех разрешенных чатах. **Это позволяет активировать отслеживание в одном чате, а собирать роли в другом, при этом сбор ролей будет происходить только в указанном чате.**
 <b>Новая функция:</b> Настройка <code>auto_role_tracking_trigger_chat_id</code> позволяет указать ID чата (положительное или отрицательное), в котором модуль будет слушать триггеры для автоматического включения/выключения отслеживания ролей. Если `0`, триггеры будут отслеживаться во всех разрешенных чатах.
 """, # Updated help_text
         "ajgid_bots_list": """<emoji document_id=5771887475421090729>👤</emoji> Список ID ботов для мафии:
@@ -174,7 +170,7 @@ Mafia Combat Premium <code>1634167847</code>""",
         "no_time_remaining": "N/A",
         "tracked_roles_send_success": "🎉 AutoJoinGame: Список отслеживаемых ролей успешно отправлен в чат <code>{chat_id}</code>.",
         "tracked_roles_send_error": "❌ AutoJoinGame: Ошибка при отправке списка отслеживаемых ролей в чат <code>{chat_id}</code>: {error}",
-        "send_tracked_roles_chat_id_display": "Отключено (0)",
+        # OLD: "send_tracked_roles_chat_id_display": "Отключено (0)",
         "send_tracked_roles_delay_display": "Отключено (0)",
         "auto_track_roles_trigger_phrases_display": "(пусто)",
         "auto_role_tracking_activated": "<emoji document_id=5776375003280838798>✅</emoji> Автоматическое отслеживание ролей включено на {duration} секунд.",
@@ -213,14 +209,12 @@ Mafia Combat Premium <code>1634167847</code>""",
         "command_result_template": "Результаты для чата <code>{chat_id}</code>:\n• {dialog_action_result}\n• {module_action_result}",
         "ajg_only_action_start_msg": "⏳ Пытаюсь {action_text_verb} чат <code>{chat_id}</code> в списке разрешенных чатов модуля...",
 
-        # UPDATED: Strings for tracked_roles_display_chat_id
-        "tracked_roles_display_chat_id_display": "Отключено (0)",
+        # NEW consolidated strings for role_tracking_output_chat_id
+        "role_tracking_output_chat_id_display_default": "По умолчанию (отслеживание в разрешенных чатах, отправка в чат активации/команды) (0)", # NEW
+        "role_tracking_output_chat_id_display_specific": "ID чата: {}", # NEW
 
-        # UPDATED: Strings for role_tracking_monitor_chat_id
-        "role_tracking_monitor_chat_id_display": "Во всех разрешенных чатах (0)",
-
-        # NEW: Strings for auto_role_tracking_trigger_chat_id
-        "auto_role_tracking_trigger_chat_id_display": "Во всех разрешенных чатах (0)",
+        "auto_role_tracking_trigger_chat_id_display_default": "Во всех разрешенных чатах (0)", # auto_role_tracking_trigger_chat_id remains separate
+        "any_users": "Любые пользователи", # For pin_unpin_allowed_user_ids display fix
     }
 
     def __init__(self):
@@ -259,7 +253,7 @@ Mafia Combat Premium <code>1634167847</code>""",
             loader.ConfigValue(
                 "allowed_chats",
                 [],
-                lambda: "Список ID чатов, в которых модуль будет активен. Если список пуст, модуль будет работать во всех чатах.",
+                lambda: "Список ID чатов, в которых модуль будет активен (для автовхода, линчевания, пересылки ролей). Если список пуст, модуль будет работать во всех чатах.", # Updated description
                 validator=loader.validators.Series(loader.validators.Integer())
             ),
             loader.ConfigValue(
@@ -316,7 +310,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                 lambda: "Список фраз, которые модуль будет искать в сообщениях от ботов (из bot_ids) для активации голосования за конкретного игрока.",
                 validator=loader.validators.Series(loader.validators.String())
             ),
-            loader.ConfigValue( # UPDATED CONFIG VALUE
+            loader.ConfigValue(
                 "role_forward_chat_id",
                 0,
                 lambda: "ID чата, куда будет пересылаться полученная роль в мафии. Если 0, функция отключена.",
@@ -352,10 +346,10 @@ Mafia Combat Premium <code>1634167847</code>""",
                 lambda: "Список фраз, которые пользователи могут использовать для объявления своей роли.",
                 validator=loader.validators.Series(loader.validators.String())
             ),
-            loader.ConfigValue( # UPDATED CONFIG VALUE
-                "send_tracked_roles_chat_id",
-                0,
-                lambda: "ID чата (положительное или отрицательное), куда будет отправлен список отслеживаемых ролей после активации. Если 0, функция отключена.", # UPDATED DESCRIPTION
+            loader.ConfigValue( # NEW CONSOLIDATED CONFIG VALUE
+                "role_tracking_output_chat_id",
+                0, # Default to 0 (monitor in any allowed chat, send to activating/command chat)
+                lambda: "ID чата (положительное или отрицательное), в котором модуль будет отслеживать объявления ролей пользователей И куда будет отправлен список отслеживаемых ролей (автоматически после активации или по команде .ajgshowtrackedroles). Если 0, отслеживание будет происходить во всех разрешенных чатах ('allowed_chats'), а списки будут отправляться в чат активации (для автоматической отправки) или в текущий чат (для команды).", # Updated consolidated description
                 validator=loader.validators.Integer() # Allows negative chat IDs
             ),
             loader.ConfigValue(
@@ -376,18 +370,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                 lambda: "Список фраз, которые модуль будет искать в сообщениях для автоматического выключения отслеживания ролей (от ботов из 'bot_ids').",
                 validator=loader.validators.Series(loader.validators.String())
             ),
-            loader.ConfigValue(
-                "tracked_roles_display_chat_id",
-                0,
-                lambda: "ID чата, куда будет отправляться список найденных отслеживаемых ролей по команде .ajgshowtrackedroles. Если 0, список будет отправлен в текущий чат.",
-                validator=loader.validators.Integer(minimum=0)
-            ),
-            loader.ConfigValue(
-                "role_tracking_monitor_chat_id",
-                0, # Default to 0 (monitor in any allowed chat)
-                lambda: "ID чата, в котором модуль будет отслеживать объявления ролей пользователей. Если 0, отслеживание будет происходить во всех разрешенных чатах.",
-                validator=loader.validators.Integer() # Allows negative chat IDs
-            ),
+            # REMOVED: tracked_roles_display_chat_id is now part of role_tracking_output_chat_id
             loader.ConfigValue(
                 "auto_role_tracking_trigger_chat_id",
                 0, # Default to 0 (triggers work in any allowed chat)
@@ -814,7 +797,7 @@ Mafia Combat Premium <code>1634167847</code>""",
 
     @loader.command(ru_doc="Показать список найденных отслеживаемых ролей")
     async def ajgshowtrackedroles(self, message: Message):
-        """Показать список найденных отслеживаемых ролей. Если настроен tracked_roles_display_chat_id, список будет отправлен туда."""
+        """Показать список найденных отслеживаемых ролей. Если настроен role_tracking_output_chat_id, список будет отправлен туда, иначе - в текущий чат.""" # Updated docstring
         if self.config["command_delay"] > 0:
             await asyncio.sleep(self.config["command_delay"])
         active_roles_display = []
@@ -840,18 +823,20 @@ Mafia Combat Premium <code>1634167847</code>""",
             inactive_roles_section=inactive_section
         )
 
-        display_chat_id = self.config["tracked_roles_display_chat_id"]
-        if display_chat_id != 0:
+        # Determine target chat for display based on new consolidated parameter
+        output_chat_id = self.config["role_tracking_output_chat_id"]
+        if output_chat_id != 0:
+            target_chat_for_display = output_chat_id
             try:
-                await self._client.send_message(display_chat_id, message_text)
-                await utils.answer(message, self.strings("tracked_roles_sent_to_configured_chat").format(chat_id=display_chat_id))
+                await self._client.send_message(target_chat_for_display, message_text)
+                await utils.answer(message, self.strings("tracked_roles_sent_to_configured_chat").format(chat_id=target_chat_for_display))
             except Exception as e:
-                logger.error(f"AutoJoinGame: Ошибка при отправке списка отслеживаемых ролей в настроенный чат {display_chat_id}: {e}")
-                await utils.answer(message, self.strings("tracked_roles_send_error_to_configured_chat").format(chat_id=display_chat_id, error=e))
+                logger.error(f"AutoJoinGame: Ошибка при отправке списка отслеживаемых ролей в настроенный чат {target_chat_for_display}: {e}")
+                await utils.answer(message, self.strings("tracked_roles_send_error_to_configured_chat").format(chat_id=target_chat_for_display, error=e))
                 await utils.answer(message, self.strings("tracked_roles_sent_to_current_chat_fallback"))
                 await utils.answer(message, message_text) # Fallback to current chat
         else:
-            await utils.answer(message, message_text)
+            await utils.answer(message, message_text) # Send to current chat as default
 
 
     @loader.command(ru_doc="Переключить активную конфигурацию ключевых слов для кнопок. Если ID_конфига не указан, покажет текущую активную конфигурацию и доступные ID.")
@@ -918,7 +903,8 @@ Mafia Combat Premium <code>1634167847</code>""",
         allowed_chats = self.config["allowed_chats"]
         allowed_chats_display = ", ".join(map(str, allowed_chats)) if allowed_chats else "Все чаты"
 
-        pin_unpin_allowed_user_ids_display = ", ".join(map(str, self.config["pin_unpin_allowed_user_ids"])) if self.config["pin_unpin_allowed_user_ids"] else self.strings("pin_unpin_allowed_user_ids_display")
+        # Corrected pin_unpin_allowed_user_ids display
+        pin_unpin_allowed_user_ids_display = ", ".join(map(str, self.config["pin_unpin_allowed_user_ids"])) if self.config["pin_unpin_allowed_user_ids"] else self.strings("any_users")
 
         button_keyword_configs_string_display = self.config["button_keyword_configs_string"] if self.config["button_keyword_configs_string"] else "(пусто)"
         active_button_config_id_display = self.config["active_button_config_id"] if self.config["active_button_config_id"] else "(не задан)"
@@ -956,17 +942,19 @@ Mafia Combat Premium <code>1634167847</code>""",
             else:
                 time_remaining_display = "Истекло"
 
-        send_tracked_roles_chat_id_display = str(self.config["send_tracked_roles_chat_id"]) if self.config["send_tracked_roles_chat_id"] != 0 else self.strings("send_tracked_roles_chat_id_display") # UPDATED
+        # NEW: Consolidated role_tracking_output_chat_id display
+        role_tracking_output_chat_id_config = self.config["role_tracking_output_chat_id"]
+        if role_tracking_output_chat_id_config != 0:
+            role_tracking_output_chat_id_formatted = self.strings("role_tracking_output_chat_id_display_specific").format(role_tracking_output_chat_id_config)
+        else:
+            role_tracking_output_chat_id_formatted = self.strings("role_tracking_output_chat_id_display_default")
+        
         send_tracked_roles_delay_display = str(self.config["send_tracked_roles_delay"]) if self.config["send_tracked_roles_delay"] > 0 else self.strings("send_tracked_roles_delay_display")
 
         auto_track_roles_trigger_phrases_display = ", ".join(self.config["auto_track_roles_trigger_phrases"]) if self.config["auto_track_roles_trigger_phrases"] else self.strings("auto_track_roles_trigger_phrases_display")
         auto_disable_track_roles_trigger_phrases_display = ", ".join(self.config["auto_disable_track_roles_trigger_phrases"]) if self.config["auto_disable_track_roles_trigger_phrases"] else self.strings("auto_disable_track_roles_trigger_phrases_display")
 
-        tracked_roles_display_chat_id_formatted = str(self.config["tracked_roles_display_chat_id"]) if self.config["tracked_roles_display_chat_id"] else self.strings("tracked_roles_display_chat_id_display")
-
-        role_tracking_monitor_chat_id_formatted = str(self.config["role_tracking_monitor_chat_id"]) if self.config["role_tracking_monitor_chat_id"] != 0 else self.strings("role_tracking_monitor_chat_id_display")
-
-        auto_role_tracking_trigger_chat_id_formatted = str(self.config["auto_role_tracking_trigger_chat_id"]) if self.config["auto_role_tracking_trigger_chat_id"] != 0 else self.strings("auto_role_tracking_trigger_chat_id_display")
+        auto_role_tracking_trigger_chat_id_formatted = str(self.config["auto_role_tracking_trigger_chat_id"]) if self.config["auto_role_tracking_trigger_chat_id"] != 0 else self.strings("auto_role_tracking_trigger_chat_id_display_default")
 
 
         await utils.answer(message, self.strings("status").format(
@@ -997,13 +985,11 @@ Mafia Combat Premium <code>1634167847</code>""",
             role_announcement_phrases_display,
             tracked_roles_count,
             time_remaining_display,
-            send_tracked_roles_chat_id_display, # UPDATED
+            role_tracking_output_chat_id_formatted, # NEW consolidated
             send_tracked_roles_delay_display,
             auto_track_roles_trigger_phrases_display,
             auto_disable_track_roles_trigger_phrases_display,
-            tracked_roles_display_chat_id_formatted,
-            role_tracking_monitor_chat_id_formatted,
-            auto_role_tracking_trigger_chat_id_formatted,
+            auto_role_tracking_trigger_chat_id_formatted, # Remains separate
         ))
 
     @loader.command(ru_doc="Показать справку")
@@ -1269,18 +1255,16 @@ Mafia Combat Premium <code>1634167847</code>""",
                 return
 
             # --- Общая логика фильтрации чатов для всех функций модуля ---
-            allowed_chats = self.config["allowed_chats"]
-            monitor_chat_id = self.config["role_tracking_monitor_chat_id"]
-            auto_track_trigger_chat_id = self.config["auto_role_tracking_trigger_chat_id"]
+            allowed_chats_config = self.config["allowed_chats"]
+            role_output_chat_config = self.config["role_tracking_output_chat_id"]
+            auto_track_trigger_chat_config = self.config["auto_role_tracking_trigger_chat_id"]
 
-            is_message_from_allowed_chat = not allowed_chats or message.chat_id in allowed_chats
-            is_message_from_role_monitor_chat = monitor_chat_id != 0 and message.chat_id == monitor_chat_id
-            is_message_from_auto_track_trigger_chat = auto_track_trigger_chat_id != 0 and message.chat_id == auto_track_trigger_chat_id
+            is_message_from_allowed_chat = not allowed_chats_config or message.chat_id in allowed_chats_config
+            is_message_from_role_output_specific = role_output_chat_config != 0 and message.chat_id == role_output_chat_config
+            is_message_from_auto_track_trigger_specific = auto_track_trigger_chat_config != 0 and message.chat_id == auto_track_trigger_chat_config
 
-            # Сообщение проходит, если оно из общего списка разрешенных чатов
-            # ИЛИ из чата мониторинга ролей
-            # ИЛИ из чата триггеров автоотслеживания ролей
-            if not (is_message_from_allowed_chat or is_message_from_role_monitor_chat or is_message_from_auto_track_trigger_chat):
+            # Сообщение проходит, если оно релевантно для какой-либо функции модуля
+            if not (is_message_from_allowed_chat or is_message_from_role_output_specific or is_message_from_auto_track_trigger_specific):
                 logger.debug(f"AutoJoinGame: Чат {message.chat_id} не соответствует никаким условиям активности модуля. Пропускаю сообщение {message.id}.")
                 return
 
@@ -1289,12 +1273,13 @@ Mafia Combat Premium <code>1634167847</code>""",
 
             # --- Автоматическое включение отслеживания ролей ---
             auto_track_phrases = self.config["auto_track_roles_trigger_phrases"]
-            trigger_chat_id_for_auto_track = self.config["auto_role_tracking_trigger_chat_id"]
+            # auto_role_tracking_trigger_chat_id (specific chat or fallback to allowed_chats)
+            
+            # Condition for auto-track/disable triggers
+            is_trigger_chat_active = (auto_track_trigger_chat_config == 0 and is_message_from_allowed_chat) or \
+                                     (auto_track_trigger_chat_config != 0 and message.chat_id == auto_track_trigger_chat_config)
 
-            # Автоматическое включение может произойти из любого разрешенного чата (если trigger_chat_id_for_auto_track == 0)
-            # или из конкретного чата, если он установлен.
-            if (auto_track_phrases and not self.config["role_tracking_enabled"] and
-                (trigger_chat_id_for_auto_track == 0 or message.chat_id == trigger_chat_id_for_auto_track)):
+            if (auto_track_phrases and not self.config["role_tracking_enabled"] and is_trigger_chat_active):
                 is_auto_track_trigger_bot = (
                     getattr(sender, 'bot', False) and
                     (not self.config["bot_ids"] or sender_id in self.config["bot_ids"])
@@ -1310,20 +1295,24 @@ Mafia Combat Premium <code>1634167847</code>""",
                     self._tracked_roles_lookup_set.clear()
                     self._update_tracked_roles_patterns()
 
-                    send_chat_id = self.config["send_tracked_roles_chat_id"]
+                    # Determine target chat for auto-send
+                    send_to_chat = self.config["role_tracking_output_chat_id"]
+                    if send_to_chat == 0:
+                        send_to_chat = message.chat_id # Use activating chat if no specific output chat configured
+                    
                     send_delay = self.config["send_tracked_roles_delay"]
 
-                    if send_chat_id != 0 and send_delay > 0:
+                    if send_to_chat != 0 and send_delay > 0:
                         if self._send_tracked_roles_task:
                             self._send_tracked_roles_task.cancel()
                             self._send_tracked_roles_task = None
                         self._send_tracked_roles_task = asyncio.create_task(
-                            self._send_tracked_roles_list_scheduled(send_delay, send_chat_id)
+                            self._send_tracked_roles_list_scheduled(send_delay, send_to_chat)
                         )
                         logger.info(self.strings("auto_role_tracking_activated_with_send").format(
                             duration=self.config["role_tracking_duration"],
                             delay=send_delay,
-                            chat_id=send_chat_id
+                            chat_id=send_to_chat
                         ))
                     else:
                         logger.info(self.strings("auto_role_tracking_activated").format(
@@ -1333,12 +1322,11 @@ Mafia Combat Premium <code>1634167847</code>""",
 
             # --- Автоматическое выключение отслеживания ролей ---
             auto_disable_phrases = self.config["auto_disable_track_roles_trigger_phrases"]
-            trigger_chat_id_for_auto_track = self.config["auto_role_tracking_trigger_chat_id"]
-
-            # Автоматическое выключение может произойти из любого разрешенного чата (если trigger_chat_id_for_auto_track == 0)
-            # или из конкретного чата, если он установлен.
-            if (auto_disable_phrases and self.config["role_tracking_enabled"] and
-                (trigger_chat_id_for_auto_track == 0 or message.chat_id == trigger_chat_id_for_auto_track)):
+            # auto_role_tracking_trigger_chat_id (specific chat or fallback to allowed_chats)
+            
+            # Condition for auto-track/disable triggers
+            # is_trigger_chat_active already determined above
+            if (auto_disable_phrases and self.config["role_tracking_enabled"] and is_trigger_chat_active):
                 is_auto_disable_trigger_bot = (
                     getattr(sender, 'bot', False) and
                     (not self.config["bot_ids"] or sender_id in self.config["bot_ids"])
@@ -1360,7 +1348,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                     await self._client.send_message(message.chat_id, self.strings("auto_role_tracking_deactivated"))
                     return
 
-            # --- Логика отслеживания ролей ---
+            # --- Логика отслеживания ролей (мониторинг) ---
             if self.config["role_tracking_enabled"] and self._role_tracking_active:
                 # Проверка на истечение времени
                 if self._role_tracking_start_time and (datetime.now() - self._role_tracking_start_time).total_seconds() > self.config["role_tracking_duration"]:
@@ -1375,14 +1363,14 @@ Mafia Combat Premium <code>1634167847</code>""",
                         self._send_tracked_roles_task.cancel()
                         self._send_tracked_roles_task = None
                 else:
-                    # Проверка на чат мониторинга ролей
-                    # Если monitor_chat_id == 0, отслеживание происходит во всех чатах, прошедших общую фильтрацию.
-                    # Если monitor_chat_id != 0, то сообщение должно быть из этого конкретного чата.
-                    monitor_chat_id_config = self.config["role_tracking_monitor_chat_id"]
-                    if monitor_chat_id_config != 0 and message.chat_id != monitor_chat_id_config:
-                        logger.debug(f"AutoJoinGame: Отслеживание ролей активно, но сообщение {message.id} не из настроенного чата для мониторинга ({monitor_chat_id_config}). Пропускаю.")
-                        # Если не совпадает, то дальнейшая логика отслеживания ролей для этого сообщения не выполняется.
-                    else:
+                    # Determine if monitoring should be active in this specific chat
+                    is_monitoring_active_in_this_chat = False
+                    if role_output_chat_config == 0: # Monitor in allowed_chats
+                        is_monitoring_active_in_this_chat = is_message_from_allowed_chat # Use the pre-computed flag
+                    else: # Monitor only in the specific output_chat_id
+                        is_monitoring_active_in_this_chat = message.chat_id == role_output_chat_config
+
+                    if is_monitoring_active_in_this_chat:
                         role_announcement_phrases_lower = [p.lower() for p in self.config["role_announcement_phrases"]]
 
                         # Быстрая проверка на наличие фразы-объявления
@@ -1423,10 +1411,12 @@ Mafia Combat Premium <code>1634167847</code>""",
             role_forward_chat_id = self.config["role_forward_chat_id"]
             role_trigger_phrases = self.config["role_trigger_phrases"]
 
+            # Only forward if message is from an allowed chat (or all chats if allowed_chats is empty)
             if (role_forward_chat_id != 0 and
                     message.is_private and
                     getattr(sender, 'bot', False) and
-                    any(phrase.lower() in msg_text_lower for phrase in role_trigger_phrases)):
+                    any(phrase.lower() in msg_text_lower for phrase in role_trigger_phrases) and
+                    is_message_from_allowed_chat): # Added check for allowed_chats
                 try:
                     await self._client.forward_messages(
                         entity=role_forward_chat_id,
@@ -1436,6 +1426,11 @@ Mafia Combat Premium <code>1634167847</code>""",
                     logger.info(self.strings("role_forward_success").format(chat_id=role_forward_chat_id))
                 except Exception as e:
                     logger.error(self.strings("role_forward_error").format(chat_id=role_forward_chat_id, error=e))
+                return
+
+            # Continue only if message is from an allowed chat for general bot functions
+            if not is_message_from_allowed_chat:
+                logger.debug(f"AutoJoinGame: Сообщение {message.id} из чата {message.chat_id} не соответствует 'allowed_chats' для общих функций бота. Пропускаю.")
                 return
 
             is_general_game_bot = getattr(sender, 'bot', False) and (
