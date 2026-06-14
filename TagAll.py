@@ -1,4 +1,4 @@
-# meta developer: @yourhandle
+meta developer: @yourhandle
 # meta name: TagAll
 # meta version: 2.5.2
 
@@ -208,9 +208,9 @@ class TagAllMod(loader.Module):
         if target_chat_id in self._tagall_events and self._tagall_events[target_chat_id].state:
             return # Уже запущен
 
-        # Удаляем исходное сообщение, если это исходящая команда или триггер
-        if message.out:
-            with contextlib.suppress(Exception): await message.delete()
+        # Удаляем исходное сообщение, если это исходящая команда или триггер - УДАЛЕНО
+        # if message.out:
+        #     with contextlib.suppress(Exception): await message.delete()
 
         event = StopEvent(target_chat_id)
         self._tagall_events[target_chat_id] = event
@@ -223,8 +223,9 @@ class TagAllMod(loader.Module):
         event = self._tagall_events.get(target_chat_id)
         if event and event.state:
             event.stop()
-            if message.out: # Удаляем исходящее сообщение-триггер/команду
-                with contextlib.suppress(Exception): await message.delete()
+            # Удаляем исходящее сообщение-триггер/команду - УДАЛЕНО
+            # if message.out: 
+            #     with contextlib.suppress(Exception): await message.delete()
         else:
             await utils.answer(message, self.strings("tagall_not_running").format(chat_id=target_chat_id))
 
@@ -259,8 +260,8 @@ class TagAllMod(loader.Module):
             await utils.answer(message, self.strings("autotagall_enabled"))
         else:
             await utils.answer(message, self.strings("autotagall_disabled"))
-        if message.out:
-            with contextlib.suppress(Exception): await message.delete()
+        # if message.out: # УДАЛЕНО
+        #     with contextlib.suppress(Exception): await message.delete()
 
 
     def _get_random_timeout(self, event: StopEvent) -> float:
