@@ -357,9 +357,8 @@ class TagAllMod(loader.Module):
         self._client = client
         self._db = db
         # Initial parsing of configurations
+        # NOTE: Config changes made after this will not automatically re-parse until module reload.
         self._parse_configs()
-        # Add a listener for config changes
-        self.config.add_watched(self._parse_configs)
 
         # Убедитесь, что обработчик событий добавлен только один раз
         if not self._message_watcher_handler:
@@ -431,10 +430,6 @@ class TagAllMod(loader.Module):
         logger.debug("TagAll configurations parsed and cached.")
 
     async def on_unload(self):
-        # Remove the config update listener
-        if self.config:
-            self.config.remove_watched(self._parse_configs)
-
         # Удаляем обработчик событий, чтобы он не вызывался после выгрузки
         if self._client and self._message_watcher_handler:
             self._client.remove_event_handler(self._message_watcher_handler)
