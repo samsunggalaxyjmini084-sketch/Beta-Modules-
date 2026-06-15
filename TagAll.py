@@ -76,6 +76,7 @@ class TagAllMod(loader.Module):
         "cmd_not_allowed_multiple": "🚫 <b>Эта команда не может быть использована в текущем чате. Укажите индекс чата или используйте в одном из разрешенных чатов:</b> {allowed_chats}.",
         # New trigger strings
         "_cfg_doc_trigger_system_enabled": "Включить или выключить систему триггеров.",
+        "_cfg_doc_trigger_send_notifications": "Отправлять ли уведомления о запуске/остановке TagAll по триггеру.",
         "_cfg_doc_trigger_start_message": (
             "Сообщение-триггер для запуска TagAll. Если пусто, триггер не активен."
         ),
@@ -136,6 +137,7 @@ class TagAllMod(loader.Module):
         "cmd_not_allowed_multiple": "🚫 <b>Dieser Befehl darf im aktuellen Chat nicht verwendet werden. Geben Sie einen Chat-Index an oder verwenden Sie ihn in einem der erlaubten Chats:</b> {allowed_chats}.",
         # New trigger strings
         "_cfg_doc_trigger_system_enabled": "Triggersystem aktivieren oder deaktivieren.",
+        "_cfg_doc_trigger_send_notifications": "Benachrichtigungen über den Start/Stopp von TagAll per Trigger senden.",
         "_cfg_doc_trigger_start_message": "Auslösernachricht zum Starten von TagAll. Leer lassen, um den Auslöser zu deaktivieren.",
         "_cfg_doc_trigger_stop_message": "Auslösernachricht zum Stoppen von TagAll. Leer lassen, um den Auslöser zu deaktivieren.",
         "_cfg_doc_trigger_chat_id": "Chat-ID, in der Auslöser funktionieren. Auf 0 setzen, damit Auslöser in jedem Chat funktionieren.",
@@ -180,6 +182,7 @@ class TagAllMod(loader.Module):
         "cmd_not_allowed_multiple": "🚫 <b>Bu komut mevcut sohbette kullanılamaz. Bir sohbet dizini belirtin veya izin verilen sohbetlerden birinde kullanın:</b> {allowed_chats}.",
         # New trigger strings
         "_cfg_doc_trigger_system_enabled": "Tetikleyici sistemini etkinleştir veya devre dışı bırak.",
+        "_cfg_doc_trigger_send_notifications": "TagAll'un tetikleyici ile başlatılması/durdurulması hakkında bildirim gönderilsin mi?",
         "_cfg_doc_trigger_start_message": "TagAll'u başlatmak için tetikleyici mesajı. Boş bırakılırsa tetikleyici etkin değildir.",
         "_cfg_doc_trigger_stop_message": "TagAll'u durdurmak için tetikleyici mesajı. Boş bırakılırsa tetikleyici etkin değildir.",
         "_cfg_doc_trigger_chat_id": "Tetikleyicilerin çalışacağı sohbet kimliği. Herhangi bir sohbette çalışması için 0 olarak ayarlayın.",
@@ -226,6 +229,7 @@ class TagAllMod(loader.Module):
         "cmd_not_allowed_multiple": "🚫 <b>Ushbu buyruq joriy chatda ishlatilmaydi. Chat indeksini ko'rsating yoki ruxsat berilgan chatlardan birida foydalaning:</b> {allowed_chats}.",
         # New trigger strings
         "_cfg_doc_trigger_system_enabled": "Trigger tizimini yoqish yoki o'chirish.",
+        "_cfg_doc_trigger_send_notifications": "Trigger orqali TagAll ishga tushirilishi/to'xtatilishi haqida bildirishnomalar yuborilsinmi.",
         "_cfg_doc_trigger_start_message": "TagAll'ni ishga tushirish uchun trigger xabari. Bo'sh qoldirilsa, trigger faol emas.",
         "_cfg_doc_trigger_stop_message": "TagAll'ni to'xtatish uchun trigger xabari. Bo'sh qoldirilsa, trigger faol emas.",
         "_cfg_doc_trigger_chat_id": "Triggerlar ishlaydigan chat ID. Triggerlar istalgan chatda ishlashi uchun 0 ga o'rnating.",
@@ -305,6 +309,12 @@ class TagAllMod(loader.Module):
                 validator=loader.validators.Boolean(),
             ),
             loader.ConfigValue(
+                "trigger_send_notifications", # New config value
+                True, # Default to True to preserve existing behavior
+                lambda: self.strings("_cfg_doc_trigger_send_notifications"),
+                validator=loader.validators.Boolean(),
+            ),
+            loader.ConfigValue(
                 "trigger_start_message",
                 "",
                 lambda: self.strings("_cfg_doc_trigger_start_message"),
@@ -336,7 +346,7 @@ class TagAllMod(loader.Module):
             ),
         )
         self._tagall_events: dict[int, StopEvent] = {}
-        self._message_watcher_handler = None # Re-introduce this
+        self._message_watcher_handler = None
 
     async def client_ready(self, client, db):
         self._client = client
@@ -701,6 +711,7 @@ class TagAllMod(loader.Module):
         trigger_chat = self.config["trigger_chat_id"]
         trigger_user = self.config["trigger_user_id"]
         delete_trigger_message = self.config["trigger_delete_message"]
+        send_notifications = self.config["trigger_send_notifications"] # Get new config value
 
         # Check chat and user conditions
         if trigger_chat != 0 and chat_id != trigger_chat:
@@ -713,13 +724,15 @@ class TagAllMod(loader.Module):
         # Handle start trigger
         if start_trigger and message_text == start_trigger:
             if chat_id in self._tagall_events and self._tagall_events[chat_id].state:
-                await self._client.send_message(chat_id, self.strings("trigger_tagall_already_running").format(chat_id=chat_id))
+                if send_notifications:
+                    await self._client.send_message(chat_id, self.strings("trigger_tagall_already_running").format(chat_id=chat_id))
             else:
                 event = StopEvent(chat_id)
                 self._tagall_events[chat_id] = event
                 # Run tagall without prefix for trigger, and mark as trigger activation
                 self._client.loop.create_task(self._run_tagall_process(chat_id, "", event, is_trigger=True))
-                await self._client.send_message(chat_id, self.strings("trigger_tagall_started").format(chat_id=chat_id))
+                if send_notifications:
+                    await self._client.send_message(chat_id, self.strings("trigger_tagall_started").format(chat_id=chat_id))
             if delete_trigger_message and message.out: # Delete if it's our own message
                 await message.delete()
             return
@@ -729,9 +742,11 @@ class TagAllMod(loader.Module):
             event = self._tagall_events.get(chat_id)
             if event and event.state:
                 event.stop()
-                await self._client.send_message(chat_id, self.strings("trigger_tagall_stopped").format(chat_id=chat_id))
+                if send_notifications:
+                    await self._client.send_message(chat_id, self.strings("trigger_tagall_stopped").format(chat_id=chat_id))
             else:
-                await self._client.send_message(chat_id, self.strings("trigger_tagall_not_running").format(chat_id=chat_id))
+                if send_notifications:
+                    await self._client.send_message(chat_id, self.strings("trigger_tagall_not_running").format(chat_id=chat_id))
             if delete_trigger_message and message.out: # Delete if it's our own message
                 await message.delete()
             return
