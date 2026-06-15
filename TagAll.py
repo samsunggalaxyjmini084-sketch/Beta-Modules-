@@ -8,10 +8,10 @@ import logging
 import random
 import time
 import re
+import unicodedata  # Импортируем unicodedata
 
 from hikkatl.tl.functions.channels import InviteToChannelRequest
-from hikkatl.tl.types import Message, MessageEntity
-from hikkatl.tl.types.message_entity import MessageEntityType # Импортируем MessageEntityType
+from hikkatl.tl.types import Message
 
 from .. import loader, utils
 
@@ -71,18 +71,6 @@ class TagAllMod(loader.Module):
         "_cmd_autotagall_doc": "Включить/выключить работу триггеров TagAll (установленных в .cfg)",
     }
 
-    # Определяем типы сущностей, которые считаются "форматированием" (не обычный текст)
-    FORMATTING_ENTITY_TYPES = {
-        MessageEntityType.BOLD,
-        MessageEntityType.ITALIC,
-        MessageEntityType.CODE,
-        MessageEntityType.PRE,
-        MessageEntityType.STRIKETHROUGH,
-        MessageEntityType.UNDERLINE,
-        MessageEntityType.SPOILER,
-        # MessageEntityType.BLOCKQUOTE, # Можно добавить, если блок-цитаты тоже считаются
-    }
-
     def __init__(self):
         self.config = loader.ModuleConfig(
             loader.ConfigValue("delete", False, lambda: self.strings("_cfg_doc_delete"), validator=loader.validators.Boolean()),
@@ -111,6 +99,7 @@ class TagAllMod(loader.Module):
             ),
         )
         self._tagall_events: dict[int, StopEvent] = {}
+        self._translation_table = self._build_stylized_char_map() # Таблица для нормализации символов
 
     async def client_ready(self, client, db):
         self._client = client
@@ -121,35 +110,106 @@ class TagAllMod(loader.Module):
             event.stop()
         self._tagall_events.clear()
 
-    def _is_text_formatted(self, message: Message, text_to_check: str) -> bool:
+    def _build_stylized_char_map(self) -> dict:
         """
-        Проверяет, имеет ли указанный 'text_to_check' внутри сообщения какое-либо
-        специальное форматирование (отличный от обычного шрифт).
+        Строит таблицу для преобразования стилизованных Unicode-символов
+        (например, жирные, курсивные из математических блоков)
+        в их базовые строчные аналоги, а также для нормализации пробелов и дефисов.
         """
-        if not message.text or not message.entities:
-            return False
+        translation_table = str.maketrans("", "")
 
-        message_text_lower = message.text.lower()
-        text_to_check_lower = text_to_check.lower()
+        def add_stylized_block(start_stylized_char: str, start_base_char: str, length: int):
+            for i in range(length):
+                stylized_char_code = ord(start_stylized_char) + i
+                base_char_lower = chr(ord(start_base_char) + i).lower()
+                # Только добавляем в таблицу, если это не прямое отображение на себя
+                if chr(stylized_char_code) != base_char_lower:
+                    translation_table[stylized_char_code] = base_char_lower
 
-        # Ищем все вхождения текста триггера (без учета регистра)
-        for match in re.finditer(re.escape(text_to_check_lower), message_text_lower):
-            trigger_start = match.start()
-            trigger_end = match.end()
+        # Математические буквенно-цифровые символы (латиница)
+        # Жирные (Bold)
+        add_stylized_block('𝐀', 'A', 26) # Заглавные
+        add_stylized_block('𝐚', 'a', 26) # Строчные
+        # Курсивные (Italic)
+        add_stylized_block('𝐴', 'A', 26)
+        add_stylized_block('𝑎', 'a', 26)
+        # Жирные курсивные (Bold Italic)
+        add_stylized_block('𝑨', 'A', 26)
+        add_stylized_block('𝒂', 'a', 26)
+        # Моноширинные (Monospace)
+        add_stylized_block('𝙰', 'A', 26)
+        add_stylized_block('𝚊', 'a', 26)
+        
+        # Цифры различных стилей
+        add_stylized_block('𝟎', '0', 10) # Жирные
+        add_stylized_block('𝟘', '0', 10) # С двойным подчеркиванием
+        add_stylized_block('𝟢', '0', 10) # Без засечек
+        add_stylized_block('𝟬', '0', 10) # Жирные без засечек
+        add_stylized_block('𝟶', '0', 10) # Моноширинные
 
-            # Проверяем каждую сущность в сообщении
-            for entity in message.entities:
-                entity_start = entity.offset
-                entity_end = entity.offset + entity.length
+        # Полноширинные ASCII символы (часто используются в азиатских шрифтах)
+        add_stylized_block('Ａ', 'A', 26)
+        add_stylized_block('ａ', 'a', 26)
+        add_stylized_block('０', '0', 10)
+        # Полноширинные знаки препинания и символы
+        for char_code in range(ord('！'), ord('～') + 1):
+            if chr(char_code) != unicodedata.normalize("NFKC", chr(char_code)).lower(): # Только если есть нормализация
+                translation_table[char_code] = unicodedata.normalize("NFKC", chr(char_code)).lower()
 
-                # Проверяем, перекрывается ли сущность с текстом триггера
-                # И является ли тип сущности одним из "форматирующих"
-                if (
-                    entity_end > trigger_start and entity_start < trigger_end
-                    and entity.type in self.FORMATTING_ENTITY_TYPES
-                ):
-                    return True
-        return False
+        # Удаляем невидимые символы (Zero-Width Space и т.д.)
+        translation_table[0x200B] = None # Zero Width Space
+        translation_table[0x200C] = None # Zero Width Non-Joiner
+        translation_table[0x200D] = None # Zero Width Joiner
+
+        # Нормализуем различные типы дефисов к стандартному
+        translation_table[0x2010] = '-' # Hyphen
+        translation_table[0x2011] = '-' # Non-breaking hyphen
+        translation_table[0x2012] = '-' # Figure dash
+        translation_table[0x2013] = '-' # En dash
+        translation_table[0x2014] = '-' # Em dash
+        translation_table[0x2015] = '-' # Horizontal bar
+
+        # Нормализуем различные пробелы к стандартному
+        translation_table[0x00A0] = ' ' # NO-BREAK SPACE
+        translation_table[0x2000] = ' ' # EN QUAD
+        translation_table[0x2001] = ' ' # EM QUAD
+        translation_table[0x2002] = ' ' # EN SPACE
+        translation_table[0x2003] = ' ' # EM SPACE
+        translation_table[0x2004] = ' ' # THREE-PER-EM SPACE
+        translation_table[0x2005] = ' ' # FOUR-PER-EM SPACE
+        translation_table[0x2006] = ' ' # SIX-PER-EM SPACE
+        translation_table[0x2007] = ' ' # FIGURE SPACE
+        translation_table[0x2008] = ' ' # PUNCTUATION SPACE
+        translation_table[0x2009] = ' ' # THIN SPACE
+        translation_table[0x200A] = ' ' # HAIR SPACE
+        translation_table[0x202F] = ' ' # NARROW NO-BREAK SPACE
+        translation_table[0x205F] = ' ' # MEDIUM MATHEMATICAL SPACE
+        translation_table[0x3000] = ' ' # IDEOGRAPHIC SPACE
+
+        return translation_table
+
+    def _normalize_text_for_trigger(self, text: str) -> str:
+        """
+        Нормализует текст для сравнения с триггерами.
+        Преобразует стилизованные Unicode-символы в их стандартные строчные эквиваленты,
+        удаляет нулевой ширины символы и нормализует различные пробелы/дефисы.
+        """
+        if not isinstance(text, str):
+            return ""
+
+        # Сначала применяем NFKC нормализацию для общей совместимости (например, лигатуры, полноширинные)
+        normalized_text = unicodedata.normalize("NFKC", text)
+
+        # Применяем предварительно построенную таблицу преобразований
+        processed_text = normalized_text.translate(self._translation_table)
+
+        # Переводим весь текст в нижний регистр
+        processed_text = processed_text.lower()
+        
+        # Заменяем несколько пробелов на один и удаляем пробелы в начале/конце
+        processed_text = re.sub(r'\s+', ' ', processed_text).strip()
+
+        return processed_text
 
     @loader.watcher()
     async def watcher(self, message: Message):
@@ -167,27 +227,26 @@ class TagAllMod(loader.Module):
             # Если allowed_trigger_user_ids настроен и отправитель не в списке, игнорируем триггер
             return
 
-        # Разбираем множественные стоп-триггеры
-        # Здесь не переводим в lower(), так как _is_text_formatted делает это самостоятельно
+        # Нормализуем текст сообщения для сравнения с триггерами
+        message_text_normalized = self._normalize_text_for_trigger(message.text)
+        
+        # Разбираем и нормализуем множественные стоп-триггеры из конфига
         stop_triggers_raw = self.config["stop_trigger"]
-        stop_triggers = [t.strip() for t in stop_triggers_raw.split(',') if t.strip()]
+        stop_triggers = [self._normalize_text_for_trigger(t) for t in stop_triggers_raw.split(',') if t.strip()]
 
-        # Разбираем множественные старт-триггеры
-        # Здесь не переводим в lower(), так как _is_text_formatted делает это самостоятельно
+        # Разбираем и нормализуем множественные старт-триггеры из конфига
         start_triggers_raw = self.config["start_trigger"]
-        start_triggers = [t.strip() for t in start_triggers_raw.split(',') if t.strip()]
+        start_triggers = [self._normalize_text_for_trigger(t) for t in start_triggers_raw.split(',') if t.strip()]
 
         # Сначала проверяем стоп-триггер
         for trigger in stop_triggers:
-            # Активируем только если триггер найден и имеет форматирование
-            if trigger and self._is_text_formatted(message, trigger):
+            if trigger and trigger in message_text_normalized:
                 await self._stop_logic(message, "")
                 return
 
         # Затем старт-триггер
         for trigger in start_triggers:
-            # Активируем только если триггер найден и имеет форматирование
-            if trigger and self._is_text_formatted(message, trigger):
+            if trigger and trigger in message_text_normalized:
                 # Если триггер для запуска найден, весь остальной текст игнорируется.
                 # Поэтому prefix устанавливается в пустую строку.
                 prefix = "" 
