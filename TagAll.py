@@ -1,4 +1,4 @@
-__version__ = (2, 0, 1) # Incrementing version for the update
+__version__ = (2, 0, 2) # Incrementing version for the fix
 
 # ©️ Dan Gazizullin, 2021-2023
 # This file is a part of Hikka Userbot
@@ -205,7 +205,7 @@ class TagAllMod(loader.Module):
                 "target_chat_id",
                 None,
                 lambda: self.strings("_cfg_doc_target_chat_id"),
-                validator=loader.validators.Integer(allow_none=True),
+                validator=loader.validators.Integer(), # Изменено: убран allow_none=True
             ),
         )
 
