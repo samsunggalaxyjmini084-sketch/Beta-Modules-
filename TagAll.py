@@ -35,8 +35,8 @@ class StopEvent:
 
 
 # Новый класс валидатора для параметра timeout
-# ИСПРАВЛЕНО: Изменено с loader.validators.Base на loader.ConfigValue.BaseValidator
-class TimeoutValidator(loader.ConfigValue.BaseValidator):
+# ИСПРАВЛЕНО: Изменено с loader.ConfigValue.BaseValidator на loader.BaseValidator
+class TimeoutValidator(loader.BaseValidator):
     """
     Валидатор и парсер для значения конфигурации 'timeout'.
     Преобразует строку в более эффективное внутреннее представление (float, list, tuple).
