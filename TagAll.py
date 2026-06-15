@@ -6,9 +6,9 @@ import asyncio
 import contextlib
 import logging
 import random
-import time # Изменен для использования time.monotonic()
+import time
 import re
-import unicodedata
+import unicodedata  # Импортируем unicodedata
 
 from hikkatl.tl.functions.channels import InviteToChannelRequest
 from hikkatl.tl.types import Message
@@ -46,7 +46,7 @@ class TagAllMod(loader.Module):
         "_cfg_doc_timeout": "Время между сообщениями (число, список или диапазон 0.1-1.0)",
         "_cfg_doc_silent": "Не отправлять сообщение с кнопкой отмены",
         "_cfg_doc_cycle_tagging": "Цикличный тег (пока не остановите)",
-        "_cfg_doc_cycle_delay": "Задержка между циклами (сек)",
+        # УДАЛЕНО: "_cfg_doc_cycle_delay": "Задержка между циклами (сек)",
         "_cfg_doc_chunk_size": "Сколько пользователей в одном сообщении",
         "_cfg_doc_duration": "Длительность работы (0 = бесконечно)",
         "_cfg_doc_exclude_user_ids": "ID пользователей-исключений",
@@ -78,7 +78,7 @@ class TagAllMod(loader.Module):
             loader.ConfigValue("timeout", "0.1", lambda: self.strings("_cfg_doc_timeout"), validator=loader.validators.String()),
             loader.ConfigValue("silent", False, lambda: self.strings("_cfg_doc_silent"), validator=loader.validators.Boolean()),
             loader.ConfigValue("cycle_tagging", False, lambda: self.strings("_cfg_doc_cycle_tagging"), validator=loader.validators.Boolean()),
-            loader.ConfigValue("cycle_delay", 0, lambda: self.strings("_cfg_doc_cycle_delay"), validator=loader.validators.Integer(minimum=0)),
+            # УДАЛЕНО: loader.ConfigValue("cycle_delay", 0, lambda: self.strings("_cfg_doc_cycle_delay"), validator=loader.validators.Integer(minimum=0)),
             loader.ConfigValue("chunk_size", 3, lambda: self.strings("_cfg_doc_chunk_size"), validator=loader.validators.Integer(minimum=1)),
             loader.ConfigValue("duration", 0, lambda: self.strings("_cfg_doc_duration"), validator=loader.validators.Integer(minimum=0)),
             loader.ConfigValue("exclude_user_ids", "", lambda: self.strings("_cfg_doc_exclude_user_ids"), validator=loader.validators.String()),
@@ -99,7 +99,7 @@ class TagAllMod(loader.Module):
             ),
         )
         self._tagall_events: dict[int, StopEvent] = {}
-        self._translation_table = self._build_stylized_char_map()
+        self._translation_table = self._build_stylized_char_map() # Таблица для нормализации символов
 
     async def client_ready(self, client, db):
         self._client = client
@@ -312,6 +312,10 @@ class TagAllMod(loader.Module):
         if target_chat_id in self._tagall_events and self._tagall_events[target_chat_id].state:
             return # Уже запущен
 
+        # Удаляем исходное сообщение, если это исходящая команда или триггер - УДАЛЕНО
+        # if message.out:
+        #     with contextlib.suppress(Exception): await message.delete()
+
         event = StopEvent(target_chat_id)
         self._tagall_events[target_chat_id] = event
         self._client.loop.create_task(self._run_tagall_process(target_chat_id, message_prefix, event))
@@ -323,12 +327,18 @@ class TagAllMod(loader.Module):
         event = self._tagall_events.get(target_chat_id)
         if event and event.state:
             event.stop()
+            # Удаляем исходящее сообщение-триггер/команду - УДАЛЕНО
+            # if message.out: 
+            #     with contextlib.suppress(Exception): await message.delete()
         else:
             await utils.answer(message, self.strings("tagall_not_running").format(chat_id=target_chat_id))
 
     @loader.command(
         groups=True,
         ru_doc=lambda self: self.strings("_cmd_tagall_doc"),
+        # de_doc=lambda self: self.strings("_cmd_tagall_doc"), # Добавить, если нужно
+        # tr_doc=lambda self: self.strings("_cmd_tagall_doc"), # Добавить, если нужно
+        # uz_doc=lambda self: self.strings("_cmd_tagall_doc"), # Добавить, если нужно
     )
     async def tagall(self, message: Message):
         """[<номер чата>] [текст] - Отметить всех участников чата. [текст] будет отправлен вместе с тегами. Если текст не указан, будут отправлены только теги."""
@@ -336,6 +346,9 @@ class TagAllMod(loader.Module):
 
     @loader.command(
         ru_doc=lambda self: self.strings("_cmd_stoptagall_doc"),
+        # de_doc=lambda self: self.strings("_cmd_stoptagall_doc"), # Добавить, если нужно
+        # tr_doc=lambda self: self.strings("_cmd_stoptagall_doc"), # Добавить, если нужно
+        # uz_doc=lambda self: self.strings("_cmd_stoptagall_doc"), # Добавить, если нужно
     )
     async def stoptagall(self, message: Message):
         """[<номер чата>] - Остановить запущенный процесс TagAll в <b>указанном или текущем чате</b>."""
@@ -351,6 +364,8 @@ class TagAllMod(loader.Module):
             await utils.answer(message, self.strings("autotagall_enabled"))
         else:
             await utils.answer(message, self.strings("autotagall_disabled"))
+        # if message.out: # УДАЛЕНО
+        #     with contextlib.suppress(Exception): await message.delete()
 
 
     def _get_random_timeout(self, event: StopEvent) -> float:
@@ -445,9 +460,6 @@ class TagAllMod(loader.Module):
         random.shuffle(participants)
 
         start_time = time.time()
-        # Новая переменная для отслеживания монотонного времени начала последней отправки сообщения.
-        # Это позволяет точно рассчитать интервал между *началами* отправки сообщений.
-        last_message_send_start_monotonic = None 
 
         try:
             first_pass = True
@@ -479,26 +491,6 @@ class TagAllMod(loader.Module):
                         event.stop()
                         break
 
-                    # Получаем целевой интервал для текущего сообщения.
-                    # Это значение теперь представляет собой целевое время от *начала* операции отправки предыдущего сообщения
-                    # до *начала* операции отправки текущего сообщения.
-                    target_interval = self._get_random_timeout(event)
-
-                    if last_message_send_start_monotonic is not None:
-                        # Вычисляем, сколько времени прошло с *начала* отправки последнего сообщения.
-                        elapsed_since_last_send_start = time.monotonic() - last_message_send_start_monotonic
-                        
-                        # Определяем, сколько дополнительной задержки требуется, чтобы соблюсти target_interval.
-                        # Если elapsed_since_last_send_start уже больше, чем target_interval
-                        # (например, отправка сообщения заняла больше времени, чем желаемый интервал),
-                        # то actual_sleep_duration будет 0, что означает отсутствие дополнительной задержки.
-                        actual_sleep_duration = max(0.0, target_interval - elapsed_since_last_send_start)
-                        
-                        await asyncio.sleep(actual_sleep_duration)
-
-                    # Записываем монотонное время *непосредственно перед* началом операции отправки текущего сообщения.
-                    current_message_send_start_monotonic = time.monotonic() 
-                    
                     tags = []
                     for user in chunk:
                         if user.username:
@@ -515,6 +507,7 @@ class TagAllMod(loader.Module):
 
                         tags.append(f'<a href="tg://user?id={user.id}">{user_display_name}</a>')
 
+                    # message_prefix уже пустой, если сработал триггер, так что здесь все ок
                     if message_prefix:
                         full_message_text = f"{message_prefix}\n{' '.join(tags)}"
                     else:
@@ -547,13 +540,12 @@ class TagAllMod(loader.Module):
                         if self.config["delete"]:
                             deleted_message_ids_hikkatl.append(m.id)
 
-                    # Обновляем время для следующей итерации.
-                    last_message_send_start_monotonic = current_message_send_start_monotonic 
+                    await asyncio.sleep(self._get_random_timeout(event))
 
                 first_pass = False
-                if self.config["cycle_tagging"] and event.state:
-                    await asyncio.sleep(self.config["cycle_delay"])
-                elif not self.config["cycle_tagging"]:
+                # УДАЛЕНО: if self.config["cycle_tagging"] and event.state:
+                # УДАЛЕНО:     await asyncio.sleep(self.config["cycle_delay"])
+                if not self.config["cycle_tagging"]: # Останавливаем, если циклический режим отключен
                     break
 
         finally:
