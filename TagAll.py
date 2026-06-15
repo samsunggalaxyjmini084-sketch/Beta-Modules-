@@ -395,9 +395,7 @@ class TagAllMod(loader.Module):
             logger.error(f"Не удалось получить сущность чата для ID {chat_id}: {e}")
             await self._client.send_message(chat_id, f"🚫 <b>Не удалось найти чат с ID:</b> <code>{chat_id}</code>")
             event.stop()
-            if chat_id in self._tagall_events:
-                del self._tagall_events[chat_id]
-            return
+            return # Убрано дублирующее удаление события
 
         excluded_user_ids = set()
         exclude_ids_raw = self.config["exclude_user_ids"]
@@ -411,17 +409,17 @@ class TagAllMod(loader.Module):
 
         # Первоначальное получение списка участников
         participants_initial_fetch = []
+        owner_id = self._client.tg_id # ID владельца юзербота
         async for user in self._client.iter_participants(chat_id):
-            if not user.bot and not user.deleted and user.id != self._client.tg_id and user.id not in excluded_user_ids:
+            # Исключаем ботов, удаленные аккаунты, владельца юзербота и пользователей из списка исключений
+            if not user.bot and not user.deleted and user.id != owner_id and user.id not in excluded_user_ids:
                 participants_initial_fetch.append(user)
         
         if not participants_initial_fetch:
             logger.warning(f"В чате {chat_id} не найдено подходящих участников для TagAll, останавливаем.")
             await self._client.send_message(chat_id, self.strings("no_eligible_participants"))
             event.stop()
-            if chat_id in self._tagall_events:
-                del self._tagall_events[chat_id]
-            return
+            return # Убрано дублирующее удаление события
 
         random.shuffle(participants_initial_fetch)
         # Этот список будет использоваться для первого прохода и последующих циклов, если не требуется обновление
@@ -439,9 +437,7 @@ class TagAllMod(loader.Module):
                 logger.error(f"Не удалось получить сущность бота или пригласить бота: {e}")
                 await self._client.send_message(chat_id, self.strings("bot_error"))
                 event.stop()
-                if chat_id in self._tagall_events:
-                    del self._tagall_events[chat_id]
-                return
+                return # Убрано дублирующее удаление события
 
         start_time = time.time()
 
@@ -461,7 +457,7 @@ class TagAllMod(loader.Module):
                     logger.debug(f"Повторный запрос участников для цикла в чате {chat_id}.")
                     current_cycle_participants = []
                     async for user in self._client.iter_participants(chat_id):
-                        if not user.bot and not user.deleted and user.id != self._client.tg_id and user.id not in excluded_user_ids:
+                        if not user.bot and not user.deleted and user.id != owner_id and user.id not in excluded_user_ids:
                             current_cycle_participants.append(user)
                     random.shuffle(current_cycle_participants)
                     
@@ -560,5 +556,6 @@ class TagAllMod(loader.Module):
             if event.state:
                 logger.info(f"Процесс TagAll завершен естественным образом в чате {chat_id}.")
 
+            # Гарантированное удаление события из словаря в конце работы
             if chat_id in self._tagall_events:
                 del self._tagall_events[chat_id]
