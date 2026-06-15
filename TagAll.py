@@ -98,10 +98,10 @@ class TagAllMod(loader.Module):
         "trigger_tagall_stopped": "✅ <b>TagAll остановлен по триггеру в чате {chat_id}.</b>",
         "trigger_tagall_already_running": "ℹ️ <b>TagAll уже запущен в чате {chat_id}, триггер проигнорирован.</b>",
         "trigger_tagall_not_running": "ℹ️ <b>TagAll не запущен в чате {chat_id}, триггер проигнорирован.</b>",
-        "_cmd_autotagall_doc": "[on|off|true|false] - Включить/выключить систему триггеров. Без аргументов - переключить текущее состояние.",
+        "_cmd_autotagall_doc": "[on|off] - Включить/выключить систему триггеров. Без аргументов - переключить текущее состояние. Статус будет отправлен в чат, где была использована команда.",
         "triggers_enabled": "✅ <b>Система триггеров TagAll включена.</b>",
         "triggers_disabled": "❌ <b>Система триггеров TagAll выключена.</b>",
-        "invalid_autotagall_arg": "🚫 <b>Неверный аргумент. Используйте 'on', 'off', 'true', 'false' или оставьте пустым.</b>",
+        "invalid_autotagall_arg_on_off": "🚫 <b>Неверный аргумент. Используйте 'on' или 'off' или оставьте пустым.</b>",
     }
 
     strings_de = {
@@ -147,10 +147,10 @@ class TagAllMod(loader.Module):
         "trigger_tagall_stopped": "✅ <b>TagAll wurde durch einen Auslöser in Chat {chat_id} gestoppt.</b>",
         "trigger_tagall_already_running": "ℹ️ <b>TagAll läuft bereits in Chat {chat_id}, Auslöser ignoriert.</b>",
         "trigger_tagall_not_running": "ℹ️ <b>TagAll läuft nicht in Chat {chat_id}, Auslöser ignoriert.</b>",
-        "_cmd_autotagall_doc": "[on|off|true|false] - Triggersystem aktivieren/deaktivieren. Ohne Argumente - den aktuellen Status umschalten.",
+        "_cmd_autotagall_doc": "[on|off] - Triggersystem aktivieren/deaktivieren. Ohne Argumente - den aktuellen Status umschalten. Der Status wird an den Chat gesendet, in dem der Befehl verwendet wurde.",
         "triggers_enabled": "✅ <b>TagAll-Triggersystem aktiviert.</b>",
         "triggers_disabled": "❌ <b>TagAll-Triggersystem deaktiviert.</b>",
-        "invalid_autotagall_arg": "🚫 <b>Ungültiges Argument. Verwenden Sie 'on', 'off', 'true', 'false' oder lassen Sie es leer.</b>",
+        "invalid_autotagall_arg_on_off": "🚫 <b>Ungültiges Argument. Verwenden Sie 'on' oder 'off' oder lassen Sie es leer.</b>",
     }
 
     strings_tr = {
@@ -192,10 +192,10 @@ class TagAllMod(loader.Module):
         "trigger_tagall_stopped": "✅ <b>TagAll, {chat_id} sohbetinde tetikleyici ile durduruldu.</b>",
         "trigger_tagall_already_running": "ℹ️ <b>TagAll zaten {chat_id} sohbetinde çalışıyor, tetikleyici yoksayıldı.</b>",
         "trigger_tagall_not_running": "ℹ️ <b>TagAll {chat_id} sohbetinde çalışmıyor, tetikleyici yoksayıldı.</b>",
-        "_cmd_autotagall_doc": "[on|off|true|false] - Tetikleyici sistemini etkinleştir/devre dışı bırak. Argüman yoksa - mevcut durumu değiştir.",
+        "_cmd_autotagall_doc": "[on|off] - Tetikleyici sistemini etkinleştir/devre dışı bırak. Argüman yoksa - mevcut durumu değiştir. Durum, komutun kullanıldığı sohbete gönderilecektir.",
         "triggers_enabled": "✅ <b>TagAll tetikleyici sistemi etkinleştirildi.</b>",
         "triggers_disabled": "❌ <b>TagAll tetikleyici sistemi devre dışı bırakıldı.</b>",
-        "invalid_autotagall_arg": "🚫 <b>Geçersiz argüman. 'on', 'off', 'true', 'false' kullanın veya boş bırakın.</b>",
+        "invalid_autotagall_arg_on_off": "🚫 <b>Geçersiz argüman. 'on' veya 'off' kullanın veya boş bırakın.</b>",
     }
 
     strings_uz = {
@@ -239,10 +239,10 @@ class TagAllMod(loader.Module):
         "trigger_tagall_stopped": "✅ <b>TagAll {chat_id} chatida trigger orqali to'xtatildi.</b>",
         "trigger_tagall_already_running": "ℹ️ <b>TagAll allaqachon {chat_id} chatida ishlamoqda, trigger e'tiborsiz qoldirildi.</b>",
         "trigger_tagall_not_running": "ℹ️ <b>TagAll {chat_id} chatida ishlamayapti, trigger e'tiborsiz qoldirildi.</b>",
-        "_cmd_autotagall_doc": "[on|off|true|false] - Trigger tizimini yoqish/o'chirish. Argumentlar bo'lmasa - joriy holatni almashtirish.",
+        "_cmd_autotagall_doc": "[on|off] - Trigger tizimini yoqish/o'chirish. Argumentlar bo'lmasa - joriy holatni almashtirish. Holat buyruq ishlatilgan chatga yuboriladi.",
         "triggers_enabled": "✅ <b>TagAll trigger tizimi yoqildi.</b>",
         "triggers_disabled": "❌ <b>TagAll trigger tizimi o'chirildi.</b>",
-        "invalid_autotagall_arg": "🚫 <b>Noto'g'ri argument. 'on', 'off', 'true', 'false' dan foydalaning yoki bo'sh qoldiring.</b>",
+        "invalid_autotagall_arg_on_off": "🚫 <b>Noto'g'ri argument. 'on' yoki 'off' dan foydalaning yoki bo'sh qoldiring.</b>",
     }
 
     def __init__(self):
@@ -309,8 +309,8 @@ class TagAllMod(loader.Module):
                 validator=loader.validators.Boolean(),
             ),
             loader.ConfigValue(
-                "trigger_send_notifications", # New config value
-                True, # Default to True to preserve existing behavior
+                "trigger_send_notifications",
+                True,
                 lambda: self.strings("_cfg_doc_trigger_send_notifications"),
                 validator=loader.validators.Boolean(),
             ),
@@ -819,26 +819,12 @@ class TagAllMod(loader.Module):
         uz_doc=lambda self: self.strings("_cmd_autotagall_doc"),
     )
     async def autotagall(self, message: Message):
-        """[on|off|true|false] - Включить/выключить систему триггеров. Без аргументов - переключить текущее состояние."""
+        """[on|off] - Включить/выключить систему триггеров. Без аргументов - переключить текущее состояние. Статус будет отправлен в чат, где была использована команда."""
         args = utils.get_args(message)
         
-        # Check if command can be used in this chat
-        allowed_chats_map = self._get_allowed_chat_ids_map()
-        allowed_chat_ids_set = set(allowed_chats_map.values())
+        # This command is global and can be used in any chat,
+        # so we explicitly skip the allowed_chat_ids check for command execution.
         
-        # if allowed_chat_ids is not empty, check if current chat is allowed or if there's a single redirect target
-        if allowed_chat_ids_set and message.chat_id not in allowed_chat_ids_set:
-            if len(allowed_chat_ids_set) == 1:
-                # Redirect if only one allowed chat, but we don't redirect for autotagall as it's global.
-                # Just prevent usage if not in the single allowed chat.
-                await utils.answer(message, self.strings("cmd_not_allowed_current"))
-            else:
-                # Multiple allowed chats, and current is not one of them.
-                await utils.answer(message, self.strings("cmd_not_allowed_multiple").format(allowed_chats=self._format_allowed_chats_list(allowed_chats_map)))
-            if message.out:
-                await message.delete()
-            return
-
         current_state = self.config["trigger_system_enabled"]
         new_state = current_state
 
@@ -847,21 +833,31 @@ class TagAllMod(loader.Module):
             new_state = not current_state
         else:
             arg = args[0].lower()
-            if arg in ["on", "true"]:
+            if arg == "on":
                 new_state = True
-            elif arg in ["off", "false"]:
+            elif arg == "off":
                 new_state = False
             else:
-                await utils.answer(message, self.strings("invalid_autotagall_arg"))
+                await utils.answer(message, self.strings("invalid_autotagall_arg_on_off"))
                 if message.out:
                     await message.delete()
                 return
 
         self.config["trigger_system_enabled"] = new_state
-        if new_state:
-            await utils.answer(message, self.strings("triggers_enabled"))
-        else:
-            await utils.answer(message, self.strings("triggers_disabled"))
-
+        
+        # Delete original command message if it was outgoing
         if message.out:
             await message.delete()
+
+        # Always send the response to the chat where the command was issued
+        response_chat_id = message.chat_id
+        
+        # Get the entity for the response chat (original chat)
+        try:
+            target_chat_entity = await self._client.get_input_entity(response_chat_id)
+        except Exception as e:
+            logger.error(f"Не удалось получить сущность чата для ID {response_chat_id} для отправки ответа autotagall: {e}. Отправка ответа невозможна.")
+            return # Cannot send response if entity cannot be resolved
+
+        status_message = self.strings("triggers_enabled") if new_state else self.strings("triggers_disabled")
+        await self._client.send_message(target_chat_entity, status_message)
