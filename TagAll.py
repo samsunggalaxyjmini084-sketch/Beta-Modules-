@@ -1,11 +1,11 @@
-# meta developer: @Androfon_AI
+# meta developer: @yourhandle
 # meta name: TagAll
-# meta version: 2.1.1
-#
+# meta version: 2.0.41
+
 # 01101110 01100101 01110110 01100101 01110010 00100000 01100111 01101001 01110110 01100101 00100000 01110101 01110000
 # 01101110 01100101 01110110 01100101 01110010 00100000 01101100 01100101 01110100 00100000 01111001 01101111 01110101 00100000 01100100 01101111 01110111 01101110
 # 01101110 01100101 01110110 01100101 01110010 00100000 01110010 01110101 01101110 00100000 01100001 01110010 01101111 01110101 01101110 01100100 00100000 01100001 01101110 01100100 00100000 01100100 01100101 01110011 01100101 01110010 01110100 00100000 01111001 01101111 01110101
-# 01101110 01100101 01110110 01100101 01110010 00100000 01101101 01100001 01101011 01100101 00100000 01111001 01101111 01110101 00100000 01100011 01110010 01111001 00100000 01101110 01100101 01110110 01100101 01110010 00100000 01110011 01100001 01111001 00100000 01100111 01101111 01101111 01100010 01111001 01100101
+# 01101110 01100101 01110110 01100101 01110010 00100000 01101101 01100001 01101011 01100101 00100000 01111001 01101111 01110101 00100000 01100011 01110010 01111001 00100000 01101110 01100101 01110110 01100101 01110010 00100000 01110011 01100001 01111001 00100000 01100111 01101111 01101111 01100100 01100010 01111001 01100101
 # 01101110 01100101 01110110 01100101 01110010 00100000 01110100 01100101 01101100 00100000 01100001 01101100 01101100 00100000 01100001 00100000 01101100 01101001 01100101 00100000 01100001 01110010 01101111 01110101 01101110 01100100 00100000 01100001 01101110 00100000 01101000 01110101 01110010 01110100 01111001 01101111 01110101
 # (Rick Astley - Never Gonna Give You Up)
 
@@ -184,16 +184,14 @@ class TagAllMod(loader.Module):
         "_cfg_doc_activation_trigger_user_id": "TagAll'u tetikleyici mesajla başlatabilecek kullanıcı veya bot kimliği(leri). Virgülle ayırın. Herkesin başlatabilmesi için boş bırakın.",
         "_cfg_doc_exclude_user_ids": "Etiketlenmeyecek kullanıcı kimliği(leri). Virgülle ayırın. Örneğin: <code>123456789, 987654321</code>",
         "_cfg_doc_allowed_chat_ids": "TagAll modül komutlarının kullanılabileceği sohbet kimliği(leri). Virgülle ayırın. Yalnızca bir kimlik belirtilirse, diğer sohbetlerde başlatılan komutlar otomatik olarak bu sohbete yönlendirilecektir. Boş bırakılırsa, komutlara tüm sohbetlerde izin verilir.",
-        "_cmd_autotagall_doc": "[<Sohbet Numarası>] [on|off] - Trigger zum Starten/Stoppen von TagAll im <b>angegebenen oder aktuellen Chat</b> aktivieren oder deaktivieren. Verwenden Sie `on` zum Aktivieren, `off` zum Deaktivieren. Ohne Argumente wird der Trigger-Status angezeigt.",
+        "_cmd_autotagall_doc": "[<Sohbet Numarası>] [on|off] - TagAll'u başlatmak/durdurmak için tetikleyicileri <b>belirtilen veya mevcut sohbette</b> etkinleştir veya devre dışı bırak. Etkinleştirmek için `on`, devre dışı bırakmak için `off` kullanın. Argüman olmadan tetikleyici durumunu gösterir.",
         "_cmd_tagall_doc": "[<Sohbet Numarası>] [metin] - Sohbet katılımcılarını etiketle. [metin] etiketlerle birlikte gönderilecektir. Metin belirtilmezse, sadece etiketler gönderilecektir.",
-        "_cmd_stoptagall_doc": "[<Sohbet Numarası>] - Den laufenden TagAll-Prozess im <b>angegebenen oder aktuellen Chat</b> stoppen.",
-        "triggers_state_enabled": "✅ <b>TagAll Trigger in Chat {chat_id} aktiviert!</b>",
-        "triggers_state_disabled": "❌ <b>TagAll Trigger in Chat {chat_id} deaktiviert!</b>",
-        "triggers_status_enabled": "✅ <b>TagAll Trigger in Chat {chat_id} aktiviert.</b>",
-        "triggers_status_disabled": "❌ <b>TagAll Trigger in Chat {chat_id} deaktiviert.</b>",
-        "invalid_trigger_arg": "🚫 <b>Ungültiges Argument. Verwenden Sie 'on', 'off' oder lassen Sie es leer, um den Status anzuzeigen.</b>",
-        "tagall_not_running": "🚫 <b>TagAll şu anda {chat_id} sohbetinde çalışmıyor.</b>",
-        "tagall_already_running": "🚫 <b>TagAll zaten {chat_id} sohbetinde çalışıyor. Durdurmak için <code>.stoptagall</code> kullanın.</b>",
+        "_cmd_stoptagall_doc": "[<Sohbet Numarası>] - Çalışan TagAll sürecini <b>belirtilen veya mevcut sohbette</b> durdur.",
+        "triggers_state_enabled": "✅ <b>TagAll Tetikleyiciler {chat_id} sohbetinde etkinleştirildi!</b>",
+        "triggers_state_disabled": "❌ <b>TagAll Tetikleyiciler {chat_id} sohbetinde devre dışı bırakıldı!</b>",
+        "triggers_status_enabled": "✅ <b>TagAll Tetikleyiciler {chat_id} sohbetinde etkin.</b>",
+        "triggers_status_disabled": "❌ <b>TagAll Tetikleyiciler {chat_id} sohbetinde devre dışı.</b>",
+        "invalid_trigger_arg": "🚫 <b>Geçersiz argüman. 'on', 'off' kullanın veya durumu görmek için boş bırakın.</b>",
         "no_eligible_participants": "🚫 <b>Bu sohbette etiketlenecek uygun katılımcı yok.</b>",
         "cmd_redirected": "➡️ <b>Komut, izin verilen tek sohbet olduğu için</b> <code>{target_chat_id}</code> sohbetine yönlendirildi.",
         "cmd_not_allowed": "🚫 <b>Bu komut mevcut sohbette kullanılamaz ve yönlendirmek için tek bir izin verilen sohbet yok.</b>",
@@ -246,8 +244,6 @@ class TagAllMod(loader.Module):
         "triggers_status_enabled": "✅ <b>TagAll triggerlari {chat_id} chatida yoqilgan.</b>",
         "triggers_status_disabled": "❌ <b>TagAll triggerlari {chat_id} chatida o'chirilgan.</b>",
         "invalid_trigger_arg": "🚫 <b>Noto'g'ri argument. 'on', 'off' dan foydalaning yoki holatini ko'rish uchun bo'sh qoldiring.</b>",
-        "tagall_not_running": "🚫 <b>TagAll hozirda {chat_id} chatida ishlamayapti.</b>",
-        "tagall_already_running": "🚫 <b>TagAll {chat_id} chatida allaqachon ishlamoqda. Uni to'xtatish uchun <code>.stoptagall</code> dan foydalaning.</b>",
         "no_eligible_participants": "🚫 <b>Bu chatda tegish uchun mos ishtirokchilar topilmadi.</b>",
         "cmd_redirected": "➡️ <b>Buyruq, ruxsat berilgan yagona chat bo'lgani uchun</b> <code>{target_chat_id}</code> chatiga yo'naltirildi.",
         "cmd_not_allowed": "🚫 <b>Ushbu buyruq joriy chatda ishlatilmaydi va yo'naltirish uchun yagona ruxsat berilgan chat yo'q.</b>",
@@ -547,99 +543,94 @@ class TagAllMod(loader.Module):
         activation_triggers_enabled = self._db.get(self.name, f"activation_triggers_enabled_{chat_id}", False)
 
         # --- Обработка триггера ОСТАНОВКИ ---
-        if stop_triggers_enabled: # Only process if stop triggers are enabled for this chat
+        if stop_triggers_enabled:
             trigger_stop_messages_raw = self.config["trigger_message"]
-            if trigger_stop_messages_raw: # Only process if trigger message is configured
-                parsed_stop_triggers = []
-                for t_raw in trigger_stop_messages_raw.split(','):
-                    if t_raw.strip():
-                        parsed_stop_triggers.append(self._parse_trigger_string(t_raw))
+            parsed_stop_triggers = []
+            for t_raw in trigger_stop_messages_raw.split(','):
+                if t_raw.strip():
+                    parsed_stop_triggers.append(self._parse_trigger_string(t_raw))
 
-                has_stop_trigger_message = False
-                for base_trigger, config_chat_index in parsed_stop_triggers:
-                    if base_trigger in message_text_lower:
-                        # Проверяем, относится ли триггер к текущему чату
-                        if config_chat_index is None:
-                            # Индекс не указан, триггер применяется к текущему чату
+            has_stop_trigger_message = False
+            for base_trigger, config_chat_index in parsed_stop_triggers:
+                if base_trigger in message_text_lower:
+                    # Проверяем, относится ли триггер к текущему чату
+                    if config_chat_index is None:
+                        # Индекс не указан, триггер применяется к текущему чату
+                        has_stop_trigger_message = True
+                        break
+                    else:
+                        # Индекс указан, проверяем, соответствует ли он текущему чату
+                        trigger_target_chat_id = allowed_chats_map.get(config_chat_index)
+                        if trigger_target_chat_id is not None and trigger_target_chat_id == chat_id:
                             has_stop_trigger_message = True
                             break
-                        else:
-                            # Индекс указан, проверяем, соответствует ли он текущему чату
-                            trigger_target_chat_id = allowed_chats_map.get(config_chat_index)
-                            if trigger_target_chat_id is not None and trigger_target_chat_id == chat_id:
-                                has_stop_trigger_message = True
-                                break
 
-                trigger_stop_user_ids_raw = self.config["trigger_user_id"]
-                trigger_stop_user_ids = set()
-                for uid_str in trigger_stop_user_ids_raw.split(','):
-                    uid_str = uid_str.strip()
-                    if uid_str:
-                        try:
-                            uid = int(uid_str)
-                            if uid > 0:
-                                trigger_stop_user_ids.add(uid)
-                        except ValueError:
-                            logger.warning(f"Неверный trigger_user_id в конфигурации: '{uid_str}'. Должен быть целым числом.")
+            trigger_stop_user_ids_raw = self.config["trigger_user_id"]
+            trigger_stop_user_ids = set()
+            for uid_str in trigger_stop_user_ids_raw.split(','):
+                uid_str = uid_str.strip()
+                if uid_str:
+                    try:
+                        uid = int(uid_str)
+                        if uid > 0:
+                            trigger_stop_user_ids.add(uid)
+                    except ValueError:
+                        logger.warning(f"Неверный trigger_user_id в конфигурации: '{uid_str}'. Должен быть целым числом.")
 
-                is_authorized_stop_user = not trigger_stop_user_ids or (message.sender and message.sender.id in trigger_stop_user_ids)
+            is_authorized_stop_user = not trigger_stop_user_ids or (message.sender and message.sender.id in trigger_stop_user_ids)
 
-                if current_tagall_event and current_tagall_event.state and has_stop_trigger_message and is_authorized_stop_user:
-                    current_tagall_event.stop()
-                    logger.info(f"TagAll остановлен триггерным сообщением '{message.text}' от отправителя {message.sender.id if message.sender else 'unknown'} в чате {chat_id}")
-                    return
+            if current_tagall_event and current_tagall_event.state and has_stop_trigger_message and is_authorized_stop_user:
+                current_tagall_event.stop()
+                return
 
         # --- Обработка триггера АКТИВАЦИИ ---
-        if activation_triggers_enabled: # Only process if activation triggers are enabled for this chat
+        if activation_triggers_enabled:
             activation_trigger_messages_raw = self.config["activation_trigger_message"]
-            if activation_trigger_messages_raw: # Only process if activation trigger message is configured
-                parsed_activation_triggers = []
-                for t_raw in activation_trigger_messages_raw.split(','):
-                    if t_raw.strip():
-                        parsed_activation_triggers.append(self._parse_trigger_string(t_raw))
+            parsed_activation_triggers = []
+            for t_raw in activation_trigger_messages_raw.split(','):
+                if t_raw.strip():
+                    parsed_activation_triggers.append(self._parse_trigger_string(t_raw))
 
-                has_activation_trigger_message = False
-                for base_trigger, config_chat_index in parsed_activation_triggers:
-                    if base_trigger in message_text_lower:
-                        # Проверяем, относится ли триггер к текущему чату
-                        if config_chat_index is None:
-                            # Индекс не указан, триггер применяется к текущему чату
+            has_activation_trigger_message = False
+            for base_trigger, config_chat_index in parsed_activation_triggers:
+                if base_trigger in message_text_lower:
+                    # Проверяем, относится ли триггер к текущему чату
+                    if config_chat_index is None:
+                        # Индекс не указан, триггер применяется к текущему чату
+                        has_activation_trigger_message = True
+                        break
+                    else:
+                        # Индекс указан, проверяем, соответствует ли он текущему чату
+                        trigger_target_chat_id = allowed_chats_map.get(config_chat_index)
+                        if trigger_target_chat_id is not None and trigger_target_chat_id == chat_id:
                             has_activation_trigger_message = True
                             break
-                        else:
-                            # Индекс указан, проверяем, соответствует ли он текущему чату
-                            trigger_target_chat_id = allowed_chats_map.get(config_chat_index)
-                            if trigger_target_chat_id is not None and trigger_target_chat_id == chat_id:
-                                has_activation_trigger_message = True
-                                break
 
-                activation_trigger_user_ids_raw = self.config["activation_trigger_user_id"]
-                activation_trigger_user_ids = set()
-                for uid_str in activation_trigger_user_ids_raw.split(','):
-                    uid_str = uid_str.strip()
-                    if uid_str:
-                        try:
-                            uid = int(uid_str)
-                            if uid > 0:
-                                activation_trigger_user_ids.add(uid)
-                        except ValueError:
-                            logger.warning(f"Неверный activation_trigger_user_id в конфигурации: '{uid_str}'. Должен быть целым числом.")
+            activation_trigger_user_ids_raw = self.config["activation_trigger_user_id"]
+            activation_trigger_user_ids = set()
+            for uid_str in activation_trigger_user_ids_raw.split(','):
+                uid_str = uid_str.strip()
+                if uid_str:
+                    try:
+                        uid = int(uid_str)
+                        if uid > 0:
+                            activation_trigger_user_ids.add(uid)
+                    except ValueError:
+                        logger.warning(f"Неверный activation_trigger_user_id в конфигурации: '{uid_str}'. Должен быть целым числом.")
 
-                is_authorized_activation_user = not activation_trigger_user_ids or (message.sender and message.sender.id in activation_trigger_user_ids)
+            is_authorized_activation_user = not activation_trigger_user_ids or (message.sender and message.sender.id in activation_trigger_user_ids)
 
-                if has_activation_trigger_message and is_authorized_activation_user:
-                    if current_tagall_event and current_tagall_event.state:
-                        logger.info(f"TagAll уже запущен в чате {chat_id}, игнорируем триггер активации.")
-                        # Optionally, you could send a message here, but silent is often preferred for triggers
-                        return
+            if has_activation_trigger_message and is_authorized_activation_user:
+                if current_tagall_event and current_tagall_event.state:
+                    logger.info(f"TagAll уже запущен в чате {chat_id}, игнорируем триггер активации.")
+                    return
 
-                    logger.info(f"TagAll активирован триггерным сообщением '{message.text}' от отправителя {message.sender.id if message.sender else 'unknown'} в чате {chat_id}")
+                logger.info(f"TagAll активирован триггерным сообщением '{message.text}' от отправителя {message.sender.id if message.sender else 'unknown'} в чате {chat_id}")
 
-                    event = StopEvent(chat_id)
-                    self._tagall_events[chat_id] = event
+                event = StopEvent(chat_id)
+                self._tagall_events[chat_id] = event
 
-                    # Use silent_start=True for triggers to prevent "failed to find chat" or "no eligible participants" messages
-                    self._client.loop.create_task(self._run_tagall_process(chat_id, "", event, silent_start=True))
+                self._client.loop.create_task(self._run_tagall_process(chat_id, "", event, True))
 
     async def _run_tagall_process(self, chat_id: int, message_prefix: str, event: StopEvent, silent_start: bool = False):
         """Внутренняя функция для обработки основной логики TagAll."""
@@ -652,7 +643,7 @@ class TagAllMod(loader.Module):
             chat_entity = await self._client.get_input_entity(chat_id)
         except Exception as e:
             logger.error(f"Не удалось получить сущность чата для ID {chat_id}: {e}")
-            if not silent_start: # Only send message if not silent start
+            if not silent_start:
                 await self._client.send_message(chat_id, f"🚫 <b>Не удалось найти чат с ID:</b> <code>{chat_id}</code>")
             event.stop()
             if chat_id in self._tagall_events:
@@ -680,7 +671,7 @@ class TagAllMod(loader.Module):
                     await self._client(InviteToChannelRequest(chat_entity, [bot_entity]))
             except Exception as e:
                 logger.error(f"Не удалось получить сущность бота или пригласить бота: {e}")
-                if not silent_start: # Only send message if not silent start
+                if not silent_start:
                     await self._client.send_message(chat_id, self.strings("bot_error"))
                 event.stop()
                 if chat_id in self._tagall_events:
@@ -695,7 +686,7 @@ class TagAllMod(loader.Module):
 
         if not participants:
             logger.warning(f"В чате {chat_id} не найдено подходящих участников для TagAll, останавливаем.")
-            if not silent_start: # Only send message if not silent start
+            if not silent_start:
                 await self._client.send_message(chat_id, self.strings("no_eligible_participants"))
             event.stop()
             if chat_id in self._tagall_events:
@@ -843,7 +834,7 @@ class TagAllMod(loader.Module):
         event = StopEvent(target_chat_id)
         self._tagall_events[target_chat_id] = event
 
-        self._client.loop.create_task(self._run_tagall_process(target_chat_id, message_prefix, event))
+        self._client.loop.create_task(self._run_tagall_process(target_chat_id, message_prefix, event, False))
 
     @loader.command(
         ru_doc=lambda self: self.strings("_cmd_stoptagall_doc"),
@@ -899,15 +890,11 @@ class TagAllMod(loader.Module):
             self._db.set(self.name, f"activation_triggers_enabled_{target_chat_id}", False)
             await utils.answer(message, self.strings("triggers_state_disabled").format(chat_id=target_chat_id))
         elif not args:
-            is_stop_enabled = self._db.get(self.name, f"stop_triggers_enabled_{target_chat_id}", False)
-            is_activation_enabled = self._db.get(self.name, f"activation_triggers_enabled_{target_chat_id}", False)
-            
-            status_message = (
-                f"<b>Состояние триггеров TagAll в чате {target_chat_id}:</b>\n"
-                f"  Остановка: {'✅ Включены' if is_stop_enabled else '❌ Выключены'}\n"
-                f"  Запуск: {'✅ Включены' if is_activation_enabled else '❌ Выключены'}"
-            )
-            await utils.answer(message, status_message)
+            is_enabled = self._db.get(self.name, f"stop_triggers_enabled_{target_chat_id}", False)
+            if is_enabled:
+                await utils.answer(message, self.strings("triggers_status_enabled").format(chat_id=target_chat_id))
+            else:
+                await utils.answer(message, self.strings("triggers_status_disabled").format(chat_id=target_chat_id))
         else:
             await utils.answer(message, self.strings("invalid_trigger_arg"))
 
