@@ -9,7 +9,7 @@ import random
 import time
 import re
 import unicodedata  # Импортируем unicodedata
-from typing import Union, List, Tuple # Импортируем для аннотаций типов в валидаторе
+from typing import Union, List, Tuple, Any # Импортируем для аннотаций типов в валидаторе
 
 from hikkatl.tl.functions.channels import InviteToChannelRequest
 from hikkatl.tl.types import Message
@@ -35,7 +35,7 @@ class StopEvent:
 
 
 # Новый класс валидатора для параметра timeout
-class TimeoutValidator(loader.BaseValidator):
+class TimeoutValidator(loader.validators.Base):
     """
     Валидатор и парсер для значения конфигурации 'timeout'.
     Преобразует строку в более эффективное внутреннее представление (float, list, tuple).
@@ -122,6 +122,7 @@ class TagAllMod(loader.Module):
         self.config = loader.ModuleConfig(
             loader.ConfigValue("delete", False, lambda: self.strings("_cfg_doc_delete"), validator=loader.validators.Boolean()),
             loader.ConfigValue("use_bot", False, lambda: self.strings("_cfg_doc_use_bot"), validator=loader.validators.Boolean()),
+            # Используем новый валидатор для timeout
             loader.ConfigValue("timeout", "0.1", lambda: self.strings("_cfg_doc_timeout"), validator=TimeoutValidator()),
             loader.ConfigValue("silent", False, lambda: self.strings("_cfg_doc_silent"), validator=loader.validators.Boolean()),
             loader.ConfigValue("cycle_tagging", False, lambda: self.strings("_cfg_doc_cycle_tagging"), validator=loader.validators.Boolean()),
@@ -459,11 +460,12 @@ class TagAllMod(loader.Module):
 
         if is_bot_sender:
             try:
+                # Добавлена проверка на наличие self.inline.bot_client
                 if not hasattr(self, 'inline') or not hasattr(self.inline, 'bot_client') or not getattr(self.inline, 'bot_client', None):
                     raise RuntimeError("Инлайн-бот не настроен или недоступен.")
 
                 bot_entity = await self._client.get_input_entity(self.inline.bot_username)
-                with contextlib.suppress(Exception):
+                with contextlib.suppress(Exception):  # Подавляем ошибки, если бот уже в чате или не может быть приглашен
                     await self._client(InviteToChannelRequest(chat_entity, [bot_entity]))
             except Exception as e:
                 logger.error(f"Не удалось получить сущность бота или пригласить бота: {e}")
@@ -487,7 +489,7 @@ class TagAllMod(loader.Module):
                 del self._tagall_events[chat_id]
             return
 
-        random.shuffle(participants) # Перемешиваем список участников один раз в начале
+        random.shuffle(participants) # Начальное перемешивание всего списка
 
         start_time = time.time()
 
@@ -501,18 +503,14 @@ class TagAllMod(loader.Module):
                     event.stop()
                     break
 
-                # УДАЛЕНО: Блок повторного запроса и перемешивания участников для каждого цикла
-                # current_cycle_participants = []
-                # if self.config["cycle_tagging"] and not first_pass:
-                #     logger.debug(f"Повторный запрос участников для цикла в чате {chat_id}.")
-                #     async for user in self._client.iter_participants(chat_id):
-                #         if not user.bot and not user.deleted and user.id != owner_id and user.id not in excluded_user_ids:
-                #             current_cycle_participants.append(user)
-                #     random.shuffle(current_cycle_participants)
-                #     participants = current_cycle_participants
-                #     if not participants:
-                #         logger.warning(f"В чате {chat_id} не найдено участников для TagAll для следующего цикла, останавливаем.")
-                #         break
+                # --- ИЗМЕНЕНИЕ ЗДЕСЬ ---
+                # Если включен цикличный тег и это не первый проход,
+                # просто перемешиваем уже существующий список участников,
+                # не запрашивая его повторно из Telegram.
+                if self.config["cycle_tagging"] and not first_pass:
+                    logger.debug(f"Перемешиваем участников для нового цикла в чате {chat_id}.")
+                    random.shuffle(participants)
+                # --- КОНЕЦ ИЗМЕНЕНИЯ ---
 
                 for chunk in utils.chunks(participants, self.config["chunk_size"]):
                     if not event.state:
