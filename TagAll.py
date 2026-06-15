@@ -28,6 +28,7 @@ class StopEvent:
         self.state = True
         self.chat_id = chat_id
         self.last_timeout: float | None = None
+        self.last_message_start_time: float = 0.0 # НОВЫЙ АТРИБУТ: время начала последней отправки сообщения
 
     def stop(self):
         self.state = False
@@ -43,7 +44,11 @@ class TagAllMod(loader.Module):
         "bot_error": "🚫 <b>Не получилось пригласить бота в чат.</b>",
         "_cfg_doc_delete": "Удалять сообщения после тега",
         "_cfg_doc_use_bot": "Использовать бота для тегов",
-        "_cfg_doc_timeout": "Время между сообщениями (число, список или диапазон 0.1-1.0). Установите 0 или очень низкое значение (например, 0.01) для постоянного тега.",
+        "_cfg_doc_timeout": (
+            "Время между сообщениями (число, список или диапазон 0.1-1.0). "
+            "Это интервал между НАЧАЛОМ отправки последовательных сообщений. "
+            "Установите 0 или очень низкое значение (например, 0.01) для максимально быстрого тега."
+        ),
         "_cfg_doc_silent": "Не отправлять сообщение с кнопкой отмены",
         "_cfg_doc_cycle_tagging": "Цикличный тег (пока не остановите)",
         "_cfg_doc_cycle_delay": "Задержка между циклами (сек). Установите 0 для непрерывного тега без пауз между циклами.",
@@ -101,7 +106,7 @@ class TagAllMod(loader.Module):
                 lambda: self.strings("_cfg_doc_enable_watcher"),
                 validator=loader.validators.Boolean(),
             ),
-            loader.ConfigValue( # НОВЫЙ ПАРАМЕТР
+            loader.ConfigValue(
                 "refresh_participants_on_cycle",
                 True,
                 lambda: self.strings("_cfg_doc_refresh_participants_on_cycle"),
@@ -132,46 +137,35 @@ class TagAllMod(loader.Module):
             for i in range(length):
                 stylized_char_code = ord(start_stylized_char) + i
                 base_char_lower = chr(ord(start_base_char) + i).lower()
-                # Только добавляем в таблицу, если это не прямое отображение на себя
                 if chr(stylized_char_code) != base_char_lower:
                     translation_table[stylized_char_code] = base_char_lower
 
-        # Математические буквенно-цифровые символы (латиница)
-        # Жирные (Bold)
-        add_stylized_block('𝐀', 'A', 26) # Заглавные
-        add_stylized_block('𝐚', 'a', 26) # Строчные
-        # Курсивные (Italic)
-        add_stylized_block('𝐴', 'A', 26)
-        add_stylized_block('𝑎', 'a', 26)
-        # Жирные курсивные (Bold Italic)
-        add_stylized_block('𝑨', 'A', 26)
-        add_stylized_block('𝒂', 'a', 26)
-        # Моноширинные (Monospace)
-        add_stylized_block('𝙰', 'A', 26)
-        add_stylized_block('𝚊', 'a', 26)
+        add_stylized_block('𝐀', 'A', 26) # Жирные Заглавные
+        add_stylized_block('𝐚', 'a', 26) # Жирные Строчные
+        add_stylized_block('𝐴', 'A', 26) # Курсивные Заглавные
+        add_stylized_block('𝑎', 'a', 26) # Курсивные Строчные
+        add_stylized_block('𝑨', 'A', 26) # Жирные курсивные Заглавные
+        add_stylized_block('𝒂', 'a', 26) # Жирные курсивные Строчные
+        add_stylized_block('𝙰', 'A', 26) # Моноширинные Заглавные
+        add_stylized_block('𝚊', 'a', 26) # Моноширинные Строчные
         
-        # Цифры различных стилей
-        add_stylized_block('𝟎', '0', 10) # Жирные
-        add_stylized_block('𝟘', '0', 10) # С двойным подчеркиванием
-        add_stylized_block('𝟢', '0', 10) # Без засечек
-        add_stylized_block('𝟬', '0', 10) # Жирные без засечек
-        add_stylized_block('𝟶', '0', 10) # Моноширинные
+        add_stylized_block('𝟎', '0', 10) # Жирные цифры
+        add_stylized_block('𝟘', '0', 10) # Цифры с двойным подчеркиванием
+        add_stylized_block('𝟢', '0', 10) # Цифры без засечек
+        add_stylized_block('𝟬', '0', 10) # Жирные цифры без засечек
+        add_stylized_block('𝟶', '0', 10) # Моноширинные цифры
 
-        # Полноширинные ASCII символы (часто используются в азиатских шрифтах)
-        add_stylized_block('Ａ', 'A', 26)
-        add_stylized_block('ａ', 'a', 26)
-        add_stylized_block('０', '0', 10)
-        # Полноширинные знаки препинания и символы
-        for char_code in range(ord('！'), ord('～') + 1):
+        add_stylized_block('Ａ', 'A', 26) # Полноширинные Заглавные
+        add_stylized_block('ａ', 'a', 26) # Полноширинные Строчные
+        add_stylized_block('０', '0', 10) # Полноширинные цифры
+        for char_code in range(ord('！'), ord('～') + 1): # Полноширинные знаки препинания
             if chr(char_code) != unicodedata.normalize("NFKC", chr(char_code)).lower():
                 translation_table[char_code] = unicodedata.normalize("NFKC", chr(char_code)).lower()
 
-        # Удаляем невидимые символы (Zero-Width Space и т.д.)
         translation_table[0x200B] = None # Zero Width Space
         translation_table[0x200C] = None # Zero Width Non-Joiner
         translation_table[0x200D] = None # Zero Width Joiner
 
-        # Нормализуем различные типы дефисов к стандартному
         translation_table[0x2010] = '-' # Hyphen
         translation_table[0x2011] = '-' # Non-breaking hyphen
         translation_table[0x2012] = '-' # Figure dash
@@ -179,7 +173,6 @@ class TagAllMod(loader.Module):
         translation_table[0x2014] = '-' # Em dash
         translation_table[0x2015] = '-' # Horizontal bar
 
-        # Нормализуем различные пробелы к стандартному
         translation_table[0x00A0] = ' ' # NO-BREAK SPACE
         translation_table[0x2000] = ' ' # EN QUAD
         translation_table[0x2001] = ' ' # EM QUAD
@@ -201,22 +194,13 @@ class TagAllMod(loader.Module):
     def _normalize_text_for_trigger(self, text: str) -> str:
         """
         Нормализует текст для сравнения с триггерами.
-        Преобразует стилизованные Unicode-символы в их стандартные строчные эквиваленты,
-        удаляет нулевой ширины символы и нормализует различные пробелы/дефисы.
         """
         if not isinstance(text, str):
             return ""
 
-        # Сначала применяем NFKC нормализацию для общей совместимости (например, лигатуры, полноширинные)
         normalized_text = unicodedata.normalize("NFKC", text)
-
-        # Применяем предварительно построенную таблицу преобразований
         processed_text = normalized_text.translate(self._translation_table)
-
-        # Переводим весь текст в нижний регистр
         processed_text = processed_text.lower()
-        
-        # Заменяем несколько пробелов на один и удаляем пробелы в начале/конце
         processed_text = re.sub(r'\s+', ' ', processed_text).strip()
 
         return processed_text
@@ -395,7 +379,7 @@ class TagAllMod(loader.Module):
             logger.error(f"Не удалось получить сущность чата для ID {chat_id}: {e}")
             await self._client.send_message(chat_id, f"🚫 <b>Не удалось найти чат с ID:</b> <code>{chat_id}</code>")
             event.stop()
-            return # Убрано дублирующее удаление события
+            return
 
         excluded_user_ids = set()
         exclude_ids_raw = self.config["exclude_user_ids"]
@@ -409,9 +393,8 @@ class TagAllMod(loader.Module):
 
         # Первоначальное получение списка участников
         participants_initial_fetch = []
-        owner_id = self._client.tg_id # ID владельца юзербота
+        owner_id = self._client.tg_id
         async for user in self._client.iter_participants(chat_id):
-            # Исключаем ботов, удаленные аккаунты, владельца юзербота и пользователей из списка исключений
             if not user.bot and not user.deleted and user.id != owner_id and user.id not in excluded_user_ids:
                 participants_initial_fetch.append(user)
         
@@ -419,10 +402,9 @@ class TagAllMod(loader.Module):
             logger.warning(f"В чате {chat_id} не найдено подходящих участников для TagAll, останавливаем.")
             await self._client.send_message(chat_id, self.strings("no_eligible_participants"))
             event.stop()
-            return # Убрано дублирующее удаление события
+            return
 
         random.shuffle(participants_initial_fetch)
-        # Этот список будет использоваться для первого прохода и последующих циклов, если не требуется обновление
         participants = participants_initial_fetch 
 
         if is_bot_sender:
@@ -437,9 +419,10 @@ class TagAllMod(loader.Module):
                 logger.error(f"Не удалось получить сущность бота или пригласить бота: {e}")
                 await self._client.send_message(chat_id, self.strings("bot_error"))
                 event.stop()
-                return # Убрано дублирующее удаление события
+                return
 
         start_time = time.time()
+        event.last_message_start_time = time.time() # Инициализация времени начала первой отправки
 
         try:
             first_pass = True
@@ -451,8 +434,6 @@ class TagAllMod(loader.Module):
                     event.stop()
                     break
 
-                # Обновляем список участников, если включен цикличный тег, это не первый проход
-                # И разрешено обновление списка участников при цикле.
                 if self.config["cycle_tagging"] and not first_pass and self.config["refresh_participants_on_cycle"]:
                     logger.debug(f"Повторный запрос участников для цикла в чате {chat_id}.")
                     current_cycle_participants = []
@@ -464,12 +445,10 @@ class TagAllMod(loader.Module):
                     if not current_cycle_participants:
                         logger.warning(f"В чате {chat_id} не найдено участников для TagAll для следующего цикла, останавливаем.")
                         break
-                    participants = current_cycle_participants # Обновляем список для нового цикла
+                    participants = current_cycle_participants
                 elif self.config["cycle_tagging"] and not first_pass and not self.config["refresh_participants_on_cycle"]:
-                    # Если обновление не требуется, просто перемешиваем существующий список для следующего цикла
                     random.shuffle(participants)
                 
-                # Проверка, не стал ли список участников пустым после обновления или первоначальной выборки
                 if not participants:
                     logger.warning(f"Список участников пуст, останавливаем TagAll в чате {chat_id}.")
                     event.stop()
@@ -482,6 +461,24 @@ class TagAllMod(loader.Module):
                     if self.config["duration"] > 0 and (time.time() - start_time) > self.config["duration"]:
                         event.stop()
                         break
+
+                    # --- НАЧАЛО ОПТИМИЗАЦИИ ВРЕМЕНИ МЕЖДУ ТЕГАМИ ---
+                    desired_interval = self._get_random_timeout(event)
+                    # Вычисляем, когда должно начаться следующее сообщение
+                    next_possible_start_time = event.last_message_start_time + desired_interval
+                    
+                    current_wall_time = time.time()
+                    
+                    # Рассчитываем, сколько нужно спать, чтобы выдержать интервал
+                    sleep_duration_to_maintain_rate = next_possible_start_time - current_wall_time
+                    
+                    if sleep_duration_to_maintain_rate > 0:
+                        await asyncio.sleep(sleep_duration_to_maintain_rate)
+
+                    # Обновляем время начала последней отправки *перед* текущей отправкой
+                    # Это гарантирует, что `desired_interval` будет соблюдаться между НАЧАЛОМ последовательных операций
+                    event.last_message_start_time = time.time()
+                    # --- КОНЕЦ ОПТИМИЗАЦИИ ВРЕМЕНИ МЕЖДУ ТЕГАМИ ---
 
                     tags = []
                     for user in chunk:
@@ -531,8 +528,6 @@ class TagAllMod(loader.Module):
                         if self.config["delete"]:
                             deleted_message_ids_hikkatl.append(m.id)
 
-                    await asyncio.sleep(self._get_random_timeout(event))
-
                 first_pass = False
                 if self.config["cycle_tagging"] and event.state:
                     await asyncio.sleep(self.config["cycle_delay"])
@@ -556,6 +551,5 @@ class TagAllMod(loader.Module):
             if event.state:
                 logger.info(f"Процесс TagAll завершен естественным образом в чате {chat_id}.")
 
-            # Гарантированное удаление события из словаря в конце работы
             if chat_id in self._tagall_events:
                 del self._tagall_events[chat_id]
