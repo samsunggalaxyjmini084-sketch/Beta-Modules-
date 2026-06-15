@@ -10,7 +10,8 @@ import time
 import re
 
 from hikkatl.tl.functions.channels import InviteToChannelRequest
-from hikkatl.tl.types import Message
+from hikkatl.tl.types import Message, MessageEntity
+from hikkatl.tl.types.message_entity import MessageEntityType # Импортируем MessageEntityType
 
 from .. import loader, utils
 
@@ -70,6 +71,18 @@ class TagAllMod(loader.Module):
         "_cmd_autotagall_doc": "Включить/выключить работу триггеров TagAll (установленных в .cfg)",
     }
 
+    # Определяем типы сущностей, которые считаются "форматированием" (не обычный текст)
+    FORMATTING_ENTITY_TYPES = {
+        MessageEntityType.BOLD,
+        MessageEntityType.ITALIC,
+        MessageEntityType.CODE,
+        MessageEntityType.PRE,
+        MessageEntityType.STRIKETHROUGH,
+        MessageEntityType.UNDERLINE,
+        MessageEntityType.SPOILER,
+        # MessageEntityType.BLOCKQUOTE, # Можно добавить, если блок-цитаты тоже считаются
+    }
+
     def __init__(self):
         self.config = loader.ModuleConfig(
             loader.ConfigValue("delete", False, lambda: self.strings("_cfg_doc_delete"), validator=loader.validators.Boolean()),
@@ -108,6 +121,36 @@ class TagAllMod(loader.Module):
             event.stop()
         self._tagall_events.clear()
 
+    def _is_text_formatted(self, message: Message, text_to_check: str) -> bool:
+        """
+        Проверяет, имеет ли указанный 'text_to_check' внутри сообщения какое-либо
+        специальное форматирование (отличный от обычного шрифт).
+        """
+        if not message.text or not message.entities:
+            return False
+
+        message_text_lower = message.text.lower()
+        text_to_check_lower = text_to_check.lower()
+
+        # Ищем все вхождения текста триггера (без учета регистра)
+        for match in re.finditer(re.escape(text_to_check_lower), message_text_lower):
+            trigger_start = match.start()
+            trigger_end = match.end()
+
+            # Проверяем каждую сущность в сообщении
+            for entity in message.entities:
+                entity_start = entity.offset
+                entity_end = entity.offset + entity.length
+
+                # Проверяем, перекрывается ли сущность с текстом триггера
+                # И является ли тип сущности одним из "форматирующих"
+                if (
+                    entity_end > trigger_start and entity_start < trigger_end
+                    and entity.type in self.FORMATTING_ENTITY_TYPES
+                ):
+                    return True
+        return False
+
     @loader.watcher()
     async def watcher(self, message: Message):
         if not self.config["enable_watcher"]: # Проверка нового параметра
@@ -124,25 +167,27 @@ class TagAllMod(loader.Module):
             # Если allowed_trigger_user_ids настроен и отправитель не в списке, игнорируем триггер
             return
 
-        message_text_lower = message.text.lower()
-        
         # Разбираем множественные стоп-триггеры
+        # Здесь не переводим в lower(), так как _is_text_formatted делает это самостоятельно
         stop_triggers_raw = self.config["stop_trigger"]
-        stop_triggers = [t.strip().lower() for t in stop_triggers_raw.split(',') if t.strip()]
+        stop_triggers = [t.strip() for t in stop_triggers_raw.split(',') if t.strip()]
 
         # Разбираем множественные старт-триггеры
+        # Здесь не переводим в lower(), так как _is_text_formatted делает это самостоятельно
         start_triggers_raw = self.config["start_trigger"]
-        start_triggers = [t.strip().lower() for t in start_triggers_raw.split(',') if t.strip()]
+        start_triggers = [t.strip() for t in start_triggers_raw.split(',') if t.strip()]
 
         # Сначала проверяем стоп-триггер
         for trigger in stop_triggers:
-            if trigger and trigger in message_text_lower:
+            # Активируем только если триггер найден и имеет форматирование
+            if trigger and self._is_text_formatted(message, trigger):
                 await self._stop_logic(message, "")
                 return
 
         # Затем старт-триггер
         for trigger in start_triggers:
-            if trigger and trigger in message_text_lower:
+            # Активируем только если триггер найден и имеет форматирование
+            if trigger and self._is_text_formatted(message, trigger):
                 # Если триггер для запуска найден, весь остальной текст игнорируется.
                 # Поэтому prefix устанавливается в пустую строку.
                 prefix = "" 
