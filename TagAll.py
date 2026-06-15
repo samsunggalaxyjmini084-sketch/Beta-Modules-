@@ -9,6 +9,7 @@ import random
 import time
 import re
 import unicodedata  # Импортируем unicodedata
+from typing import Union, List, Tuple, Any # Импортируем для аннотаций типов в валидаторе
 
 from hikkatl.tl.functions.channels import InviteToChannelRequest
 from hikkatl.tl.types import Message
@@ -33,6 +34,53 @@ class StopEvent:
         self.state = False
 
 
+# Новый класс валидатора для параметра timeout
+class TimeoutValidator(loader.validators.Base):
+    """
+    Валидатор и парсер для значения конфигурации 'timeout'.
+    Преобразует строку в более эффективное внутреннее представление (float, list, tuple).
+    """
+    def __call__(self, value: str, key: str = None) -> Union[float, List[float], Tuple[float, float]]:
+        if not isinstance(value, str):
+            raise ValueError(f"Значение '{key}' должно быть строкой.")
+
+        cleaned = re.sub(r"[^0-9.,-]", "", value)
+        if not cleaned:
+            # Если строка пустая или содержит только нечисловые символы, возвращаем дефолт
+            return 0.1
+
+        try:
+            if "-" in cleaned:
+                parts = cleaned.split("-")
+                if len(parts) != 2:
+                    raise ValueError(f"Для диапазона '{key}' ожидаются два числа, разделенные '-' (например, '0.1-1.0').")
+                min_val = max(0.0, float(parts[0]))
+                max_val = max(0.0, float(parts[1]))
+                if min_val > max_val:
+                    min_val, max_val = max_val, min_val
+                return (min_val, max_val)  # Возвращаем кортеж для диапазона
+
+            if "," in cleaned:
+                vals = []
+                for x in cleaned.split(","):
+                    if x.strip():
+                        val = float(x.strip())
+                        if val < 0.0:
+                            raise ValueError(f"Значения '{key}' не могут быть отрицательными.")
+                        vals.append(val)
+                if not vals:
+                    raise ValueError(f"Список значений '{key}', разделенных запятыми, не может быть пустым.")
+                return vals  # Возвращаем список значений
+
+            single_val = float(cleaned)
+            if single_val < 0.0:
+                raise ValueError(f"Значение '{key}' не может быть отрицательным.")
+            return single_val  # Возвращаем одно число
+
+        except ValueError as e:
+            raise ValueError(f"Неверный формат таймаута для '{key}': '{value}'. Ожидается '0.1', '0.1-1.0' или '0.1,0.5,1.0'. Ошибка: {e}")
+
+
 @loader.tds
 class TagAllMod(loader.Module):
     """Отмечает всех участников чата через команды или триггеры в тексте.
@@ -46,7 +94,6 @@ class TagAllMod(loader.Module):
         "_cfg_doc_timeout": "Время между сообщениями (число, список или диапазон 0.1-1.0)",
         "_cfg_doc_silent": "Не отправлять сообщение с кнопкой отмены",
         "_cfg_doc_cycle_tagging": "Цикличный тег (пока не остановите)",
-        # УДАЛЕНО: "_cfg_doc_cycle_delay": "Задержка между циклами (сек)",
         "_cfg_doc_chunk_size": "Сколько пользователей в одном сообщении",
         "_cfg_doc_duration": "Длительность работы (0 = бесконечно)",
         "_cfg_doc_exclude_user_ids": "ID пользователей-исключений",
@@ -75,10 +122,10 @@ class TagAllMod(loader.Module):
         self.config = loader.ModuleConfig(
             loader.ConfigValue("delete", False, lambda: self.strings("_cfg_doc_delete"), validator=loader.validators.Boolean()),
             loader.ConfigValue("use_bot", False, lambda: self.strings("_cfg_doc_use_bot"), validator=loader.validators.Boolean()),
-            loader.ConfigValue("timeout", "0.1", lambda: self.strings("_cfg_doc_timeout"), validator=loader.validators.String()),
+            # Используем новый валидатор для timeout
+            loader.ConfigValue("timeout", "0.1", lambda: self.strings("_cfg_doc_timeout"), validator=TimeoutValidator()),
             loader.ConfigValue("silent", False, lambda: self.strings("_cfg_doc_silent"), validator=loader.validators.Boolean()),
             loader.ConfigValue("cycle_tagging", False, lambda: self.strings("_cfg_doc_cycle_tagging"), validator=loader.validators.Boolean()),
-            # УДАЛЕНО: loader.ConfigValue("cycle_delay", 0, lambda: self.strings("_cfg_doc_cycle_delay"), validator=loader.validators.Integer(minimum=0)),
             loader.ConfigValue("chunk_size", 3, lambda: self.strings("_cfg_doc_chunk_size"), validator=loader.validators.Integer(minimum=1)),
             loader.ConfigValue("duration", 0, lambda: self.strings("_cfg_doc_duration"), validator=loader.validators.Integer(minimum=0)),
             loader.ConfigValue("exclude_user_ids", "", lambda: self.strings("_cfg_doc_exclude_user_ids"), validator=loader.validators.String()),
@@ -312,10 +359,6 @@ class TagAllMod(loader.Module):
         if target_chat_id in self._tagall_events and self._tagall_events[target_chat_id].state:
             return # Уже запущен
 
-        # Удаляем исходное сообщение, если это исходящая команда или триггер - УДАЛЕНО
-        # if message.out:
-        #     with contextlib.suppress(Exception): await message.delete()
-
         event = StopEvent(target_chat_id)
         self._tagall_events[target_chat_id] = event
         self._client.loop.create_task(self._run_tagall_process(target_chat_id, message_prefix, event))
@@ -327,18 +370,12 @@ class TagAllMod(loader.Module):
         event = self._tagall_events.get(target_chat_id)
         if event and event.state:
             event.stop()
-            # Удаляем исходящее сообщение-триггер/команду - УДАЛЕНО
-            # if message.out: 
-            #     with contextlib.suppress(Exception): await message.delete()
         else:
             await utils.answer(message, self.strings("tagall_not_running").format(chat_id=target_chat_id))
 
     @loader.command(
         groups=True,
         ru_doc=lambda self: self.strings("_cmd_tagall_doc"),
-        # de_doc=lambda self: self.strings("_cmd_tagall_doc"), # Добавить, если нужно
-        # tr_doc=lambda self: self.strings("_cmd_tagall_doc"), # Добавить, если нужно
-        # uz_doc=lambda self: self.strings("_cmd_tagall_doc"), # Добавить, если нужно
     )
     async def tagall(self, message: Message):
         """[<номер чата>] [текст] - Отметить всех участников чата. [текст] будет отправлен вместе с тегами. Если текст не указан, будут отправлены только теги."""
@@ -346,9 +383,6 @@ class TagAllMod(loader.Module):
 
     @loader.command(
         ru_doc=lambda self: self.strings("_cmd_stoptagall_doc"),
-        # de_doc=lambda self: self.strings("_cmd_stoptagall_doc"), # Добавить, если нужно
-        # tr_doc=lambda self: self.strings("_cmd_stoptagall_doc"), # Добавить, если нужно
-        # uz_doc=lambda self: self.strings("_cmd_stoptagall_doc"), # Добавить, если нужно
     )
     async def stoptagall(self, message: Message):
         """[<номер чата>] - Остановить запущенный процесс TagAll в <b>указанном или текущем чате</b>."""
@@ -364,40 +398,38 @@ class TagAllMod(loader.Module):
             await utils.answer(message, self.strings("autotagall_enabled"))
         else:
             await utils.answer(message, self.strings("autotagall_disabled"))
-        # if message.out: # УДАЛЕНО
-        #     with contextlib.suppress(Exception): await message.delete()
 
 
     def _get_random_timeout(self, event: StopEvent) -> float:
-        timeout_str = str(self.config["timeout"])
-        try:
-            cleaned = re.sub(r"[^0-9.,-]", "", timeout_str)
-            if "-" in cleaned:
-                parts = cleaned.split("-")
-                min_val = max(0.0, float(parts[0]))
-                max_val = max(0.0, float(parts[1]))
-                if min_val > max_val: min_val, max_val = max_val, min_val
-                return random.uniform(min_val, max_val)
-            if "," in cleaned:
-                vals = [float(x) for x in cleaned.split(",") if x and float(x) >= 0.0]
+        """
+        Возвращает случайное значение таймаута на основе пред-обработанного значения из конфига.
+        """
+        parsed_timeout = self.config["timeout"] # Теперь это уже float, list или tuple
+
+        if isinstance(parsed_timeout, float):
+            timeout = parsed_timeout
+        elif isinstance(parsed_timeout, tuple) and len(parsed_timeout) == 2:  # Диапазон (min_val, max_val)
+            min_val, max_val = parsed_timeout
+            timeout = random.uniform(min_val, max_val)
+        elif isinstance(parsed_timeout, list):  # Список значений
+            if len(parsed_timeout) > 1 and event.last_timeout is not None and event.last_timeout in parsed_timeout:
                 # Избегаем повторения того же таймаута, если есть несколько значений
-                if len(vals) > 1 and event.last_timeout is not None and event.last_timeout in vals:
-                    available_values = [v for v in vals if v != event.last_timeout]
-                    if available_values:
-                        new_timeout = random.choice(available_values)
-                    else: # Если все значения совпадают с last_timeout, повтор допустим
-                        new_timeout = random.choice(vals)
-                else:
-                    new_timeout = random.choice(vals)
-                event.last_timeout = new_timeout
-                return new_timeout
-            single_val = float(cleaned)
-            event.last_timeout = max(0.0, single_val)
-            return event.last_timeout
-        except (ValueError, TypeError):
-            logger.warning(f"Не удалось разобрать таймаут '{timeout_str}'. Используется значение по умолчанию 0.1.")
-            event.last_timeout = 0.1
-            return 0.1
+                available_values = [v for v in parsed_timeout if v != event.last_timeout]
+                if available_values:
+                    timeout = random.choice(available_values)
+                else: # Если все значения совпадают с last_timeout, повтор допустим
+                    timeout = random.choice(parsed_timeout)
+            else:
+                timeout = random.choice(parsed_timeout)
+        else:
+            # Сюда код не должен доходить при корректной работе валидатора.
+            # Если дошел, это означает непредвиденное состояние конфига.
+            logger.error(f"Неожиданный тип обработанного таймаута: {type(parsed_timeout)}, значение: {parsed_timeout}. Используется значение по умолчанию 0.1.")
+            timeout = 0.1
+        
+        event.last_timeout = timeout
+        return timeout
+
 
     async def _run_tagall_process(self, chat_id: int, message_prefix: str, event: StopEvent):
         """Внутренняя функция для обработки основной логики TagAll."""
@@ -507,7 +539,6 @@ class TagAllMod(loader.Module):
 
                         tags.append(f'<a href="tg://user?id={user.id}">{user_display_name}</a>')
 
-                    # message_prefix уже пустой, если сработал триггер, так что здесь все ок
                     if message_prefix:
                         full_message_text = f"{message_prefix}\n{' '.join(tags)}"
                     else:
@@ -543,9 +574,7 @@ class TagAllMod(loader.Module):
                     await asyncio.sleep(self._get_random_timeout(event))
 
                 first_pass = False
-                # УДАЛЕНО: if self.config["cycle_tagging"] and event.state:
-                # УДАЛЕНО:     await asyncio.sleep(self.config["cycle_delay"])
-                if not self.config["cycle_tagging"]: # Останавливаем, если циклический режим отключен
+                if not self.config["cycle_tagging"]:
                     break
 
         finally:
