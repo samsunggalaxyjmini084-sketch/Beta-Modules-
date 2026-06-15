@@ -9,7 +9,7 @@ import random
 import time
 import re
 import unicodedata  # Импортируем unicodedata
-from typing import Union, List, Tuple, Any # Импортируем для аннотаций типов в валидаторе
+from typing import Union, List, Tuple # Импортируем для аннотаций типов в валидаторе
 
 from hikkatl.tl.functions.channels import InviteToChannelRequest
 from hikkatl.tl.types import Message
@@ -35,7 +35,8 @@ class StopEvent:
 
 
 # Новый класс валидатора для параметра timeout
-class TimeoutValidator(loader.validators.Base):
+# ИСПРАВЛЕНО: Изменено с loader.validators.Base на loader.ConfigValue.BaseValidator
+class TimeoutValidator(loader.ConfigValue.BaseValidator):
     """
     Валидатор и парсер для значения конфигурации 'timeout'.
     Преобразует строку в более эффективное внутреннее представление (float, list, tuple).
