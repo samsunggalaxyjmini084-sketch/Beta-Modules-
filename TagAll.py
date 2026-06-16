@@ -170,6 +170,10 @@ class TagAllMod(loader.Module):
         "bot_error": (
             "🚫 <b>Inline botni chatga taklif qilish muvaffaqiyatsiz bo‘ldi</b>"
         ),
+        "_cls_doc": (
+            "Отмечает всех участников чата, используя инлайн бот или классическим"
+            " методом"
+        ),
         "_cfg_doc_default_message": "Odatiy etiket xabari",
         "_cfg_doc_delete": "Etiketdan so‘ng xabarlarni o‘chirish",
         "_cfg_doc_use_bot": "Odamlarni etiketlash uchun inline botdan foydalanish",
