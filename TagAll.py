@@ -61,8 +61,8 @@ class TagAllMod(loader.Module):
         "_cfg_doc_trigger_system_enabled": "Enable or disable the trigger system for TagAll",
         "_cfg_doc_trigger_on_phrases": "List of phrases that activate TagAll (comma-separated)",
         "_cfg_doc_trigger_off_phrases": "List of phrases that deactivate TagAll (comma-separated)",
-        "_cfg_doc_authorized_user_id": "User ID who can activate/deactivate triggers (0 for any user, leave empty for none)",
-        "_cfg_doc_triggered_tagall_message": "Message to use when TagAll is activated by a trigger",
+        "_cfg_doc_authorized_user_id": "User ID who can activate/deactivate triggers (0 or leave empty for any user)",
+        # Removed _cfg_doc_triggered_tagall_message
         "trigger_enabled": "✅ <b>TagAll trigger system enabled!</b>",
         "trigger_disabled": "❌ <b>TagAll trigger system disabled!</b>",
         "trigger_on_activated": "▶️ <b>TagAll activated by trigger in this chat!</b>",
@@ -95,8 +95,8 @@ class TagAllMod(loader.Module):
         "_cfg_doc_trigger_system_enabled": "Включить или выключить систему триггеров для TagAll",
         "_cfg_doc_trigger_on_phrases": "Список фраз, активирующих TagAll (через запятую)",
         "_cfg_doc_trigger_off_phrases": "Список фраз, деактивирующих TagAll (через запятую)",
-        "_cfg_doc_authorized_user_id": "ID пользователя, который может активировать/деактивировать триггеры (0 для любого пользователя, оставьте пустым для отключения)",
-        "_cfg_doc_triggered_tagall_message": "Сообщение для использования, когда TagAll активирован триггером",
+        "_cfg_doc_authorized_user_id": "ID пользователя, который может активировать/деактивировать триггеры (0 или оставьте пустым для любого пользователя)",
+        # Removed _cfg_doc_triggered_tagall_message
         "trigger_enabled": "✅ <b>Система триггеров TagAll включена!</b>",
         "trigger_disabled": "❌ <b>Система триггеров TagAll выключена!</b>",
         "trigger_on_activated": "▶️ <b>TagAll активирован триггером в этом чате!</b>",
@@ -129,8 +129,8 @@ class TagAllMod(loader.Module):
         "_cfg_doc_trigger_system_enabled": "Triggersystem für TagAll aktivieren oder deaktivieren",
         "_cfg_doc_trigger_on_phrases": "Liste der Phrasen, die TagAll aktivieren (kommagetrennt)",
         "_cfg_doc_trigger_off_phrases": "Liste der Phrasen, die TagAll deaktivieren (kommagetrennt)",
-        "_cfg_doc_authorized_user_id": "Benutzer-ID, die Trigger aktivieren/deaktivieren kann (0 für beliebigen Benutzer, leer lassen für keine)",
-        "_cfg_doc_triggered_tagall_message": "Nachricht, die verwendet wird, wenn TagAll durch einen Trigger aktiviert wird",
+        "_cfg_doc_authorized_user_id": "Benutzer-ID, die Trigger aktivieren/deaktivieren kann (0 oder leer lassen für beliebigen Benutzer)",
+        # Removed _cfg_doc_triggered_tagall_message
         "trigger_enabled": "✅ <b>TagAll Triggersystem aktiviert!</b>",
         "trigger_disabled": "❌ <b>TagAll Triggersystem deaktiviert!</b>",
         "trigger_on_activated": "▶️ <b>TagAll durch Trigger in diesem Chat aktiviert!</b>",
@@ -159,8 +159,8 @@ class TagAllMod(loader.Module):
         "_cfg_doc_trigger_system_enabled": "TagAll için tetikleyici sistemi etkinleştir veya devre dışı bırak",
         "_cfg_doc_trigger_on_phrases": "TagAll'u etkinleştiren ifadeler listesi (virgülle ayrılmış)",
         "_cfg_doc_trigger_off_phrases": "TagAll'u devre dışı bırakan ifadeler listesi (virgülle ayrılmış)",
-        "_cfg_doc_authorized_user_id": "Tetikleyicileri etkinleştirebilecek/devre dışı bırakabilecek kullanıcı kimliği (herhangi bir kullanıcı için 0, boş bırakın)",
-        "_cfg_doc_triggered_tagall_message": "TagAll bir tetikleyici tarafından etkinleştirildiğinde kullanılacak mesaj",
+        "_cfg_doc_authorized_user_id": "Tetikleyicileri etkinleştirebilecek/devre dışı bırakabilecek kullanıcı kimliği (herhangi bir kullanıcı için 0 veya boş bırakın)",
+        # Removed _cfg_doc_triggered_tagall_message
         "trigger_enabled": "✅ <b>TagAll tetikleme sistemi etkinleştirildi!</b>",
         "trigger_disabled": "❌ <b>TagAll tetikleme sistemi devre dışı bırakıldı!</b>",
         "trigger_on_activated": "▶️ <b>TagAll bu sohbette tetikleyici tarafından etkinleştirildi!</b>",
@@ -191,8 +191,8 @@ class TagAllMod(loader.Module):
         "_cfg_doc_trigger_system_enabled": "TagAll uchun trigger tizimini yoqish yoki o'chirish",
         "_cfg_doc_trigger_on_phrases": "TagAll'ni faollashtiradigan iboralar ro'yxati (vergul bilan ajratilgan)",
         "_cfg_doc_trigger_off_phrases": "TagAll'ni o'chiradigan iboralar ro'yxati (vergul bilan ajratilgan)",
-        "_cfg_doc_authorized_user_id": "Triggerlarni faollashtirishi/o'chirishi mumkin bo'lgan foydalanuvchi IDsi (har qanday foydalanuvchi uchun 0, qoldiring bo'sh qoldirilsin)",
-        "_cfg_doc_triggered_tagall_message": "TagAll trigger orqali faollashtirilganda ishlatiladigan xabar",
+        "_cfg_doc_authorized_user_id": "Triggerlarni faollashtirishi/o'chirishi mumkin bo'lgan foydalanuvchi IDsi (har qanday foydalanuvchi uchun 0 yoki bo'sh qoldirilsin)",
+        # Removed _cfg_doc_triggered_tagall_message
         "trigger_enabled": "✅ <b>TagAll trigger tizimi yoqildi!</b>",
         "trigger_disabled": "❌ <b>TagAll trigger tizimi o'chirildi!</b>",
         "trigger_on_activated": "▶️ <b>TagAll ushbu chatda trigger orqali faollashtirildi!</b>",
@@ -266,15 +266,11 @@ class TagAllMod(loader.Module):
             ),
             loader.ConfigValue(
                 "authorized_user_id",
-                None,  # None means no specific user, 0 means any user for backwards compatibility with a common pattern.
+                None,  # None means no specific user, 0 means any user.
                 lambda: self.strings("_cfg_doc_authorized_user_id"),
-                validator=loader.validators.Integer(minimum=0), # FIXED: Removed optional=True
+                validator=loader.validators.Integer(minimum=0),
             ),
-            loader.ConfigValue(
-                "triggered_tagall_message",
-                "@all",
-                lambda: self.strings("_cfg_doc_triggered_tagall_message"),
-            ),
+            # Removed triggered_tagall_message
         )
 
         # Dictionary to store active triggered TagAll tasks: chat_id -> (asyncio.Task, StopEvent)
@@ -308,8 +304,7 @@ class TagAllMod(loader.Module):
 
         # Check authorized user
         authorized_user_id = self.config["authorized_user_id"]
-        # If authorized_user_id is None, any user can trigger.
-        # If authorized_user_id is 0, any user can trigger.
+        # If authorized_user_id is None (empty config) or 0, any user can trigger.
         # If authorized_user_id is a positive integer, only that user can trigger.
         if authorized_user_id is not None and authorized_user_id != 0:
             if message.sender_id != authorized_user_id:
@@ -349,14 +344,13 @@ class TagAllMod(loader.Module):
                     await message.respond(self.strings("trigger_not_running"))
                 return
 
-    async def _perform_tagging(self, message: Message, args: str, stop_event: StopEvent, silent: bool = False, use_triggered_message: bool = False):
+    async def _perform_tagging(self, message: Message, args: str, stop_event: StopEvent, silent: bool = False):
         """
         Core tagging logic, used by both manual command and triggered system.
         :param message: The original message object (for peer_id, chat_id).
         :param args: Arguments for the tagging message (from manual command).
         :param stop_event: An instance of StopEvent to control the tagging loop.
         :param silent: If True, do not send an inline cancel button message.
-        :param use_triggered_message: If True, use the configured triggered_tagall_message.
         """
         if self.config["use_bot"]:
             try:
@@ -388,7 +382,6 @@ class TagAllMod(loader.Module):
                 },
             )
 
-        first = True
         while True:
             if not stop_event.state:
                 if cancel_msg:
@@ -398,14 +391,26 @@ class TagAllMod(loader.Module):
             members = []
             try:
                 async for user in self._client.iter_participants(message.peer_id):
-                    members.append(f'<a href="tg://user?id={user.id}">\xad</a>')
+                    if user.deleted:
+                        continue # Skip deleted users
+
+                    if user.username:
+                        mention = f"@{user.username}"
+                    else:
+                        full_name = utils.get_display_name(user)
+                        # Fallback if display_name is empty (e.g., user has no first/last name set)
+                        if not full_name:
+                            full_name = "Unknown User"
+                        mention = f'<a href="tg://user?id={user.id}">{utils.escape_html(full_name)}</a>'
+                    members.append(mention)
             except Exception as e:
                 logger.error(f"Error iterating participants: {e}")
                 if not silent:
                     await utils.answer(message, f"🚫 <b>Error gathering participants:</b> {e}")
                 break
 
-            message_text_to_use = args or (self.config["triggered_tagall_message"] if use_triggered_message else self.config["default_message"])
+            # The message to use will now always be args (if provided) or default_message
+            message_text_to_use = args or self.config["default_message"]
 
             for chunk in utils.chunks(
                 members,
@@ -422,7 +427,8 @@ class TagAllMod(loader.Module):
                     )(
                         chat_id,
                         utils.escape_html(message_text_to_use)
-                        + "\xad".join(chunk),
+                        + "\xad".join(chunk), # Still use soft hyphen for joining
+                        parse_mode="HTML", # Explicitly set parse_mode for <a> tags and @mentions
                     )
 
                     if self.config["delete"]:
@@ -430,21 +436,18 @@ class TagAllMod(loader.Module):
                             await m.delete()
                 except Exception as e:
                     logger.error(f"Error sending tag message in chat {chat_id}: {e}")
-                    # Handle specific errors if needed, e.g., message too long
                     if "MESSAGE_TOO_LONG" in str(e):
                         logger.warning(f"Tag message too long in chat {chat_id}, consider reducing chunk size or message content.")
-                    # Continue to next chunk or break based on severity
-                    pass # For now, just log and continue
+                    pass
 
                 await asyncio.sleep(self.config["timeout"])
 
             if not stop_event.state:
-                break # Exit loop if stopped during chunk iteration
+                break
 
-            if not self.config["cycle_tagging"]:
-                break # Exit if not cycling
+            if not self.config["cycle_tagging"]: # Break out of loop if not cycling after one pass
+                break
 
-            # If cycling, wait for cycle_delay
             await asyncio.sleep(self.config["cycle_delay"])
 
         if cancel_msg and stop_event.state: # If not stopped by event but loop completed (e.g., no cycle)
@@ -464,7 +467,7 @@ class TagAllMod(loader.Module):
             await message.delete()
 
         stop_event = StopEvent() # Local stop event for manual command
-        await self._perform_tagging(message, args, stop_event, self.config["silent"], use_triggered_message=False)
+        await self._perform_tagging(message, args, stop_event, self.config["silent"])
 
 
     async def _run_triggered_tagall(self, message: Message, stop_event: StopEvent):
@@ -473,13 +476,12 @@ class TagAllMod(loader.Module):
         This runs as a background task and does not create its own cancel button.
         """
         try:
-            await self._perform_tagging(message, "", stop_event, silent=True, use_triggered_message=True)
+            # Pass an empty string for args; it will fall back to default_message
+            await self._perform_tagging(message, "", stop_event, silent=True)
         except asyncio.CancelledError:
             logger.info(f"Triggered TagAll task for chat {utils.get_chat_id(message)} cancelled.")
         finally:
             chat_id = utils.get_chat_id(message)
             if chat_id in self._active_tagall_tasks:
-                # Remove the task from the tracking dict regardless of how it finished,
-                # as it's no longer actively tagging for this trigger.
                 del self._active_tagall_tasks[chat_id]
             logger.info(f"Triggered TagAll task for chat {utils.get_chat_id(message)} finished/removed from tracking.")
