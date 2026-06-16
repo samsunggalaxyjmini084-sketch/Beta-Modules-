@@ -54,6 +54,7 @@ class TagAllMod(loader.Module):
             " the button in the message"
         ),
         "_cfg_doc_cycle_delay": "Delay between each cycle of tagging in seconds",
+        "_cfg_doc_chunk_size": "Number of users to tag in one message (max 5 for inline bot, higher for client)",
         "gathering": "🧚‍♀️ <b>Calling participants of this chat...</b>",
         "cancel": "🚫 Cancel",
         "cancelled": "🧚‍♀️ <b>TagAll cancelled!</b>",
@@ -87,6 +88,7 @@ class TagAllMod(loader.Module):
             " используя кнопку в сообщении"
         ),
         "_cfg_doc_cycle_delay": "Задержка между циклами тегов в секундах",
+        "_cfg_doc_chunk_size": "Количество пользователей для тега в одном сообщении (макс 5 для инлайн бота, больше для клиента)",
         "gathering": "🧚‍♀️ <b>Отмечаю участников чата...</b>",
         "cancel": "🚫 Отмена",
         "cancelled": "🧚‍♀️ <b>Сбор участников отменен!</b>",
@@ -120,6 +122,7 @@ class TagAllMod(loader.Module):
         "_cfg_doc_cycle_delay": (
             "Verzögerung zwischen jedem Zyklus der Erwähnung in Sekunden"
         ),
+        "_cfg_doc_chunk_size": "Anzahl der Benutzer, die in einer Nachricht erwähnt werden sollen (max. 5 für Inline-Bot, mehr für Client)",
         "gathering": "🧚‍♀️ <b>Erwähne Teilnehmer dieses Chats...</b>",
         "cancel": "🚫 Abbrechen",
         "cancelled": "🧚‍♀️ <b>TagAll abgebrochen!</b>",
@@ -149,6 +152,7 @@ class TagAllMod(loader.Module):
             " tekrar tekrar etiketle"
         ),
         "_cfg_doc_cycle_delay": "Etiketleme döngüsü arasındaki gecikme süresi (saniye)",
+        "_cfg_doc_chunk_size": "Tek mesajda etiketlenecek kullanıcı sayısı (inline bot için maks 5, client için daha fazla)",
         "gathering": "🧚‍♀️ <b>Bu sohbetteki katılımcıları çağırıyorum...</b>",
         "cancel": "🚫 İptal",
         "cancelled": "🧚‍♀️ <b>TagAll iptal edildi!</b>",
@@ -184,6 +188,7 @@ class TagAllMod(loader.Module):
             " qatnashuvchilarni qayta-qayta etiketlash"
         ),
         "_cfg_doc_cycle_delay": "Har bir etiketlash tsikli orasida gecikma (soniya)",
+        "_cfg_doc_chunk_size": "Bitta xabarda belgilash uchun foydalanuvchilar soni (inline bot uchun maks 5, client uchun ko'proq)",
         "gathering": "🧚‍♀️ <b>Ushbu chatta qatnashganlarni chaqiraman...</b>",
         "cancel": "🚫 Bekor qilish",
         "cancelled": "🧚‍♀️ <b>TagAll bekor qilindi!</b>",
@@ -243,6 +248,12 @@ class TagAllMod(loader.Module):
                 0,
                 lambda: self.strings("_cfg_doc_cycle_delay"),
                 validator=loader.validators.Integer(minimum=0),
+            ),
+            loader.ConfigValue(
+                "chunk_size",
+                5, # Default to 5 users per message
+                lambda: self.strings("_cfg_doc_chunk_size"),
+                validator=loader.validators.Integer(minimum=1),
             ),
             # New config values for triggers
             loader.ConfigValue(
@@ -421,7 +432,7 @@ class TagAllMod(loader.Module):
 
             for chunk in utils.chunks(
                 members,
-                5,
+                self.config["chunk_size"], # Use configurable chunk_size
             ):
                 if not stop_event.state: # Check again before sending each chunk
                     break
