@@ -47,7 +47,7 @@ class TagAllMod(loader.Module):
         "_cfg_doc_default_message": "Default message of mentions",
         "_cfg_doc_delete": "Delete messages after tagging",
         "_cfg_doc_use_bot": "Use inline bot to tag people",
-        "_cfg_doc_timeout": "What time interval to sleep between each tag message",
+        "_cfg_doc_timeout": "What time interval to sleep between each tag message. Lower values risk hitting Telegram API flood limits, causing longer forced delays.",
         "_cfg_doc_silent": "Do not send message with cancel button",
         "_cfg_doc_cycle_tagging": (
             "Tag all participants over and over again until you stop the script using"
@@ -58,6 +58,8 @@ class TagAllMod(loader.Module):
         "gathering": "🧚‍♀️ <b>Calling participants of this chat...</b>",
         "cancel": "🚫 Cancel",
         "cancelled": "🧚‍♀️ <b>TagAll cancelled!</b>",
+        "no_participants": "🚫 <b>No participants found to tag in this chat.</b>",
+        "error_gathering_participants": "🚫 <b>Error gathering participants:</b> {}",
         # New strings for triggers
         "_cfg_doc_trigger_system_enabled": "Enable or disable the trigger system for TagAll",
         "_cfg_doc_trigger_on_phrases": "List of phrases that activate TagAll (comma-separated)",
@@ -81,7 +83,7 @@ class TagAllMod(loader.Module):
         "_cfg_doc_default_message": "Сообщение по умолчанию для тегов",
         "_cfg_doc_delete": "Удалять сообщения после тега",
         "_cfg_doc_use_bot": "Использовать бота для тегов",
-        "_cfg_doc_timeout": "Время между сообщениями с тегами",
+        "_cfg_doc_timeout": "Время между сообщениями с тегами. Меньшие значения увеличивают риск попадания под Flood Wait от Telegram, вызывая более длительные принудительные задержки.",
         "_cfg_doc_silent": "Не отправлять сообщение с кнопкой отмены",
         "_cfg_doc_cycle_tagging": (
             "Тегать всех участников снова и снова, пока вы не остановите скрипт,"
@@ -92,6 +94,8 @@ class TagAllMod(loader.Module):
         "gathering": "🧚‍♀️ <b>Отмечаю участников чата...</b>",
         "cancel": "🚫 Отмена",
         "cancelled": "🧚‍♀️ <b>Сбор участников отменен!</b>",
+        "no_participants": "🚫 <b>Участники для тега не найдены.</b>",
+        "error_gathering_participants": "🚫 <b>Ошибка при сборе участников:</b> {}",
         # New strings for triggers (Russian)
         "_cfg_doc_trigger_system_enabled": "Включить или выключить систему триггеров для TagAll",
         "_cfg_doc_trigger_on_phrases": "Список фраз, активирующих TagAll (через запятую)",
@@ -105,15 +109,14 @@ class TagAllMod(loader.Module):
         "trigger_not_running": "ℹ️ <b>TagAll не запущен в этом чате.</b>",
         "not_authorized": "🚫 <b>Вы не авторизованы для использования триггеров TagAll.</b>",
     }
-
+    
+    # ... (other languages omitted for brevity, ensure they are updated similarly)
     strings_de = {
         "bot_error": "🚫 <b>Einladung des Inline-Bots in den Chat fehlgeschlagen</b>",
         "_cfg_doc_default_message": "Standardnachricht für Erwähnungen",
         "_cfg_doc_delete": "Nachrichten nach Erwähnung löschen",
         "_cfg_doc_use_bot": "Inline-Bot verwenden, um Leute zu erwähnen",
-        "_cfg_doc_timeout": (
-            "Zeitintervall, in dem zwischen den Erwähnungen gewartet wird"
-        ),
+        "_cfg_doc_timeout": "Zeitintervall, in dem zwischen den Erwähnungen gewartet wird. Niedrigere Werte bergen das Risiko, Telegram-API-Flood-Limits zu erreichen, was zu längeren erzwungenen Verzögerungen führt.",
         "_cfg_doc_silent": "Nachricht ohne Abbrechen-Button senden",
         "_cfg_doc_cycle_tagging": (
             "Alle Teilnehmer immer wieder erwähnen, bis du das Skript mit der"
@@ -126,7 +129,8 @@ class TagAllMod(loader.Module):
         "gathering": "🧚‍♀️ <b>Erwähne Teilnehmer dieses Chats...</b>",
         "cancel": "🚫 Abbrechen",
         "cancelled": "🧚‍♀️ <b>TagAll abgebrochen!</b>",
-        # New strings for triggers (German)
+        "no_participants": "🚫 <b>Keine Teilnehmer zum Markieren in diesem Chat gefunden.</b>",
+        "error_gathering_participants": "🚫 <b>Fehler beim Sammeln der Teilnehmer:</b> {}",
         "_cfg_doc_trigger_system_enabled": "Triggersystem für TagAll aktivieren oder deaktivieren",
         "_cfg_doc_trigger_on_phrases": "Liste der Phrasen, die TagAll aktivieren (kommagetrennt)",
         "_cfg_doc_trigger_off_phrases": "Liste der Phrasen, die TagAll deaktivieren (kommagetrennt)",
@@ -145,7 +149,7 @@ class TagAllMod(loader.Module):
         "_cfg_doc_default_message": "Varsayılan etiket mesajı",
         "_cfg_doc_delete": "Etiketledikten sonra mesajları sil",
         "_cfg_doc_use_bot": "İnsanları etiketlemek için inline botu kullan",
-        "_cfg_doc_timeout": "Her etiket mesajı arasında ne kadar bekleneceği",
+        "_cfg_doc_timeout": "Her etiket mesajı arasında ne kadar bekleneceği. Daha düşük değerler, Telegram API sel limitlerine ulaşma riskini artırır ve daha uzun zorunlu gecikmelere neden olur.",
         "_cfg_doc_silent": "İptal düğmesi olmadan mesaj gönderme",
         "_cfg_doc_cycle_tagging": (
             "Mesajdaki düğmeyi kullanarak betiği durdurana kadar tüm katılımcıları"
@@ -156,7 +160,8 @@ class TagAllMod(loader.Module):
         "gathering": "🧚‍♀️ <b>Bu sohbetteki katılımcıları çağırıyorum...</b>",
         "cancel": "🚫 İptal",
         "cancelled": "🧚‍♀️ <b>TagAll iptal edildi!</b>",
-        # New strings for triggers (Turkish)
+        "no_participants": "🚫 <b>Bu sohbette etiketlenecek katılımcı bulunamadı.</b>",
+        "error_gathering_participants": "🚫 <b>Katılımcı toplarken hata oluştu:</b> {}",
         "_cfg_doc_trigger_system_enabled": "TagAll için tetikleyici sistemi etkinleştir veya devre dışı bırak",
         "_cfg_doc_trigger_on_phrases": "TagAll'u etkinleştiren ifadeler listesi (virgülle ayrılmış)",
         "_cfg_doc_trigger_off_phrases": "TagAll'u devre dışı bırakan ifadeler listesi (virgülle ayrılmış)",
@@ -181,7 +186,7 @@ class TagAllMod(loader.Module):
         "_cfg_doc_default_message": "Odatiy etiket xabari",
         "_cfg_doc_delete": "Etiketdan so‘ng xabarlarni o‘chirish",
         "_cfg_doc_use_bot": "Odamlarni etiketlash uchun inline botdan foydalanish",
-        "_cfg_doc_timeout": "Har bir etiket xabari orasida nechta kutish kerak",
+        "_cfg_doc_timeout": "Har bir etiket xabari orasida nechta kutish kerak. Kichikroq qiymatlar Telegram API flood limitlariga tushish xavfini oshiradi, bu esa majburiy kechikishlarga olib keladi.",
         "_cfg_doc_silent": "Bekor tugmasi olmadan xabar jo‘natish",
         "_cfg_doc_cycle_tagging": (
             "Xabar bo‘yicha tugmani ishlatib, skriptni to‘xtatguncha barcha"
@@ -192,7 +197,8 @@ class TagAllMod(loader.Module):
         "gathering": "🧚‍♀️ <b>Ushbu chatta qatnashganlarni chaqiraman...</b>",
         "cancel": "🚫 Bekor qilish",
         "cancelled": "🧚‍♀️ <b>TagAll bekor qilindi!</b>",
-        # New strings for triggers (Uzbek)
+        "no_participants": "🚫 <b>Bu chatda belgilash uchun ishtirokchilar topilmadi.</b>",
+        "error_gathering_participants": "🚫 <b>Ishtirokchilarni yig'ishda xato:</b> {}",
         "_cfg_doc_trigger_system_enabled": "TagAll uchun trigger tizimini yoqish yoki o'chirish",
         "_cfg_doc_trigger_on_phrases": "TagAll'ni faollashtiradigan iboralar ro'yxati (vergul bilan ajratilgan)",
         "_cfg_doc_trigger_off_phrases": "TagAll'ni o'chiradigan iboralar ro'yxati (vergul bilan ajratilgan)",
@@ -205,6 +211,7 @@ class TagAllMod(loader.Module):
         "trigger_not_running": "ℹ️ <b>TagAll bu chatda ishlamayapti.</b>",
         "not_authorized": "🚫 <b>Siz TagAll triggerlaridan foydalanishga ruxsat etilmagansiz.</b>",
     }
+
 
     def __init__(self):
         self.config = loader.ModuleConfig(
@@ -390,6 +397,50 @@ class TagAllMod(loader.Module):
                     "args": (stop_event,),
                 },
             )
+        
+        # --- OPTIMIZATION: Fetch participants ONCE before the main loop ---
+        all_members = []
+        try:
+            async for user in self._client.iter_participants(message.peer_id):
+                if user.deleted:
+                    continue # Skip deleted users
+
+                if user.username:
+                    mention = f"@{user.username}"
+                else:
+                    # Construct full_name manually
+                    full_name_parts = []
+                    if user.first_name:
+                        full_name_parts.append(user.first_name)
+                    if user.last_name:
+                        full_name_parts.append(user.last_name)
+                    
+                    full_name = " ".join(full_name_parts).strip()
+                    
+                    # Fallback if full_name is still empty (e.g., user has no first/last name set)
+                    if not full_name:
+                        full_name = "Unknown User"
+                    
+                    mention = f'<a href="tg://user?id={user.id}">{utils.escape_html(full_name)}</a>'
+                all_members.append(mention)
+            
+            if not all_members: # If no members found
+                if not silent:
+                    await utils.answer(message, self.strings("no_participants"))
+                if cancel_msg:
+                    await cancel_msg.delete()
+                return # Exit if no members to tag
+
+        except Exception as e:
+            logger.error(f"Error gathering participants: {e}")
+            if not silent:
+                await utils.answer(message, self.strings("error_gathering_participants").format(utils.escape_html(str(e))))
+            if cancel_msg:
+                await cancel_msg.delete()
+            return # Exit on error
+        # -----------------------------------------------------------------
+
+        message_text_to_use = args or self.config["default_message"]
 
         while True:
             if not stop_event.state:
@@ -397,41 +448,8 @@ class TagAllMod(loader.Module):
                     await cancel_msg.edit(self.strings("cancelled"))
                 break # Exit loop if stopped
 
-            members = []
-            try:
-                async for user in self._client.iter_participants(message.peer_id):
-                    if user.deleted:
-                        continue # Skip deleted users
-
-                    if user.username:
-                        mention = f"@{user.username}"
-                    else:
-                        # Construct full_name manually
-                        full_name_parts = []
-                        if user.first_name:
-                            full_name_parts.append(user.first_name)
-                        if user.last_name:
-                            full_name_parts.append(user.last_name)
-                        
-                        full_name = " ".join(full_name_parts).strip()
-                        
-                        # Fallback if full_name is still empty (e.g., user has no first/last name set)
-                        if not full_name:
-                            full_name = "Unknown User"
-                        
-                        mention = f'<a href="tg://user?id={user.id}">{utils.escape_html(full_name)}</a>'
-                    members.append(mention)
-            except Exception as e:
-                logger.error(f"Error iterating participants: {e}")
-                if not silent:
-                    await utils.answer(message, f"🚫 <b>Error gathering participants:</b> {e}")
-                break
-
-            # The message to use will now always be args (if provided) or default_message
-            message_text_to_use = args or self.config["default_message"]
-
             for chunk in utils.chunks(
-                members,
+                all_members, # Use the pre-fetched list of members
                 self.config["chunk_size"], # Use configurable chunk_size
             ):
                 if not stop_event.state: # Check again before sending each chunk
@@ -456,6 +474,9 @@ class TagAllMod(loader.Module):
                     logger.error(f"Error sending tag message in chat {chat_id}: {e}")
                     if "MESSAGE_TOO_LONG" in str(e):
                         logger.warning(f"Tag message too long in chat {chat_id}, consider reducing chunk size or message content.")
+                    elif "FLOOD_WAIT" in str(e): # Explicitly log flood waits
+                         logger.warning(f"Hit FLOOD_WAIT in chat {chat_id}. Telegram forced a delay of {e.seconds} seconds.")
+                         # Note: Telethon/Aiogram usually handle sleeping for e.seconds automatically.
                     pass
 
                 await asyncio.sleep(self.config["timeout"])
