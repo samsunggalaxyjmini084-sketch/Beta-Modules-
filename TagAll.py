@@ -1,12 +1,12 @@
 # meta developer: @yourhandle
 # meta name: TagAll
-# meta version: 2.0.42  # Updated version
+# meta version: 2.0.42 # Updated version to reflect changes
 #
 # 01101110 01100101 01110110 01100101 01110010 00100000 01100111 01101001 01110110 01100101 00100000 01110101 01110000
 # 01101110 01100101 01110110 01100101 01110010 00100000 01101100 01100101 01110100 00100000 01111001 01101111 01110101 00100000 01100100 01101111 01110111 01101110
 # 01101110 01100101 01110110 01100101 01110010 00100000 01110010 01110101 01101110 00100000 01100001 01110010 01101111 01110101 01101110 01100100 00100000 01100001 01101110 01100100 00100000 01100100 01100101 01110011 01100101 01110010 01110100 00100000 01111001 01101111 01110101
 # 01101110 01100101 01110110 01100101 01110010 00100000 01101101 01100001 01101011 01100101 00100000 01111001 01101111 01110101 00100000 01100011 01110010 01111001 00100000 01101110 01100101 01110110 01100101 01110010 00100000 01110011 01100001 01111001 00100000 01100111 01101111 01101111 01100100 01100010 01111001 01100101
-# 01101110 01100101 01110110 01100101 01110010 00100000 01110100 01100101 01101100 00100000 01100001 01101100 01101100 00100000 01100001 00100000 01101100 01101001 01100101 00100000 01100001 01110010 01101111 01110101 01101110 01100100 00100000 01100001 01101110 00100000 01101000 01110101 01110010 01110100 01111001 01101111 01110101
+# 01101110 01100101 01110110 01100101 01110010 00100000 01110100 01100101 01101100 00100000 01100001 01101100 01101100 00100000 01100001 00100000 01101100 01101001 01100101 00100000 01100001 01110010 01101111 01110101 01101110 01100100 00100000 01100001 01101110 00100000 01101000 01110101 01110010 01111001 01101111 01110101
 # (Rick Astley - Never Gonna Give You Up)
 
 import asyncio
@@ -42,71 +42,41 @@ class StopEvent:
 
 @loader.tds
 class TagAllMod(loader.Module):
-    """Отмечает всех участников чата, используя инлайн бот или классическим методом"""
+    """Отмечает всех участников чата через команды или триггеры в тексте.
+    Включает/выключает работу триггеров командой .autotagall."""
 
     strings = {
         "name": "TagAll",
-        "bot_error": "🚫 <b>Не получилось пригласить бота в чат или тип чата не поддерживается для приглашения бота.</b>",
+        "bot_error": "🚫 <b>Не получилось пригласить бота в чат.</b>",
         "_cfg_doc_delete": "Удалять сообщения после тега",
         "_cfg_doc_use_bot": "Использовать бота для тегов",
-        "_cfg_doc_timeout": (
-            "Время между сообщениями с тегами. Можно указать одно значение (например, '0.1'),"
-            " несколько значений через запятую (например, '0.1, 0.5, 1.0') или диапазон"
-            " (например, '0.1-1.0')."
-        ),
+        "_cfg_doc_timeout": "Время между сообщениями (число, список или диапазон 0.1-1.0)",
         "_cfg_doc_silent": "Не отправлять сообщение с кнопкой отмены",
-        "_cfg_doc_cycle_tagging": (
-            "Тегать всех участников снова и снова, пока вы не остановите скрипт,"
-            " используя кнопку в сообщении"
+        "_cfg_doc_cycle_tagging": "Цикличный тег (пока не остановите)",
+        "_cfg_doc_cycle_delay": "Задержка между циклами (сек)",
+        "_cfg_doc_chunk_size": "Сколько пользователей в одном сообщении",
+        "_cfg_doc_duration": "Длительность работы (0 = бесконечно)",
+        "_cfg_doc_exclude_user_ids": "ID пользователей-исключений",
+        "_cfg_doc_allowed_chat_ids": "ID разрешенных чатов для выполнения команд",
+        "_cfg_start_trigger": "Триггер(ы) для запуска (если есть в тексте сообщения). Разделяйте запятыми.",
+        "_cfg_stop_trigger": "Триггер(ы) для остановки (если есть в тексте сообщения). Разделяйте запятыми.",
+        "_cfg_doc_allowed_trigger_user_ids": (
+            "ID пользователей, которые могут использовать триггеры (через текст сообщения). "
+            "Разделяйте запятыми. Если пусто, любой может использовать триггеры."
         ),
-        "_cfg_doc_cycle_delay": "Задержка между циклами тегов в секундах",
-        "_cfg_doc_chunk_size": "Сколько пользователей тегать в одном сообщении",
-        "_cfg_doc_duration": "Как долго (в секундах) должен работать процесс TagAll. Установите 0 для неограниченного времени.",
-        "_cfg_doc_trigger_message": (
-            "Сообщение(я)-триггер(ы) для остановки TagAll. Разделяйте запятыми."
-            " Можно указать индекс чата в скобках, например 'стоп(1)'. Если индекс"
-            " указан, триггер сработает только в соответствующем чате. Без индекса"
-            " триггер сработает в любом разрешенном чате."
-        ),
-        "_cfg_doc_trigger_user_id": (
-            "ID пользователя(ей) или бота(ов), который(ые) может(могут) остановить TagAll сообщением-триггером."
-            " Разделяйте запятыми. Можно указать индекс чата в скобках, например '12345(1)'."
-            " Если индекс указан, пользователь сможет остановить TagAll только в соответствующем чате."
-            " Без индекса пользователь сможет остановить TagAll в любом разрешенном чате."
-            " Установите пустым, чтобы любой мог остановить."
-        ),
-        "_cfg_doc_activation_trigger_message": (
-            "Сообщение(я)-триггер(ы) для запуска TagAll. Разделяйте запятыми."
-            " Можно указать индекс чата в скобках, например 'запуск(1)'. Если индекс"
-            " указан, триггер сработает только в соответствующем чате. Без индекса"
-            " триггер сработает в любом разрешенном чате."
-        ),
-        "_cfg_doc_activation_trigger_user_id": (
-            "ID пользователя(ей) или бота(ов), который(ые) может(могут) запустить TagAll сообщением-триггером."
-            " Разделяйте запятыми. Можно указать индекс чата в скобках, например '12345(1)'."
-            " Если индекс указан, пользователь сможет запустить TagAll только в соответствующем чате."
-            " Без индекса пользователь сможет запустить TagAll в любом разрешенном чате."
-            " Установите пустым, чтобы любой мог запустить."
-        ),
-        "_cfg_doc_exclude_user_ids": "ID пользователя(ей), которых не нужно тегать. Разделяйте запятыми. Например: <code>123456789, 987654321</code>",
-        "_cfg_doc_allowed_chat_ids": "ID чата(ов), в которых разрешено использовать команды модуля TagAll. Разделяйте запятыми. Если указан только один ID, команды, запущенные в других чатах, будут автоматически перенаправлены в этот чат. Если пусто, команды разрешены во всех чатах.",
-        "_cmd_autotagall_doc": "[<номер чата>] [on|off] - Включить или выключить триггеры для запуска/остановки TagAll в <b>указанном или текущем чате</b>. Используйте `on` для включения, `off` для выключения. Без аргументов покажет статус триггеров.",
+        "_cfg_doc_enable_watcher": "Включить/выключить работу триггеров (команда .autotagall)",
+        "tagall_not_running": "🚫 <b>TagAll не запущен в чате {chat_id}.</b>",
+        "tagall_already_running": "🚫 <b>TagAll уже запущен в чате {chat_id}.</b>",
+        "no_eligible_participants": "🚫 <b>Нет подходящих участников.</b>",
+        "cmd_redirected": "➡️ <b>Команда перенаправлена в чат</b> <code>{target_chat_id}</code>, так как он единственный разрешенный.",
+        "cmd_not_allowed_multiple": "🚫 <b>Чат не в белом списке. Разрешенные:</b> {allowed_chats}.",
+        "trigger_not_allowed": "🚫 <b>Вам не разрешено использовать триггеры для TagAll.</b>",
+        "autotagall_enabled": "✅ <b>Работа триггеров TagAll включена.</b>",
+        "autotagall_disabled": "❌ <b>Работа триггеров TagAll выключена.</b>",
         "_cmd_tagall_doc": "[<номер чата>] [текст] - Отметить всех участников чата. [текст] будет отправлен вместе с тегами. Если текст не указан, будут отправлены только теги.",
         "_cmd_stoptagall_doc": "[<номер чата>] - Остановить запущенный процесс TagAll в <b>указанном или текущем чате</b>.",
-        "triggers_state_enabled": "✅ <b>Триггеры TagAll включены в чате {chat_id}!</b>",
-        "triggers_state_disabled": "❌ <b>Триггеры TagAll выключены в чате {chat_id}!</b>",
-        "triggers_status_enabled": "✅ <b>Триггеры TagAll в чате {chat_id} включены.</b>",
-        "triggers_status_disabled": "❌ <b>Триггеры TagAll в чате {chat_id} выключены.</b>",
-        "invalid_trigger_arg": "🚫 <b>Неверный аргумент. Используйте 'on', 'off' или оставьте пустым для просмотра статуса.</b>",
-        "tagall_not_running": "🚫 <b>TagAll в данный момент не запущен в чате {chat_id}.</b>",
-        "tagall_already_running": "🚫 <b>TagAll уже запущен в чате {chat_id}. Используйте <code>.stoptagall</code>, чтобы остановить его.</b>",
-        "no_eligible_participants": "🚫 <b>В этом чате нет подходящих участников для тега.</b>",
-        "cmd_redirected": "➡️ <b>Команда перенаправлена в чат</b> <code>{target_chat_id}</code>, так как он единственный разрешенный.",
-        "cmd_not_allowed": "🚫 <b>Эта команда не может быть использована в текущем чате, и нет единственного разрешенного чата для перенаправления.</b>",
-        "cmd_not_allowed_current": "🚫 <b>Эта команда не может быть использована в текущем чате.</b>",
-        "cmd_redirected_indexed": "➡️ <b>Команда перенаправлена в чат</b> <code>{target_chat_id}</code> (индекс <code>{index}</code>).",
+        "_cmd_autotagall_doc": "Включить/выключить работу триггеров TagAll (установленных в .cfg)",
         "invalid_chat_index": "🚫 <b>Неверный индекс чата</b> <code>{index}</code>. Разрешенные чаты: {allowed_chats}.",
-        "cmd_not_allowed_multiple": "🚫 <b>Эта команда не может быть использована в текущем чате. Укажите индекс чата или используйте в одном из разрешенных чатов:</b> {allowed_chats}.",
     }
 
     strings_de = {
@@ -128,51 +98,25 @@ class TagAllMod(loader.Module):
         ),
         "_cfg_doc_chunk_size": "Wie viele Benutzer in einer Nachricht erwähnt werden sollen",
         "_cfg_doc_duration": "Wie lange (in Sekunden) der TagAll-Prozess laufen soll. Auf 0 für unbegrenzte Zeit einstellen.",
+        "_cfg_start_trigger": "Trigger zum Starten (wenn im Nachrichtentext vorhanden). Durch Kommas trennen.",
+        "_cfg_stop_trigger": "Trigger zum Stoppen (wenn im Nachrichtentext vorhanden). Durch Kommas trennen.",
+        "_cfg_doc_allowed_trigger_user_ids": (
+            "Benutzer-ID(s), die Trigger verwenden dürfen (über Nachrichtentext). "
+            "Durch Kommas trennen. Wenn leer, darf jeder Trigger verwenden."
+        ),
+        "_cfg_doc_enable_watcher": "Trigger-Überwachung aktivieren/deaktivieren (.autotagall Befehl)",
         "tagall_not_running": "🚫 <b>TagAll läuft derzeit nicht in Chat {chat_id}.</b>",
-        "tagall_already_running": "🚫 <b>TagAll läuft bereits in Chat {chat_id}. Verwenden Sie <code>.stoptagall</code>, um es zu stoppen.</b>",
-        "_cfg_doc_trigger_message": (
-            "Trigger-Nachricht(en), um TagAll zu stoppen. Kommagetrennt eingeben."
-            " Sie können einen Chat-Index in Klammern angeben, z. B. 'stop(1)'. Wenn der Index"
-            " angegeben ist, wird der Trigger nur im entsprechenden Chat ausgelöst. Ohne Index"
-            " wird der Trigger in jedem erlaubten Chat ausgelöst."
-        ),
-        "_cfg_doc_trigger_user_id": (
-            "ID(s) des Benutzers oder Bots, der TagAll mit einer Trigger-Nachricht stoppen kann."
-            " Kommagetrennt eingeben. Sie können einen Chat-Index in Klammern angeben, z. B. '12345(1)'."
-            " Wenn der Index angegeben ist, kann der Benutzer TagAll nur in dem entsprechenden Chat stoppen."
-            " Ohne Index kann der Benutzer TagAll in jedem erlaubten Chat stoppen."
-            " Leer lassen, damit jeder stoppen kann."
-        ),
-        "_cfg_doc_activation_trigger_message": (
-            "Trigger-Nachricht(en) zum Starten von TagAll. Kommagetrennt eingeben."
-            " Sie können einen Chat-Index in Klammern angeben, z. B. 'start(1)'. Wenn der Index"
-            " angegeben ist, wird der Trigger nur im entsprechenden Chat ausgelöst. Ohne Index"
-            " wird der Trigger in jedem erlaubten Chat ausgelöst."
-        ),
-        "_cfg_doc_activation_trigger_user_id": (
-            "ID(s) des Benutzers oder Bots, der TagAll mit einer Trigger-Nachricht starten kann."
-            " Kommagetrennt eingeben. Sie können einen Chat-Index in Klammern angeben, z. B. '12345(1)'."
-            " Wenn der Index angegeben ist, kann der Benutzer TagAll nur in dem entsprechenden Chat starten."
-            " Ohne Index kann der Benutzer TagAll in jedem erlaubten Chat starten."
-            " Leer lassen, damit jeder starten kann."
-        ),
-        "_cfg_doc_exclude_user_ids": "Benutzer-ID(s), die nicht erwähnt werden sollen. Kommagetrennt eingeben. Zum Beispiel: <code>123456789, 987654321</code>",
-        "_cfg_doc_allowed_chat_ids": "Chat-ID(s), in denen die TagAll-Modulbefehle verwendet werden dürfen. Durch Kommas getrennt eingeben. Wenn nur eine ID angegeben ist, werden Befehle, die in anderen Chats ausgeführt werden, automatisch in diesen Chat umgeleitet. Wenn leer, sind Befehle in allen Chats erlaubt.",
-        "_cmd_autotagall_doc": "[<Chat-Nummer>] [on|off] - Trigger zum Starten/Stoppen von TagAll im <b>angegebenen oder aktuellen Chat</b> aktivieren oder deaktivieren. Verwenden Sie `on` zum Aktivieren, `off` zum Deaktivieren. Ohne Argumente wird der Trigger-Status angezeigt.",
-        "_cmd_tagall_doc": "[<Chat-Nummer>] [Text] - Alle Chatteilnehmer erwähnen. [Text] wird zusammen mit den Erwähnungen gesendet. Wenn kein Text angegeben ist, werden nur die Erwähnungen gesendet.",
-        "_cmd_stoptagall_doc": "[<Chat-Nummer>] - Den laufenden TagAll-Prozess im <b>angegebenen oder aktuellen Chat</b> stoppen.",
-        "triggers_state_enabled": "✅ <b>TagAll Trigger in Chat {chat_id} aktiviert!</b>",
-        "triggers_state_disabled": "❌ <b>TagAll Trigger in Chat {chat_id} deaktiviert!</b>",
-        "triggers_status_enabled": "✅ <b>TagAll Trigger in Chat {chat_id} aktiviert.</b>",
-        "triggers_status_disabled": "❌ <b>TagAll Trigger in Chat {chat_id} deaktiviert.</b>",
-        "invalid_trigger_arg": "🚫 <b>Ungültiges Argument. Verwenden Sie 'on', 'off' oder lassen Sie es leer, um den Status anzuzeigen.</b>",
+        "tagall_already_running": "🚫 <b>TagAll läuft bereits in Chat {chat_id}.</b>",
         "no_eligible_participants": "🚫 <b>In diesem Chat gibt es keine geeigneten Teilnehmer zum Taggen.</b>",
         "cmd_redirected": "➡️ <b>Befehl wurde in Chat</b> <code>{target_chat_id}</code> umgeleitet, da dies der einzige erlaubte ist.",
-        "cmd_not_allowed": "🚫 <b>Dieser Befehl darf im aktuellen Chat nicht verwendet werden, und es gibt keinen einzigen erlaubten Chat zur Umleitung.</b>",
-        "cmd_not_allowed_current": "🚫 <b>Dieser Befehl darf im aktuellen Chat nicht verwendet werden.</b>",
-        "cmd_redirected_indexed": "➡️ <b>Befehl wurde in Chat</b> <code>{target_chat_id}</code> (Index <code>{index}</code>) umgeleitet.",
+        "cmd_not_allowed_multiple": "🚫 <b>Chat nicht auf der Whitelist. Erlaubt sind:</b> {allowed_chats}.",
+        "trigger_not_allowed": "🚫 <b>Sie dürfen TagAll-Trigger nicht verwenden.</b>",
+        "autotagall_enabled": "✅ <b>TagAll Trigger-Überwachung aktiviert.</b>",
+        "autotagall_disabled": "❌ <b>TagAll Trigger-Überwachung deaktiviert.</b>",
+        "_cmd_tagall_doc": "[<Chat-Nummer>] [Text] - Alle Chatteilnehmer erwähnen. [Text] wird zusammen mit den Erwähnungen gesendet. Wenn kein Text angegeben ist, werden nur die Erwähnungen gesendet.",
+        "_cmd_stoptagall_doc": "[<Chat-Nummer>] - Den laufenden TagAll-Prozess im <b>angegebenen oder aktuellen Chat</b> stoppen.",
+        "_cmd_autotagall_doc": "TagAll Trigger-Überwachung aktivieren/deaktivieren (in .cfg festgelegt)",
         "invalid_chat_index": "🚫 <b>Ungültiger Chat-Index</b> <code>{index}</code>. Erlaubte Chats: {allowed_chats}.",
-        "cmd_not_allowed_multiple": "🚫 <b>Dieser Befehl darf im aktuellen Chat nicht verwendet werden. Geben Sie einen Chat-Index an oder verwenden Sie ihn in einem der erlaubten Chats:</b> {allowed_chats}.",
     }
 
     strings_tr = {
@@ -192,49 +136,25 @@ class TagAllMod(loader.Module):
         "_cfg_doc_cycle_delay": "Etiketleme döngüsü arasındaki gecikme süresi (saniye)",
         "_cfg_doc_chunk_size": "Bir mesajda kaç kullanıcı etiketlenecek",
         "_cfg_doc_duration": "TagAll sürecinin ne kadar süre (saniye) çalışması gerektiği. Sınırsız süre için 0 olarak ayarlayın.",
-        "_cfg_doc_trigger_message": (
-            "TagAll'u durdurmak için tetikleyici mesaj(lar). Virgülle ayırın."
-            " Parantez içinde sohbet dizini belirtebilirsiniz, örneğin 'durdur(1)'. Eğer dizin"
-            " belirtilirse, tetikleyici yalnızca ilgili sohbette çalışır. Dizin yoksa,"
-            " tetikleyici izin verilen herhangi bir sohbette çalışır."
+        "_cfg_start_trigger": "Başlatma tetikleyicisi(leri) (mesaj metninde varsa). Virgülle ayırın.",
+        "_cfg_stop_trigger": "Durdurma tetikleyicisi(leri) (mesaj metninde varsa). Virgülle ayırın.",
+        "_cfg_doc_allowed_trigger_user_ids": (
+            "Tetikleyicileri kullanabilecek kullanıcı kimliği(leri) (mesaj metni aracılığıyla). "
+            "Virgülle ayırın. Boşsa, herkes tetikleyicileri kullanabilir."
         ),
-        "_cfg_doc_trigger_user_id": (
-            "TagAll'u tetikleyici mesajla durdurabilecek kullanıcı veya bot kimliği(leri)."
-            " Virgülle ayırın. Parantez içinde sohbet dizini belirtebilirsiniz, örneğin '12345(1)'."
-            " Eğer dizin belirtilirse, kullanıcı TagAll'u yalnızca ilgili sohbette durdurabilir."
-            " Dizin yoksa, kullanıcı TagAll'u izin verilen herhangi bir sohbette durdurabilir."
-            " Herkesin durdurabilmesi için boş bırakın."
-        ),
-        "_cfg_doc_activation_trigger_message": (
-            "TagAll'u başlatmak için tetikleyici mesaj(lar). Virgülle ayırın."
-            " Parantez içinde sohbet dizini belirtebilirsiniz, örneğin 'başlat(1)'. Eğer dizin"
-            " belirtilirse, tetikleyici yalnızca ilgili sohbette çalışır. Dizin yoksa,"
-            " tetikleyici izin verilen herhangi bir sohbette çalışır."
-        ),
-        "_cfg_doc_activation_trigger_user_id": (
-            "TagAll'u tetikleyici mesajla başlatabilecek kullanıcı veya bot kimliği(leri)."
-            " Virgülle ayırın. Parantez içinde sohbet dizini belirtebilirsiniz, örneğin '12345(1)'."
-            " Eğer dizin belirtilirse, kullanıcı TagAll'u yalnızca ilgili sohbette başlatabilir."
-            " Dizin yoksa, kullanıcı TagAll'u izin verilen herhangi bir sohbette başlatabilir."
-            " Herkesin başlatabilmesi için boş bırakın."
-        ),
-        "_cfg_doc_exclude_user_ids": "Etiketlenmeyecek kullanıcı kimliği(leri). Virgülle ayırın. Örneğin: <code>123456789, 987654321</code>",
-        "_cfg_doc_allowed_chat_ids": "TagAll modül komutlarının kullanılabileceği sohbet kimliği(leri). Virgülle ayırın. Yalnızca bir kimlik belirtilirse, diğer sohbetlerde başlatılan komutlar otomatik olarak bu sohbete yönlendirilecektir. Boş bırakılırsa, komutlara tüm sohbetlerde izin verilir.",
-        "_cmd_autotagall_doc": "[<Sohbet Numarası>] [on|off] - TagAll'u başlatmak/durdurmak için tetikleyicileri <b>belirtilen veya mevcut sohbette</b> etkinleştir veya devre dışı bırak. Etkinleştirmek için `on`, devre dışı bırakmak için `off` kullanın. Argüman olmadan tetikleyici durumunu gösterir.",
+        "_cfg_doc_enable_watcher": "Tetikleyici izleyiciyi etkinleştir/devre dışı bırak (.autotagall komutu)",
+        "tagall_not_running": "🚫 <b>TagAll {chat_id} sohbetinde çalışmıyor.</b>",
+        "tagall_already_running": "🚫 <b>TagAll {chat_id} sohbetinde zaten çalışıyor.</b>",
+        "no_eligible_participants": "🚫 <b>Uygun katılımcı yok.</b>",
+        "cmd_redirected": "➡️ <b>Komut, izin verilen tek sohbet olduğu için</b> <code>{target_chat_id}</code> sohbetine yönlendirildi.",
+        "cmd_not_allowed_multiple": "🚫 <b>Sohbet beyaz listede değil. İzin verilenler:</b> {allowed_chats}.",
+        "trigger_not_allowed": "🚫 <b>TagAll tetikleyicilerini kullanmanıza izin verilmiyor.</b>",
+        "autotagall_enabled": "✅ <b>TagAll Tetikleyici İzleyici etkinleştirildi.</b>",
+        "autotagall_disabled": "❌ <b>TagAll Tetikleyici İzleyici devre dışı bırakıldı.</b>",
         "_cmd_tagall_doc": "[<Sohbet Numarası>] [metin] - Sohbet katılımcılarını etiketle. [metin] etiketlerle birlikte gönderilecektir. Metin belirtilmezse, sadece etiketler gönderilecektir.",
         "_cmd_stoptagall_doc": "[<Sohbet Numarası>] - Çalışan TagAll sürecini <b>belirtilen veya mevcut sohbette</b> durdur.",
-        "triggers_state_enabled": "✅ <b>TagAll Tetikleyiciler {chat_id} sohbetinde etkinleştirildi!</b>",
-        "triggers_state_disabled": "❌ <b>TagAll Tetikleyiciler {chat_id} sohbetinde devre dışı bırakıldı!</b>",
-        "triggers_status_enabled": "✅ <b>TagAll Tetikleyiciler {chat_id} sohbetinde etkin.</b>",
-        "triggers_status_disabled": "❌ <b>TagAll Tetikleyiciler {chat_id} sohbetinde devre dışı.</b>",
-        "invalid_trigger_arg": "🚫 <b>Geçersiz argüman. 'on', 'off' kullanın veya durumu görmek için boş bırakın.</b>",
-        "no_eligible_participants": "🚫 <b>Bu sohbette etiketlenecek uygun katılımcı yok.</b>",
-        "cmd_redirected": "➡️ <b>Komut, izin verilen tek sohbet olduğu için</b> <code>{target_chat_id}</code> sohbetine yönlendirildi.",
-        "cmd_not_allowed": "🚫 <b>Bu komut mevcut sohbette kullanılamaz ve yönlendirmek için tek bir izin verilen sohbet yok.</b>",
-        "cmd_not_allowed_current": "🚫 <b>Bu komut mevcut sohbette kullanılamaz.</b>",
-        "cmd_redirected_indexed": "➡️ <b>Komut,</b> <code>{target_chat_id}</code> (dizin <code>{index}</code>) sohbetine yönlendirildi.",
-        "invalid_chat_index": "🚫 <b>Ungültiger Chat-Index</b> <code>{index}</code>. Erlaubte Chats: {allowed_chats}.",
-        "cmd_not_allowed_multiple": "🚫 <b>Dieser Befehl darf im aktuellen Chat nicht verwendet werden. Geben Sie einen Chat-Index an oder verwenden Sie ihn in einem der erlaubten Chats:</b> {allowed_chats}.",
+        "_cmd_autotagall_doc": "TagAll Tetikleyici İzleyiciyi etkinleştir/devre dışı bırak (.cfg'de ayarlandı)",
+        "invalid_chat_index": "🚫 <b>Geçersiz sohbet dizini</b> <code>{index}</code>. İzin verilen sohbetler: {allowed_chats}.",
     }
 
     strings_uz = {
@@ -256,161 +176,125 @@ class TagAllMod(loader.Module):
         "_cfg_doc_cycle_delay": "Har bir etiketlash tsikli orasida gecikma (soniya)",
         "_cfg_doc_chunk_size": "Bir xabarda nechta foydalanuvchi etiketlanadi",
         "_cfg_doc_duration": "TagAll jarayoni qancha vaqt (soniya) ishlashi kerak. Cheksiz vaqt uchun 0 ga o'rnating.",
-        "_cfg_doc_trigger_message": (
-            "TagAllni to'xtatish uchun trigger xabari(lari). Vergul bilan ajrating."
-            " Qavslar ichida chat indeksini ko'rsatishingiz mumkin, masalan, 'to'xtat(1)'. Agar indeks"
-            " ko'rsatilgan bo'lsa, trigger faqat tegishli chatda ishlaydi. Indekssiz"
-            " trigger ruxsat berilgan har qanday chatda ishlaydi."
+        "_cfg_start_trigger": "Ishga tushirish uchun trigger(lar) (agar xabar matnida bo'lsa). Vergul bilan ajrating.",
+        "_cfg_stop_trigger": "To'xtatish uchun trigger(lar) (agar xabar matnida bo'lsa). Vergul bilan ajrating.",
+        "_cfg_doc_allowed_trigger_user_ids": (
+            "Triggerlardan foydalana oladigan foydalanuvchi(lar) ID'si(lari) (xabar matni orqali). "
+            "Vergul bilan ajrating. Agar bo'sh bo'lsa, har kim triggerlardan foydalana oladi."
         ),
-        "_cfg_doc_trigger_user_id": (
-            "TagAllni trigger xabari bilan to'xtata oladigan foydalanuvchi(lar) yoki bot(lar) ID'si(lari)."
-            " Vergul bilan ajrating. Qavslar ichida chat indeksini ko'rsatishingiz mumkin, masalan, '12345(1)'."
-            " Agar indeks ko'rsatilgan bo'lsa, foydalanuvchi TagAllni faqat tegishli chatda to'xtata oladi."
-            " Indekssiz foydalanuvchi TagAllni ruxsat berilgan har qanday chatda to'xtata oladi."
-            " Bo'sh qoldiring, shunda har kim to'xtata oladi."
-        ),
-        "_cfg_doc_activation_trigger_message": (
-            "TagAllni ishga tushirish uchun trigger xabari(lari). Vergul bilan ajrating."
-            " Qavslar ichida chat indeksini ko'rsatishingiz mumkin, masalan, 'ishga_tushir(1)'. Agar indeks"
-            " ko'rsatilgan bo'lsa, trigger faqat tegishli chatda ishlaydi. Indekssiz"
-            " trigger ruxsat berilgan har qanday chatda ishlaydi."
-        ),
-        "_cfg_doc_activation_trigger_user_id": (
-            "TagAllni trigger xabari bilan ishga tushira oladigan foydalanuvchi(lar) yoki bot(lar) ID'si(lari)."
-            " Vergul bilan ajrating. Qavslar ichida chat indeksini ko'rsatishingiz mumkin, masalan, '12345(1)'."
-            " Agar indeks ko'rsatilgan bo'lsa, foydalanuvchi TagAllni faqat tegishli chatda ishga tushira oladi."
-            " Indekssiz foydalanuvchi TagAllni ruxsat berilgan har qanday chatda ishga tushira oladi."
-            " Bo'sh qoldiring, shunda har kim ishga tushira oladi."
-        ),
-        "_cfg_doc_exclude_user_ids": "Etiketlanmaydigan foydalanuvchi ID(lar)i. Vergul bilan ajrating. Misol uchun: <code>123456789, 987654321</code>",
-        "_cfg_doc_allowed_chat_ids": "TagAll modul buyruqlaridan foydalanishga ruxsat berilgan chat ID(lar)i. Vergul bilan ajrating. Agar faqat bitta ID ko'rsatilgan bo'lsa, boshqa chatlarda ishga tushirilgan buyruqlar avtomatik ravishda ushbu chatga yo'naltiriladi. Bo'sh bo'lsa, buyruqlarga barcha chatlarda ruxsat beriladi.",
-        "_cmd_autotagall_doc": "[<Chat raqami>] [on|off] - TagAllni ishga tushirish/to'xtatish uchun triggerlarni <b>ko'rsatilgan yoki joriy chatda</b> yoqish yoki o'chirish. Yoqish uchun `on`, o'chirish uchun `off` dan foydalaning. Argumentlarsiz triggerlar holatini ko'rsatadi.",
+        "_cfg_doc_enable_watcher": "Trigger kuzatuvchini yoqish/o'chirish (.autotagall buyrug'i)",
+        "tagall_not_running": "🚫 <b>TagAll {chat_id} chatida ishga tushirilmagan.</b>",
+        "tagall_already_running": "🚫 <b>TagAll {chat_id} chatida allaqachon ishga tushirilgan.</b>",
+        "no_eligible_participants": "🚫 <b>Mos ishtirokchilar topilmadi.</b>",
+        "cmd_redirected": "➡️ <b>Buyruq, ruxsat berilgan yagona chat bo'lgani uchun</b> <code>{target_chat_id}</code> chatiga yo'naltirildi.",
+        "cmd_not_allowed_multiple": "🚫 <b>Chat oq ro'yxatda emas. Ruxsat berilganlar:</b> {allowed_chats}.",
+        "trigger_not_allowed": "🚫 <b>TagAll triggerlaridan foydalanishga ruxsat berilmagan.</b>",
+        "autotagall_enabled": "✅ <b>TagAll Trigger Kuzatuvchisi yoqilgan.</b>",
+        "autotagall_disabled": "❌ <b>TagAll Trigger Kuzatuvchisi o'chirilgan.</b>",
         "_cmd_tagall_doc": "[<Chat raqami>] [matn] - Chat qatnashuvchilarini tegish. [matn] teglar bilan birga yuboriladi. Agar matn ko'rsatilgan bo'lsa, teglar bilan birga yuboriladi. Matn ko'rsatilmagan bo'lsa, faqat teglar yuboriladi.",
         "_cmd_stoptagall_doc": "[<Chat raqami>] - Ishlayotgan TagAll jarayonini <b>ko'rsatilgan yoki joriy chatda</b> to'xtatish.",
-        "triggers_state_enabled": "✅ <b>TagAll triggerlari {chat_id} chatida yoqildi!</b>",
-        "triggers_state_disabled": "❌ <b>TagAll triggerlari {chat_id} chatida o'chirildi!</b>",
-        "triggers_status_enabled": "✅ <b>TagAll triggerlari {chat_id} chatida yoqilgan.</b>",
-        "triggers_status_disabled": "❌ <b>TagAll triggerlari {chat_id} chatida o'chirilgan.</b>",
-        "invalid_trigger_arg": "🚫 <b>Noto'g'ri argument. 'on', 'off' dan foydalaning yoki holatini ko'rish uchun bo'sh qoldiring.</b>",
-        "no_eligible_participants": "🚫 <b>Bu chatda tegish uchun mos ishtirokchilar topilmadi.</b>",
-        "cmd_redirected": "➡️ <b>Buyruq, ruxsat berilgan yagona chat bo'lgani uchun</b> <code>{target_chat_id}</code> chatiga yo'naltirildi.",
-        "cmd_not_allowed": "🚫 <b>Ushbu buyruq joriy chatda ishlatilmaydi va yo'naltirish uchun yagona ruxsat berilgan chat yo'q.</b>",
-        "cmd_not_allowed_current": "🚫 <b>Ushbu buyruq joriy chatda ishlatilmaydi.</b>",
-        "cmd_redirected_indexed": "➡️ <b>Buyruq,</b> <code>{target_chat_id}</code> (indeks <code>{index}</code>) chatiga yo'naltirildi.",
+        "_cmd_autotagall_doc": "TagAll Trigger Kuzatuvchisini yoqish/o'chirish (.cfg'da o'rnatilgan)",
         "invalid_chat_index": "🚫 <b>Noto'g'ri chat indeksi</b> <code>{index}</code>. Ruxsat berilgan chatlar: {allowed_chats}.",
-        "cmd_not_allowed_multiple": "🚫 <b>Ushbu buyruq joriy chatda ishlatilmaydi. Chat indeksini ko'rsating yoki ruxsat berilgan chatlardan birida foydalaning:</b> {allowed_chats}.",
     }
 
     def __init__(self):
         self.config = loader.ModuleConfig(
+            loader.ConfigValue("delete", False, lambda: self.strings("_cfg_doc_delete"), validator=loader.validators.Boolean()),
+            loader.ConfigValue("use_bot", False, lambda: self.strings("_cfg_doc_use_bot"), validator=loader.validators.Boolean()),
+            loader.ConfigValue("timeout", "0.1", lambda: self.strings("_cfg_doc_timeout"), validator=loader.validators.String()),
+            loader.ConfigValue("silent", False, lambda: self.strings("_cfg_doc_silent"), validator=loader.validators.Boolean()),
+            loader.ConfigValue("cycle_tagging", False, lambda: self.strings("_cfg_doc_cycle_tagging"), validator=loader.validators.Boolean()),
+            loader.ConfigValue("cycle_delay", 0, lambda: self.strings("_cfg_doc_cycle_delay"), validator=loader.validators.Integer(minimum=0)),
+            loader.ConfigValue("chunk_size", 3, lambda: self.strings("_cfg_doc_chunk_size"), validator=loader.validators.Integer(minimum=1)),
+            loader.ConfigValue("duration", 0, lambda: self.strings("_cfg_doc_duration"), validator=loader.validators.Integer(minimum=0)),
+            loader.ConfigValue("exclude_user_ids", "", lambda: self.strings("_cfg_doc_exclude_user_ids"), validator=loader.validators.String()),
+            loader.ConfigValue("allowed_chat_ids", "", lambda: self.strings("_cfg_doc_allowed_chat_ids"), validator=loader.validators.String()),
+            # New trigger system config values
+            loader.ConfigValue("start_trigger", "тагалл", lambda: self.strings("_cfg_start_trigger"), validator=loader.validators.String()),
+            loader.ConfigValue("stop_trigger", "стоп таг", lambda: self.strings("_cfg_stop_trigger"), validator=loader.validators.String()),
             loader.ConfigValue(
-                "delete",
-                False,
-                lambda: self.strings("_cfg_doc_delete"),
+                "allowed_trigger_user_ids",
+                "",
+                lambda: self.strings("_cfg_doc_allowed_trigger_user_ids"),
+                validator=loader.validators.String(),
+            ),
+            loader.ConfigValue(
+                "enable_watcher",
+                True,
+                lambda: self.strings("_cfg_doc_enable_watcher"),
                 validator=loader.validators.Boolean(),
-            ),
-            loader.ConfigValue(
-                "use_bot",
-                False,
-                lambda: self.strings("_cfg_doc_use_bot"),
-                validator=loader.validators.Boolean(),
-            ),
-            loader.ConfigValue(
-                "timeout",
-                "0.1",
-                lambda: self.strings("_cfg_doc_timeout"),
-                validator=loader.validators.String(),
-            ),
-            loader.ConfigValue(
-                "silent",
-                False,
-                lambda: self.strings("_cfg_doc_silent"),
-                validator=loader.validators.Boolean(),
-            ),
-            loader.ConfigValue(
-                "cycle_tagging",
-                False,
-                lambda: self.strings("_cfg_doc_cycle_tagging"),
-                validator=loader.validators.Boolean(),
-            ),
-            loader.ConfigValue(
-                "cycle_delay",
-                0,
-                lambda: self.strings("_cfg_doc_cycle_delay"),
-                validator=loader.validators.Integer(minimum=0),
-            ),
-            loader.ConfigValue(
-                "chunk_size",
-                3,
-                lambda: self.strings("_cfg_doc_chunk_size"),
-                validator=loader.validators.Integer(minimum=1),
-            ),
-            loader.ConfigValue(
-                "duration",
-                0,
-                lambda: self.strings("_cfg_doc_duration"),
-                validator=loader.validators.Integer(minimum=0),
-            ),
-            loader.ConfigValue(
-                "trigger_message",
-                "",
-                lambda: self.strings("_cfg_doc_trigger_message"),
-                validator=loader.validators.String(),
-            ),
-            loader.ConfigValue(
-                "trigger_user_id",
-                "",
-                lambda: self.strings("_cfg_doc_trigger_user_id"),
-                validator=loader.validators.String(),
-            ),
-            loader.ConfigValue(
-                "activation_trigger_message",
-                "",
-                lambda: self.strings("_cfg_doc_activation_trigger_message"),
-                validator=loader.validators.String(),
-            ),
-            loader.ConfigValue(
-                "activation_trigger_user_id",
-                "",
-                lambda: self.strings("_cfg_doc_activation_trigger_user_id"),
-                validator=loader.validators.String(),
-            ),
-            loader.ConfigValue(
-                "exclude_user_ids",
-                "",
-                lambda: self.strings("_cfg_doc_exclude_user_ids"),
-                validator=loader.validators.String(),
-            ),
-            loader.ConfigValue(
-                "allowed_chat_ids",
-                "",
-                lambda: self.strings("_cfg_doc_allowed_chat_ids"),
-                validator=loader.validators.String(),
             ),
         )
         self._tagall_events: dict[int, StopEvent] = {}
-        self._message_watcher_handler = None  # Для хранения ссылки на обработчик событий
 
     async def client_ready(self, client, db):
         self._client = client
         self._db = db
-        # Убедитесь, что обработчик событий добавлен только один раз
-        if not self._message_watcher_handler:
-            self._message_watcher_handler = self._client.add_event_handler(self._message_watcher, events.NewMessage(incoming=True))
 
     async def on_unload(self):
-        # Удаляем обработчик событий, чтобы он не вызывался после выгрузки
-        if self._client and self._message_watcher_handler:
-            self._client.remove_event_handler(self._message_watcher_handler)
-            self._message_watcher_handler = None
-
         # Останавливаем все запущенные процессы TagAll
-        # Итерируем по копии значений словаря, чтобы избежать RuntimeError, если словарь изменяется во время итерации
         for event in list(self._tagall_events.values()):
             if event.state:
                 event.stop()
         self._tagall_events.clear()
         logger.info("Все процессы TagAll остановлены из-за выгрузки модуля.")
+
+    @loader.watcher(incoming=True)
+    async def watcher(self, message: Message):
+        """Отслеживает входящие сообщения на предмет настроенных триггерных сообщений (остановка и запуск) и опциональных пользователей."""
+        if not self.config["enable_watcher"]:  # Проверка, включен ли наблюдатель
+            return
+
+        if not isinstance(message, Message) or not message.text or message.out:
+            return
+
+        chat_id = message.chat_id
+
+        allowed_chats_map = self._get_allowed_chat_ids_map()
+        allowed_chat_ids_set = set(allowed_chats_map.values())
+        if allowed_chat_ids_set and chat_id not in allowed_chat_ids_set:
+            # Игнорировать триггеры из неразрешенных чатов
+            return
+
+        # Проверяем, разрешено ли отправителю использовать триггеры
+        allowed_trigger_ids_raw = self.config["allowed_trigger_user_ids"]
+        allowed_trigger_ids = {int(x.strip()) for x in allowed_trigger_ids_raw.split(",") if x.strip().isdigit()}
+
+        if allowed_trigger_ids and message.sender_id not in allowed_trigger_ids:
+            # Если allowed_trigger_user_ids настроен и отправитель не в списке, игнорируем триггер
+            logger.debug(f"Пользователь {message.sender_id} не авторизован для использования триггеров TagAll в чате {chat_id}.")
+            return
+
+        message_text_lower = message.text.lower()
+
+        # Разбираем множественные стоп-триггеры
+        stop_triggers_raw = self.config["stop_trigger"]
+        stop_triggers = [t.strip().lower() for t in stop_triggers_raw.split(',') if t.strip()]
+
+        # Разбираем множественные старт-триггеры
+        start_triggers_raw = self.config["start_trigger"]
+        start_triggers = [t.strip().lower() for t in start_triggers_raw.split(',') if t.strip()]
+
+        # Сначала проверяем стоп-триггер
+        for trigger in stop_triggers:
+            if trigger and trigger in message_text_lower:
+                logger.info(f"TagAll остановлен триггерным сообщением '{message.text}' от отправителя {message.sender_id if message.sender else 'unknown'} в чате {chat_id}")
+                await self._stop_logic(message, "") # Пустые аргументы, т.к. триггер не содержит номера чата
+                return # Выходим после первого сработавшего стоп-триггера
+
+        # Затем старт-триггер
+        for trigger in start_triggers:
+            if trigger and trigger in message_text_lower:
+                if chat_id in self._tagall_events and self._tagall_events[chat_id].state:
+                    logger.info(f"TagAll уже запущен в чате {chat_id}, игнорируем триггер активации.")
+                    return
+
+                logger.info(f"TagAll активирован триггерным сообщением '{message.text}' от отправителя {message.sender_id if message.sender else 'unknown'} в чате {chat_id}")
+                # Если триггер для запуска найден, весь остальной текст игнорируется.
+                # Поэтому prefix устанавливается в пустую строку.
+                prefix = ""
+                await self._start_logic(message, prefix)
+                return # Выходим после первого сработавшего старт-триггера
 
     def _get_allowed_chat_ids_map(self) -> dict[int, int]:
         """
@@ -444,7 +328,6 @@ class TagAllMod(loader.Module):
         Возвращает None для effective_target_chat_id в случае ошибки.
         """
         original_chat_id = message.chat_id
-        effective_target_chat_id = original_chat_id
         remaining_args = raw_args.strip()
 
         allowed_chats_map = self._get_allowed_chat_ids_map()
@@ -458,8 +341,7 @@ class TagAllMod(loader.Module):
                 if chat_index in allowed_chats_map:
                     effective_target_chat_id = allowed_chats_map[chat_index]
                     remaining_args = chat_index_match.group(2).strip()
-                    if effective_target_chat_id != original_chat_id:
-                        await utils.answer(message, self.strings("cmd_redirected_indexed").format(target_chat_id=effective_target_chat_id, index=chat_index))
+                    # Сообщения о перенаправлении не отправляются, согласно логике TagAll.py
                     return effective_target_chat_id, remaining_args
                 else:
                     await utils.answer(message, self.strings("invalid_chat_index").format(index=chat_index, allowed_chats=self._format_allowed_chats_list(allowed_chats_map)))
@@ -481,50 +363,12 @@ class TagAllMod(loader.Module):
             if len(allowed_chat_ids_set) == 1:
                 # Только один разрешенный чат, перенаправляем туда
                 redirect_chat_id = next(iter(allowed_chat_ids_set))
-                await utils.answer(message, self.strings("cmd_redirected").format(target_chat_id=redirect_chat_id))
+                # Сообщения о перенаправлении не отправляются, согласно логике TagAll.py
                 return redirect_chat_id, remaining_args
             else:
                 # Несколько разрешенных чатов, но не текущий, и индекс не указан. Ошибка.
                 await utils.answer(message, self.strings("cmd_not_allowed_multiple").format(allowed_chats=self._format_allowed_chats_list(allowed_chats_map)))
                 return None, None
-
-    def _parse_trigger_string(self, trigger_raw: str) -> tuple[str, int | None]:
-        """Парсит необработанную строку триггера на базовое сообщение и необязательный индекс чата."""
-        # Regex для захвата базового сообщения и опционального индекса в скобках
-        match = re.match(r"^(.*?)(?:\s*\((\d+)\))?$", trigger_raw.strip())
-        if match:
-            base_message = match.group(1).strip().lower()
-            chat_index_str = match.group(2)
-            chat_index = int(chat_index_str) if chat_index_str else None
-            return base_message, chat_index
-        return trigger_raw.strip().lower(), None  # Fallback, если regex не сработал
-
-    def _parse_id_string_with_index(self, raw_id_string: str) -> list[tuple[int, int | None]]:
-        """
-        Парсит строку ID, которая может содержать индексы чатов (например, '12345, 67890(1), 11111(2)')
-        в список кортежей (ID: int, chat_index: int | None).
-        """
-        parsed_ids = []
-        # Разделяем по запятым
-        for part in raw_id_string.split(','):
-            part = part.strip()
-            if not part:
-                continue
-
-            match = re.match(r"^\s*(\d+)(?:\s*\((\d+)\))?\s*$", part)
-            if match:
-                try:
-                    user_id = int(match.group(1))
-                    chat_index_str = match.group(2)
-                    chat_index = int(chat_index_str) if chat_index_str else None
-                    if user_id > 0: # ID должен быть положительным
-                        parsed_ids.append((user_id, chat_index))
-                except ValueError:
-                    logger.warning(f"Неверный ID пользователя или индекс чата в конфигурации: '{part}'. Должен быть целым числом.")
-            else:
-                logger.warning(f"Не удалось разобрать часть конфигурации ID пользователя: '{part}'. Не соответствует ожидаемому формату 'ID' или 'ID(индекс)'.")
-        return parsed_ids
-
 
     def _get_random_timeout(self, event: StopEvent) -> float:
         """
@@ -533,7 +377,7 @@ class TagAllMod(loader.Module):
         Гарантирует, что один и тот же таймаут не повторяется в двух последовательных вызовах,
         если указано несколько различных значений.
         """
-        timeout_str = self.config["timeout"]
+        timeout_str = str(self.config["timeout"])
         default_timeout = 0.1
         current_timeout = default_timeout
 
@@ -597,141 +441,44 @@ class TagAllMod(loader.Module):
         event.last_timeout = current_timeout
         return current_timeout
 
-    async def _message_watcher(self, message: Message):
-        """Отслеживает входящие сообщения на предмет настроенных триггерных сообщений (остановка и запуск) и опциональных пользователей."""
-        if not message.text or not message.chat_id or message.out:
+    async def _start_logic(self, message: Message, prefix: str):
+        """Внутренняя логика для запуска TagAll."""
+        target_chat_id, message_prefix = await self._resolve_target_chat(message, prefix)
+        if target_chat_id is None:
             return
 
-        chat_id = message.chat_id
-
-        allowed_chats_map = self._get_allowed_chat_ids_map()
-        allowed_chats_set = set(allowed_chats_map.values())
-        if allowed_chats_set and chat_id not in allowed_chats_set:
-            # Игнорировать триггеры из неразрешенных чатов
+        if target_chat_id in self._tagall_events and self._tagall_events[target_chat_id].state:
+            # Если уже запущен, отправляем сообщение только если это не триггер из watcher
+            if message.out: # Только если это была команда
+                await utils.answer(message, self.strings("tagall_already_running").format(chat_id=target_chat_id))
             return
 
-        current_tagall_event = self._tagall_events.get(chat_id)
-        message_text_lower = message.text.strip().lower()
-        sender_id = message.sender.id if message.sender else None
+        # Удаляем исходное сообщение, если это исходящая команда или триггер
+        if message.out:
+            with contextlib.suppress(Exception): await message.delete()
 
-        # Получаем настройки триггеров для каждого чата
-        stop_triggers_enabled = self._db.get(self.name, f"stop_triggers_enabled_{chat_id}", False)
-        activation_triggers_enabled = self._db.get(self.name, f"activation_triggers_enabled_{chat_id}", False)
+        event = StopEvent(target_chat_id)
+        self._tagall_events[target_chat_id] = event
+        self._client.loop.create_task(self._run_tagall_process(target_chat_id, message_prefix, event))
 
-        # --- Общий парсинг ID пользователей для триггеров (остановки и активации) ---
-        # Формируем наборы глобальных и чат-специфичных разрешенных ID пользователей
-        stop_global_user_ids = set()
-        stop_specific_user_ids_by_chat = {} # {chat_id: set_of_uids}
+    async def _stop_logic(self, message: Message, args: str):
+        """Внутренняя логика для остановки TagAll."""
+        target_chat_id, _ = await self._resolve_target_chat(message, args)
+        if target_chat_id is None:
+            return
 
-        raw_stop_user_ids = self.config["trigger_user_id"]
-        parsed_stop_uids_with_indexes = self._parse_id_string_with_index(raw_stop_user_ids)
+        event = self._tagall_events.get(target_chat_id)
 
-        for uid, config_idx in parsed_stop_uids_with_indexes:
-            if config_idx is None:
-                stop_global_user_ids.add(uid)
-            else:
-                target_chat_id_for_uid = allowed_chats_map.get(config_idx)
-                if target_chat_id_for_uid:
-                    stop_specific_user_ids_by_chat.setdefault(target_chat_id_for_uid, set()).add(uid)
-
-        activation_global_user_ids = set()
-        activation_specific_user_ids_by_chat = {}
-
-        raw_activation_user_ids = self.config["activation_trigger_user_id"]
-        parsed_activation_uids_with_indexes = self._parse_id_string_with_index(raw_activation_user_ids)
-
-        for uid, config_idx in parsed_activation_uids_with_indexes:
-            if config_idx is None:
-                activation_global_user_ids.add(uid)
-            else:
-                target_chat_id_for_uid = allowed_chats_map.get(config_idx)
-                if target_chat_id_for_uid:
-                    activation_specific_user_ids_by_chat.setdefault(target_chat_id_for_uid, set()).add(uid)
+        if event and event.state:
+            event.stop()
+            if message.out: # Удаляем исходящее сообщение-триггер/команду
+                with contextlib.suppress(Exception): await message.delete()
+        else:
+            if message.out: # Только если это была команда
+                await utils.answer(message, self.strings("tagall_not_running").format(chat_id=target_chat_id))
 
 
-        # --- Обработка триггера ОСТАНОВКИ ---
-        if stop_triggers_enabled:
-            trigger_stop_messages_raw = self.config["trigger_message"]
-            parsed_stop_triggers = []
-            for t_raw in trigger_stop_messages_raw.split(','):
-                if t_raw.strip():
-                    parsed_stop_triggers.append(self._parse_trigger_string(t_raw))
-
-            has_stop_trigger_message = False
-            for base_trigger, config_chat_index in parsed_stop_triggers:
-                if base_trigger in message_text_lower:
-                    # Проверяем, относится ли триггер к текущему чату
-                    if config_chat_index is None:
-                        # Индекс не указан, триггер применяется к текущему чату
-                        has_stop_trigger_message = True
-                        break
-                    else:
-                        # Индекс указан, проверяем, соответствует ли он текущему чату
-                        trigger_target_chat_id = allowed_chats_map.get(config_chat_index)
-                        if trigger_target_chat_id is not None and trigger_target_chat_id == chat_id:
-                            has_stop_trigger_message = True
-                            break
-            
-            # Определяем, авторизован ли отправитель для остановки
-            is_authorized_stop_user = False
-            if not parsed_stop_uids_with_indexes: # Если список ID пуст, любой пользователь может остановить
-                is_authorized_stop_user = True
-            elif sender_id is not None:
-                if sender_id in stop_global_user_ids:
-                    is_authorized_stop_user = True
-                if chat_id in stop_specific_user_ids_by_chat and sender_id in stop_specific_user_ids_by_chat[chat_id]:
-                    is_authorized_stop_user = True
-
-            if current_tagall_event and current_tagall_event.state and has_stop_trigger_message and is_authorized_stop_user:
-                current_tagall_event.stop()
-                return
-
-        # --- Обработка триггера АКТИВАЦИИ ---
-        if activation_triggers_enabled:
-            activation_trigger_messages_raw = self.config["activation_trigger_message"]
-            parsed_activation_triggers = []
-            for t_raw in activation_trigger_messages_raw.split(','):
-                if t_raw.strip():
-                    parsed_activation_triggers.append(self._parse_trigger_string(t_raw))
-
-            has_activation_trigger_message = False
-            for base_trigger, config_chat_index in parsed_activation_triggers:
-                if base_trigger in message_text_lower:
-                    # Проверяем, относится ли триггер к текущему чату
-                    if config_chat_index is None:
-                        # Индекс не указан, триггер применяется к текущему чату
-                        has_activation_trigger_message = True
-                        break
-                    else:
-                        # Индекс указан, проверяем, соответствует ли он текущему чату
-                        trigger_target_chat_id = allowed_chats_map.get(config_chat_index)
-                        if trigger_target_chat_id is not None and trigger_target_chat_id == chat_id:
-                            has_activation_trigger_message = True
-                            break
-
-            # Определяем, авторизован ли отправитель для активации
-            is_authorized_activation_user = False
-            if not parsed_activation_uids_with_indexes: # Если список ID пуст, любой пользователь может активировать
-                is_authorized_activation_user = True
-            elif sender_id is not None:
-                if sender_id in activation_global_user_ids:
-                    is_authorized_activation_user = True
-                if chat_id in activation_specific_user_ids_by_chat and sender_id in activation_specific_user_ids_by_chat[chat_id]:
-                    is_authorized_activation_user = True
-
-            if has_activation_trigger_message and is_authorized_activation_user:
-                if current_tagall_event and current_tagall_event.state:
-                    logger.info(f"TagAll уже запущен в чате {chat_id}, игнорируем триггер активации.")
-                    return
-
-                logger.info(f"TagAll активирован триггерным сообщением '{message.text}' от отправителя {sender_id if sender_id else 'unknown'} в чате {chat_id}")
-
-                event = StopEvent(chat_id)
-                self._tagall_events[chat_id] = event
-
-                self._client.loop.create_task(self._run_tagall_process(chat_id, "", event, True))
-
-    async def _run_tagall_process(self, chat_id: int, message_prefix: str, event: StopEvent, silent_start: bool = False):
+    async def _run_tagall_process(self, chat_id: int, message_prefix: str, event: StopEvent):
         """Внутренняя функция для обработки основной логики TagAll."""
         deleted_message_ids_hikkatl = []
         deleted_message_ids_bot_client = []
@@ -742,8 +489,7 @@ class TagAllMod(loader.Module):
             chat_entity = await self._client.get_input_entity(chat_id)
         except Exception as e:
             logger.error(f"Не удалось получить сущность чата для ID {chat_id}: {e}")
-            if not silent_start:
-                await self._client.send_message(chat_id, f"🚫 <b>Не удалось найти чат с ID:</b> <code>{chat_id}</code>")
+            await self._client.send_message(chat_id, f"🚫 <b>Не удалось найти чат с ID:</b> <code>{chat_id}</code>")
             event.stop()
             if chat_id in self._tagall_events:
                 del self._tagall_events[chat_id]
@@ -762,7 +508,7 @@ class TagAllMod(loader.Module):
         if is_bot_sender:
             try:
                 # Добавлена проверка на наличие self.inline.bot_client
-                if not hasattr(self, 'inline') or not hasattr(self.inline, 'bot_username') or not getattr(self.inline, 'bot_client', None):
+                if not hasattr(self, 'inline') or not hasattr(self.inline, 'bot_client') or not getattr(self.inline, 'bot_client', None):
                     raise RuntimeError("Инлайн-бот не настроен или недоступен.")
 
                 bot_entity = await self._client.get_input_entity(self.inline.bot_username)
@@ -770,8 +516,7 @@ class TagAllMod(loader.Module):
                     await self._client(InviteToChannelRequest(chat_entity, [bot_entity]))
             except Exception as e:
                 logger.error(f"Не удалось получить сущность бота или пригласить бота: {e}")
-                if not silent_start:
-                    await self._client.send_message(chat_id, self.strings("bot_error"))
+                await self._client.send_message(chat_id, self.strings("bot_error"))
                 event.stop()
                 if chat_id in self._tagall_events:
                     del self._tagall_events[chat_id]
@@ -785,8 +530,7 @@ class TagAllMod(loader.Module):
 
         if not participants:
             logger.warning(f"В чате {chat_id} не найдено подходящих участников для TagAll, останавливаем.")
-            if not silent_start:
-                await self._client.send_message(chat_id, self.strings("no_eligible_participants"))
+            await self._client.send_message(chat_id, self.strings("no_eligible_participants"))
             event.stop()
             if chat_id in self._tagall_events:
                 del self._tagall_events[chat_id]
@@ -806,18 +550,17 @@ class TagAllMod(loader.Module):
                     event.stop()
                     break
 
-                current_participants_for_cycle = []
-                if self.config["cycle_tagging"] and not first_pass:
+                current_cycle_participants = []
+                if self.config["cycle_tagging"] and not first_pass: # Re-fetch participants if cycling
                     logger.debug(f"Повторный запрос участников для цикла в чате {chat_id}.")
                     async for user in self._client.iter_participants(chat_id):
                         if not user.bot and not user.deleted and user.id != owner_id and user.id not in excluded_user_ids:
-                            current_participants_for_cycle.append(user)
-                    random.shuffle(current_participants_for_cycle)
-                    participants = current_participants_for_cycle
-
-                if not participants:
-                    logger.warning(f"В чате {chat_id} не найдено участников для TagAll, останавливаем цикл.")
-                    break
+                            current_cycle_participants.append(user)
+                    random.shuffle(current_cycle_participants)
+                    participants = current_cycle_participants
+                    if not participants:
+                        logger.warning(f"В чате {chat_id} не найдено участников для TagAll для следующего цикла, останавливаем.")
+                        break
 
                 for chunk in utils.chunks(participants, self.config["chunk_size"]):
                     if not event.state:
@@ -843,6 +586,7 @@ class TagAllMod(loader.Module):
 
                         tags.append(f'<a href="tg://user?id={user.id}">{user_display_name}</a>')
 
+                    # message_prefix уже пустой, если сработал триггер, так что здесь все ок
                     if message_prefix:
                         full_message_text = f"{message_prefix}\n{' '.join(tags)}"
                     else:
@@ -912,28 +656,7 @@ class TagAllMod(loader.Module):
     )
     async def tagall(self, message: Message):
         """[<номер чата>] [текст] - Отметить всех участников чата. [текст] будет отправлен вместе с тегами. Если текст не указан, будут отправлены только теги."""
-        raw_args = utils.get_args_raw(message)
-        target_chat_id, message_prefix = await self._resolve_target_chat(message, raw_args)
-
-        if target_chat_id is None:  # Ошибка при разрешении чата
-            if message.out:
-                await message.delete()
-            return
-
-        if target_chat_id in self._tagall_events and self._tagall_events[target_chat_id].state:
-            await utils.answer(message, self.strings("tagall_already_running").format(chat_id=target_chat_id))
-            if message.out:
-                await message.delete()
-            return
-
-        # Если команда была исходящей, удаляем ее, чтобы не засорять чат
-        if message.out:
-            await message.delete()
-
-        event = StopEvent(target_chat_id)
-        self._tagall_events[target_chat_id] = event
-
-        self._client.loop.create_task(self._run_tagall_process(target_chat_id, message_prefix, event, False))
+        await self._start_logic(message, utils.get_args_raw(message))
 
     @loader.command(
         ru_doc=lambda self: self.strings("_cmd_stoptagall_doc"),
@@ -943,24 +666,7 @@ class TagAllMod(loader.Module):
     )
     async def stoptagall(self, message: Message):
         """[<номер чата>] - Остановить запущенный процесс TagAll в <b>указанном или текущем чате</b>."""
-        raw_args = utils.get_args_raw(message)
-        target_chat_id, _ = await self._resolve_target_chat(message, raw_args)
-
-        if target_chat_id is None:  # Ошибка при разрешении чата
-            if message.out:
-                await message.delete()
-            return
-
-        event = self._tagall_events.get(target_chat_id)
-
-        if event and event.state:
-            event.stop()
-        else:
-            await utils.answer(message, self.strings("tagall_not_running").format(chat_id=target_chat_id))
-
-        # Если команда была исходящей, удаляем ее, чтобы не засорять чат
-        if message.out:
-            await message.delete()
+        await self._stop_logic(message, utils.get_args_raw(message))
 
     @loader.command(
         ru_doc=lambda self: self.strings("_cmd_autotagall_doc"),
@@ -969,34 +675,13 @@ class TagAllMod(loader.Module):
         uz_doc=lambda self: self.strings("_cmd_autotagall_doc"),
     )
     async def autotagall(self, message: Message):
-        """[<номер чата>] [on|off] - Включить или выключить триггеры для запуска/остановки TagAll в <b>указанном или текущем чате</b>. Используйте `on` для включения, `off` для выключения. Без аргументов покажет статус триггеров."""
-        raw_args = utils.get_args_raw(message)
-        target_chat_id, args = await self._resolve_target_chat(message, raw_args)
-
-        if target_chat_id is None:  # Ошибка при разрешении чата
-            if message.out:
-                await message.delete()
-            return
-
-        args = args.lower().strip()
-
-        if args == "on":
-            self._db.set(self.name, f"stop_triggers_enabled_{target_chat_id}", True)
-            self._db.set(self.name, f"activation_triggers_enabled_{target_chat_id}", True)
-            await utils.answer(message, self.strings("triggers_state_enabled").format(chat_id=target_chat_id))
-        elif args == "off":
-            self._db.set(self.name, f"stop_triggers_enabled_{target_chat_id}", False)
-            self._db.set(self.name, f"activation_triggers_enabled_{target_chat_id}", False)
-            await utils.answer(message, self.strings("triggers_state_disabled").format(chat_id=target_chat_id))
-        elif not args:
-            is_enabled = self._db.get(self.name, f"stop_triggers_enabled_{target_chat_id}", False)
-            if is_enabled:
-                await utils.answer(message, self.strings("triggers_status_enabled").format(chat_id=target_chat_id))
-            else:
-                await utils.answer(message, self.strings("triggers_status_disabled").format(chat_id=target_chat_id))
+        """Включить/выключить работу триггеров TagAll (установленных в .cfg)"""
+        self.config["enable_watcher"] = not self.config["enable_watcher"]
+        if self.config["enable_watcher"]:
+            await utils.answer(message, self.strings("autotagall_enabled"))
         else:
-            await utils.answer(message, self.strings("invalid_trigger_arg"))
+            await utils.answer(message, self.strings("autotagall_disabled"))
 
-        # Если команда была исходящей, удаляем ее, чтобы не засорять чат
+        # Удаляем исходящую команду, чтобы не засорять чат
         if message.out:
-            await message.delete()
+            with contextlib.suppress(Exception): await message.delete()
