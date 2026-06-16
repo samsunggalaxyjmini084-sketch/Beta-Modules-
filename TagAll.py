@@ -256,19 +256,19 @@ class TagAllMod(loader.Module):
                 "trigger_on_phrases",
                 "tagall on, start tagall",
                 lambda: self.strings("_cfg_doc_trigger_on_phrases"),
-                validator=loader.validators.Series(), # FIXED: Removed item_type
+                validator=loader.validators.Series(),
             ),
             loader.ConfigValue(
                 "trigger_off_phrases",
                 "tagall off, stop tagall",
                 lambda: self.strings("_cfg_doc_trigger_off_phrases"),
-                validator=loader.validators.Series(), # FIXED: Removed item_type
+                validator=loader.validators.Series(),
             ),
             loader.ConfigValue(
                 "authorized_user_id",
                 None,  # None means no specific user, 0 means any user for backwards compatibility with a common pattern.
                 lambda: self.strings("_cfg_doc_authorized_user_id"),
-                validator=loader.validators.Integer(minimum=0, optional=True),
+                validator=loader.validators.Integer(minimum=0), # FIXED: Removed optional=True
             ),
             loader.ConfigValue(
                 "triggered_tagall_message",
@@ -285,7 +285,7 @@ class TagAllMod(loader.Module):
 
     async def cancel(self, call: InlineCall, event: StopEvent):
         event.stop()
-        await call.answer(self.strings("cancelled")) # Changed to "cancelled" for clarity
+        await call.answer(self.strings("cancelled"))
 
     @loader.command(
         ru_doc="Включить/выключить систему триггеров TagAll",
@@ -308,10 +308,11 @@ class TagAllMod(loader.Module):
 
         # Check authorized user
         authorized_user_id = self.config["authorized_user_id"]
-        if authorized_user_id is not None:  # If a value is configured (not None)
-            if authorized_user_id == 0:  # If 0 is configured, it means "any user" can trigger, so no specific ID check
-                pass
-            elif message.sender_id != authorized_user_id:  # If a specific ID is configured and it doesn't match
+        # If authorized_user_id is None, any user can trigger.
+        # If authorized_user_id is 0, any user can trigger.
+        # If authorized_user_id is a positive integer, only that user can trigger.
+        if authorized_user_id is not None and authorized_user_id != 0:
+            if message.sender_id != authorized_user_id:
                 await message.respond(self.strings("not_authorized"))
                 return
 
