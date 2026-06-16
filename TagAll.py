@@ -256,13 +256,13 @@ class TagAllMod(loader.Module):
                 "trigger_on_phrases",
                 "tagall on, start tagall",
                 lambda: self.strings("_cfg_doc_trigger_on_phrases"),
-                validator=loader.validators.Series(item_type=str),
+                validator=loader.validators.Series(), # FIXED: Removed item_type
             ),
             loader.ConfigValue(
                 "trigger_off_phrases",
                 "tagall off, stop tagall",
                 lambda: self.strings("_cfg_doc_trigger_off_phrases"),
-                validator=loader.validators.Series(item_type=str),
+                validator=loader.validators.Series(), # FIXED: Removed item_type
             ),
             loader.ConfigValue(
                 "authorized_user_id",
