@@ -62,7 +62,6 @@ class TagAllMod(loader.Module):
         "_cfg_doc_trigger_on_phrases": "List of phrases that activate TagAll (comma-separated)",
         "_cfg_doc_trigger_off_phrases": "List of phrases that deactivate TagAll (comma-separated)",
         "_cfg_doc_authorized_user_id": "User ID who can activate/deactivate triggers (0 or leave empty for any user)",
-        # Removed _cfg_doc_triggered_tagall_message
         "trigger_enabled": "✅ <b>TagAll trigger system enabled!</b>",
         "trigger_disabled": "❌ <b>TagAll trigger system disabled!</b>",
         "trigger_on_activated": "▶️ <b>TagAll activated by trigger in this chat!</b>",
@@ -96,7 +95,6 @@ class TagAllMod(loader.Module):
         "_cfg_doc_trigger_on_phrases": "Список фраз, активирующих TagAll (через запятую)",
         "_cfg_doc_trigger_off_phrases": "Список фраз, деактивирующих TagAll (через запятую)",
         "_cfg_doc_authorized_user_id": "ID пользователя, который может активировать/деактивировать триггеры (0 или оставьте пустым для любого пользователя)",
-        # Removed _cfg_doc_triggered_tagall_message
         "trigger_enabled": "✅ <b>Система триггеров TagAll включена!</b>",
         "trigger_disabled": "❌ <b>Система триггеров TagAll выключена!</b>",
         "trigger_on_activated": "▶️ <b>TagAll активирован триггером в этом чате!</b>",
@@ -130,7 +128,6 @@ class TagAllMod(loader.Module):
         "_cfg_doc_trigger_on_phrases": "Liste der Phrasen, die TagAll aktivieren (kommagetrennt)",
         "_cfg_doc_trigger_off_phrases": "Liste der Phrasen, die TagAll deaktivieren (kommagetrennt)",
         "_cfg_doc_authorized_user_id": "Benutzer-ID, die Trigger aktivieren/deaktivieren kann (0 oder leer lassen für beliebigen Benutzer)",
-        # Removed _cfg_doc_triggered_tagall_message
         "trigger_enabled": "✅ <b>TagAll Triggersystem aktiviert!</b>",
         "trigger_disabled": "❌ <b>TagAll Triggersystem deaktiviert!</b>",
         "trigger_on_activated": "▶️ <b>TagAll durch Trigger in diesem Chat aktiviert!</b>",
@@ -160,7 +157,6 @@ class TagAllMod(loader.Module):
         "_cfg_doc_trigger_on_phrases": "TagAll'u etkinleştiren ifadeler listesi (virgülle ayrılmış)",
         "_cfg_doc_trigger_off_phrases": "TagAll'u devre dışı bırakan ifadeler listesi (virgülle ayrılmış)",
         "_cfg_doc_authorized_user_id": "Tetikleyicileri etkinleştirebilecek/devre dışı bırakabilecek kullanıcı kimliği (herhangi bir kullanıcı için 0 veya boş bırakın)",
-        # Removed _cfg_doc_triggered_tagall_message
         "trigger_enabled": "✅ <b>TagAll tetikleme sistemi etkinleştirildi!</b>",
         "trigger_disabled": "❌ <b>TagAll tetikleme sistemi devre dışı bırakıldı!</b>",
         "trigger_on_activated": "▶️ <b>TagAll bu sohbette tetikleyici tarafından etkinleştirildi!</b>",
@@ -192,7 +188,6 @@ class TagAllMod(loader.Module):
         "_cfg_doc_trigger_on_phrases": "TagAll'ni faollashtiradigan iboralar ro'yxati (vergul bilan ajratilgan)",
         "_cfg_doc_trigger_off_phrases": "TagAll'ni o'chiradigan iboralar ro'yxati (vergul bilan ajratilgan)",
         "_cfg_doc_authorized_user_id": "Triggerlarni faollashtirishi/o'chirishi mumkin bo'lgan foydalanuvchi IDsi (har qanday foydalanuvchi uchun 0 yoki bo'sh qoldirilsin)",
-        # Removed _cfg_doc_triggered_tagall_message
         "trigger_enabled": "✅ <b>TagAll trigger tizimi yoqildi!</b>",
         "trigger_disabled": "❌ <b>TagAll trigger tizimi o'chirildi!</b>",
         "trigger_on_activated": "▶️ <b>TagAll ushbu chatda trigger orqali faollashtirildi!</b>",
@@ -270,7 +265,6 @@ class TagAllMod(loader.Module):
                 lambda: self.strings("_cfg_doc_authorized_user_id"),
                 validator=loader.validators.Integer(minimum=0),
             ),
-            # Removed triggered_tagall_message
         )
 
         # Dictionary to store active triggered TagAll tasks: chat_id -> (asyncio.Task, StopEvent)
@@ -397,10 +391,19 @@ class TagAllMod(loader.Module):
                     if user.username:
                         mention = f"@{user.username}"
                     else:
-                        full_name = utils.get_display_name(user)
-                        # Fallback if display_name is empty (e.g., user has no first/last name set)
+                        # Construct full_name manually
+                        full_name_parts = []
+                        if user.first_name:
+                            full_name_parts.append(user.first_name)
+                        if user.last_name:
+                            full_name_parts.append(user.last_name)
+                        
+                        full_name = " ".join(full_name_parts).strip()
+                        
+                        # Fallback if full_name is still empty (e.g., user has no first/last name set)
                         if not full_name:
                             full_name = "Unknown User"
+                        
                         mention = f'<a href="tg://user?id={user.id}">{utils.escape_html(full_name)}</a>'
                     members.append(mention)
             except Exception as e:
