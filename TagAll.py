@@ -107,7 +107,7 @@ class TagAllMod(loader.Module):
         finally:
             self.active_tasks.pop(chat_id, None)
 
-    async def tagstopcmd(self, message):к
+    async def tagstopcmd(self, message):
         """Остановить процесс упоминания пользователей в этом чате"""
         chat_id = message.chat_id
         if chat_id in self.active_tasks:
