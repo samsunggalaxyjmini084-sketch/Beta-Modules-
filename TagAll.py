@@ -15,7 +15,7 @@ class TagAllMod(loader.Module):
         "name": "TagAll",
         "gathering": "<b>[TagAll]</b> Сбор участников чата...",
         "started": "<b>[TagAll]</b> Начинаю тегать участников...",
-        "stopped": "<b>[TagAll]</b> Тег остановлен.",
+        "stopped": "<b>[TagAll]</b> *Тег остановлен.*",
         "no_group": "<b>[TagAll]</b> Эту команду можно использовать только в группах.",
         "done": "<b>[TagAll]</b> Все участники успешно отмечены!",
     }
@@ -23,14 +23,14 @@ class TagAllMod(loader.Module):
     def __init__(self):
         self.config = loader.ModuleConfig(
             loader.ConfigValue(
-                "USERS_PER_MESSAGE",
-                5,
+                option="USERS_PER_MESSAGE",
+                default=5,
                 doc="Количество пользователей, которых нужно тегать в одном сообщении",
                 validator=loader.validators.Integer(),
             ),
             loader.ConfigValue(
-                "DELAY",
-                3.0,
+                option="DELAY",
+                default=3.0,
                 doc="Задержка между сообщениями в секундах (не рекомендуется ставить меньше 2.0-3.0)",
                 validator=loader.validators.Float(),
             ),
@@ -107,7 +107,7 @@ class TagAllMod(loader.Module):
         finally:
             self.active_tasks.pop(chat_id, None)
 
-    async def tagstopcmd(self, message):
+    async def tagstopcmd(self, message):к
         """Остановить процесс упоминания пользователей в этом чате"""
         chat_id = message.chat_id
         if chat_id in self.active_tasks:
