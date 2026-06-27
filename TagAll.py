@@ -9,13 +9,14 @@ import random
 import urllib.parse
 from datetime import datetime, timedelta
 from hikkatl.tl.functions.channels import InviteToChannelRequest # Specific for TagAll bot invite
-from hikkatl.tl.types import Message, User
+from hikkatl.tl.types import Message, User, Channel # Added Channel for TagAll group check
 from hikkatl import events # Use hikkatl events for consistency
 from hikkatl.tl.functions.messages import ToggleDialogPinRequest # Specific for pin/unpin commands
 import re
 from collections import defaultdict
 from typing import Optional, List, Tuple
 import contextlib # For TagAll's bot invite
+import time # For TagAll duration tracking
 
 from .. import loader, utils
 
@@ -445,7 +446,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                 validator=loader.validators.Integer(minimum=1),
             ),
             loader.ConfigValue(
-                option="DELAY",
+                option="DELAY", # This was renamed from DELAY in TagAll to avoid conflict with AJG's delays. Now it's fine.
                 default=3.0,
                 doc="Задержка между сообщениями в секундах для TagAll (не рекомендуется ставить меньше 2.0-3.0)",
                 validator=loader.validators.Float(minimum=0.0),
@@ -463,7 +464,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                 validator=loader.validators.Boolean(),
             ),
             loader.ConfigValue(
-                option="tagall_timeout_str",
+                option="tagall_timeout_str", # Renamed from 'timeout' in TagAll to avoid conflict with AJG's delays
                 default="0.1",
                 doc=(
                     "Время между сообщениями с тегами (TagAll). Можно указать одно значение (например, '0.1'),"
@@ -473,13 +474,13 @@ Mafia Combat Premium <code>1634167847</code>""",
                 validator=loader.validators.String(),
             ),
             loader.ConfigValue(
-                option="tagall_silent",
+                option="tagall_silent", # Renamed from 'silent' in TagAll
                 default=False,
                 doc="Не отправлять сообщение с кнопкой отмены (TagAll)",
                 validator=loader.validators.Boolean(),
             ),
             loader.ConfigValue(
-                option="cycle_tagging",
+                option="cycle_tagging", # This was already in TagAll, but has a different meaning than AJG's 'cycle_tagging' if it existed there. Assuming no direct conflict, but kept name unique to TagAll context
                 default=False,
                 doc=(
                     "Тегать всех участников снова и снова, пока вы не остановите скрипт,"
@@ -488,19 +489,19 @@ Mafia Combat Premium <code>1634167847</code>""",
                 validator=loader.validators.Boolean(),
             ),
             loader.ConfigValue(
-                option="cycle_delay",
+                option="cycle_delay", # This was already in TagAll, also no direct conflict
                 default=0,
                 doc="Задержка между циклами тегов в секундах (TagAll)",
                 validator=loader.validators.Integer(minimum=0),
             ),
             loader.ConfigValue(
-                option="tagall_duration",
+                option="tagall_duration", # Renamed from 'duration' in TagAll
                 default=0,
                 doc="Как долго (в секундах) должен работать процесс TagAll. Установите 0 для неограниченного времени.",
                 validator=loader.validators.Integer(minimum=0),
             ),
             loader.ConfigValue(
-                option="tagall_stop_trigger_message",
+                option="tagall_stop_trigger_message", # Renamed from 'trigger_message' in TagAll
                 default="",
                 doc=(
                     "Сообщение(я)-триггер(ы) для остановки TagAll. Разделяйте запятыми."
@@ -511,13 +512,13 @@ Mafia Combat Premium <code>1634167847</code>""",
                 validator=loader.validators.String(),
             ),
             loader.ConfigValue(
-                option="tagall_stop_trigger_user_id",
+                option="tagall_stop_trigger_user_id", # Renamed from 'trigger_user_id' in TagAll
                 default="",
                 doc="ID пользователя(ей) или бота(ов), который(ые) может(могут) остановить TagAll сообщением-триггером. Разделяйте запятыми. Установите пустым, чтобы любой мог остановить.",
                 validator=loader.validators.String(),
             ),
             loader.ConfigValue(
-                option="tagall_activation_trigger_message",
+                option="tagall_activation_trigger_message", # Renamed from 'activation_trigger_message' in TagAll
                 default="",
                 doc=(
                     "Сообщение(я)-триггер(ы) для запуска TagAll. Разделяйте запятыми."
@@ -528,19 +529,19 @@ Mafia Combat Premium <code>1634167847</code>""",
                 validator=loader.validators.String(),
             ),
             loader.ConfigValue(
-                option="tagall_activation_trigger_user_id",
+                option="tagall_activation_trigger_user_id", # Renamed from 'activation_trigger_user_id' in TagAll
                 default="",
                 doc="ID пользователя(ей) или бота(ов), который(ые) может(могут) запустить TagAll сообщением-триггером. Разделяйте запятыми. Установите пустым, чтобы любой мог запустить.",
                 validator=loader.validators.String(),
             ),
             loader.ConfigValue(
-                option="tagall_exclude_user_ids",
+                option="tagall_exclude_user_ids", # Renamed from 'exclude_user_ids' in TagAll
                 default="",
                 doc="ID пользователя(ей), которых не нужно тегать. Разделяйте запятыми. Например: <code>123456789, 987654321</code> (TagAll)",
                 validator=loader.validators.String(),
             ),
             loader.ConfigValue(
-                option="tagall_allowed_chat_ids",
+                option="tagall_allowed_chat_ids", # Renamed from 'allowed_chat_ids' in TagAll
                 default="",
                 doc="ID чата(ов), в которых разрешено использовать команды модуля TagAll. Разделяйте запятыми. Если указан только один ID, команды, запущенные в других чатах, будут автоматически перенаправлены в этот чат. Если пусто, команды разрешены во всех чатах.",
                 validator=loader.validators.String(),
@@ -846,19 +847,19 @@ Mafia Combat Premium <code>1634167847</code>""",
                     await utils.answer(message, self.strings("tagall_invalid_chat_index").format(index=chat_index, allowed_chats=self._format_tagall_allowed_chats_list(allowed_chats_map)))
                     return None, None
             except ValueError:
-                pass
+                pass # Not a valid index, proceed to check current chat context
 
-        if not allowed_chat_ids_set:
+        if not allowed_chat_ids_set: # If no allowed chats are configured, any chat is allowed
             return original_chat_id, remaining_args
 
-        if original_chat_id in allowed_chat_ids_set:
+        if original_chat_id in allowed_chat_ids_set: # Command is run in an explicitly allowed chat
             return original_chat_id, remaining_args
-        else:
-            if len(allowed_chat_ids_set) == 1:
+        else: # Command is run in a non-allowed chat
+            if len(allowed_chat_ids_set) == 1: # Only one allowed chat, redirect there
                 redirect_chat_id = next(iter(allowed_chat_ids_set))
                 await utils.answer(message, self.strings("cmd_redirected").format(target_chat_id=redirect_chat_id))
                 return redirect_chat_id, remaining_args
-            else:
+            else: # Multiple allowed chats, but not current, and no index specified. Error.
                 await utils.answer(message, self.strings("cmd_not_allowed_multiple").format(allowed_chats=self._format_tagall_allowed_chats_list(allowed_chats_map)))
                 return None, None
 
@@ -951,6 +952,15 @@ Mafia Combat Premium <code>1634167847</code>""",
 
         try:
             chat_entity = await self._client.get_input_entity(chat_id)
+            # Ensure it's a group or channel for TagAll to make sense
+            if not isinstance(chat_entity, Channel) and not getattr(chat_entity, 'megagroup', False):
+                 logger.error(f"UniversalMafiaTools: TagAll: Команда TagAll может быть использована только в группах. Chat ID: {chat_id} не является группой.")
+                 if not silent_start:
+                     await self._client.send_message(chat_id, self.strings("no_group"))
+                 event.stop()
+                 if chat_id in self._tagall_events:
+                     del self._tagall_events[chat_id]
+                 return
         except Exception as e:
             logger.error(f"UniversalMafiaTools: TagAll: Не удалось получить сущность чата для ID {chat_id}: {e}")
             if not silent_start:
@@ -1150,8 +1160,9 @@ Mafia Combat Premium <code>1634167847</code>""",
             if is_chat_relevant_for_tagall_triggers:
                 current_tagall_event = self._tagall_events.get(chat_id)
 
-                stop_triggers_enabled = self._db.get(self.name, f"stop_triggers_enabled_{chat_id}", False)
-                activation_triggers_enabled = self._db.get(self.name, f"activation_triggers_enabled_{chat_id}", False)
+                # Fetch settings using self.name for module-specific persistence
+                stop_triggers_enabled = self._db.get(self.name, f"tagall_stop_triggers_enabled_{chat_id}", False)
+                activation_triggers_enabled = self._db.get(self.name, f"tagall_activation_triggers_enabled_{chat_id}", False)
 
                 # --- Обработка триггера ОСТАНОВКИ TagAll ---
                 if stop_triggers_enabled:
@@ -1190,6 +1201,7 @@ Mafia Combat Premium <code>1634167847</code>""",
                     if current_tagall_event and current_tagall_event.state and has_stop_trigger_message and is_authorized_stop_user:
                         current_tagall_event.stop()
                         logger.info(f"UniversalMafiaTools: TagAll: Процесс остановлен триггером в чате {chat_id}.")
+                        await utils.answer(message, self.strings("stopped")) # Send confirmation to chat
                         return
 
                 # --- Обработка триггера АКТИВАЦИИ TagAll ---
@@ -1229,15 +1241,27 @@ Mafia Combat Premium <code>1634167847</code>""",
                     if has_activation_trigger_message and is_authorized_activation_user:
                         if current_tagall_event and current_tagall_event.state:
                             logger.info(f"UniversalMafiaTools: TagAll: Уже запущен в чате {chat_id}, игнорируем триггер активации.")
+                            if not self.config["tagall_silent"]:
+                                await utils.answer(message, self.strings("tagall_already_running").format(chat_id=chat_id))
+                            return # Don't activate if already running
+
+                        # Проверка, что чат является группой
+                        chat_entity = await self._client.get_input_entity(chat_id)
+                        if not isinstance(chat_entity, Channel) and not getattr(chat_entity, 'megagroup', False):
+                            logger.error(f"UniversalMafiaTools: TagAll: Автоматическая активация TagAll возможна только в группах. Chat ID: {chat_id} не является группой.")
+                            if not self.config["tagall_silent"]:
+                                await utils.answer(message, self.strings("no_group"))
                             return
 
                         logger.info(f"UniversalMafiaTools: TagAll: Активирован триггерным сообщением '{message.text}' от отправителя {message.sender.id if message.sender else 'unknown'} в чате {chat_id}")
 
                         event = StopEvent(chat_id)
                         self._tagall_events[chat_id] = event
+                        if not self.config["tagall_silent"]:
+                            await utils.answer(message, self.strings("started")) # Send confirmation to chat
 
                         self._client.loop.create_task(self._run_tagall_process(chat_id, "", event, True))
-                        return
+                        return # Processed TagAll trigger, no further processing needed for this message
 
             # --- General AutoJoinGame Logic (Lower Priority) ---
             if not self.config["enabled"]:
@@ -1632,12 +1656,14 @@ Mafia Combat Premium <code>1634167847</code>""",
         args = utils.get_args_raw(message)
         if not args:
             await utils.answer(message, self.strings("dialog_pin_no_args"))
+            if message.out: await message.delete()
             return
 
         try:
             target_chat_id = int(args)
         except ValueError:
             await utils.answer(message, self.strings("common_invalid_chat_id"))
+            if message.out: await message.delete()
             return
 
         sender = await message.get_sender()
@@ -1645,9 +1671,781 @@ Mafia Combat Premium <code>1634167847</code>""",
         allowed_users = self.config["pin_unpin_allowed_user_ids"]
         if allowed_users and sender_id not in allowed_users:
             await utils.answer(message, self.strings("not_allowed_to_configure_chats"))
+            if message.out: await message.delete()
             return
 
+        # 1. Выполняем действие по закреплению чата в Telegram
+        # Сначала показываем сообщение о попытке
         await utils.answer(message, self.strings("dialog_pin_unpin_start_msg").format(action_text_verb="закрепить", chat_id=target_chat_id))
         dialog_pin_success, dialog_pin_msg = await self._toggle_telegram_dialog_pin(target_chat_id, True)
 
+        # 2. Выполняем действие по добавлению чата в allowed_chats модуля
         module_add_success, module_add_msg = self._toggle_module_allowed_chat(target_chat_id, True)
+
+        # Комбинируем результаты
+        final_message = self.strings("command_result_template").format(
+            chat_id=target_chat_id,
+            dialog_action_result=dialog_pin_msg,
+            module_action_result=module_add_msg
+        )
+        await utils.answer(message, final_message)
+        if message.out: await message.delete()
+
+
+    @loader.command(ru_doc="Открепить чат из вашего списка диалогов И удалить его из разрешенных чатов модуля.")
+    async def unpinchat(self, message: Message):
+        """
+        Открепляет чат из вашего списка диалогов И удаляет его из разрешенных чатов модуля.
+        Использование: .unpinchat <chat_id>
+        Пример: .unpinchat -1001234567890
+        """
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"])
+
+        args = utils.get_args_raw(message)
+        if not args:
+            await utils.answer(message, self.strings("dialog_unpin_no_args"))
+            if message.out: await message.delete()
+            return
+
+        try:
+            target_chat_id = int(args)
+        except ValueError:
+            await utils.answer(message, self.strings("common_invalid_chat_id"))
+            if message.out: await message.delete()
+            return
+
+        sender = await message.get_sender()
+        sender_id = getattr(sender, 'id', None)
+        allowed_users = self.config["pin_unpin_allowed_user_ids"]
+        if allowed_users and sender_id not in allowed_users:
+            await utils.answer(message, self.strings("not_allowed_to_configure_chats"))
+            if message.out: await message.delete()
+            return
+
+        # 1. Выполняем действие по откреплению чата из Telegram
+        # Сначала показываем сообщение о попытке
+        await utils.answer(message, self.strings("dialog_pin_unpin_start_msg").format(action_text_verb="открепить", chat_id=target_chat_id))
+        dialog_unpin_success, dialog_unpin_msg = await self._toggle_telegram_dialog_pin(target_chat_id, False)
+
+        # 2. Выполняем действие по удалению чата из allowed_chats модуля
+        module_remove_success, module_remove_msg = self._toggle_module_allowed_chat(target_chat_id, False)
+
+        # Комбинируем результаты
+        final_message = self.strings("command_result_template").format(
+            chat_id=target_chat_id,
+            dialog_action_result=dialog_unpin_msg,
+            module_action_result=module_remove_msg
+        )
+        await utils.answer(message, final_message)
+        if message.out: await message.delete()
+
+    # --- Команды для управления ТОЛЬКО allowed_chats модуля (переименованы и уточнены) ---
+    @loader.command(ru_doc="Добавить ID чата только в список разрешенных чатов для модуля (allowed_chats).")
+    async def ajgpinchat(self, message: Message):
+        """Добавить ID чата только в список разрешенных чатов модуля (без изменения закрепления в Telegram)."""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"])
+
+        args = utils.get_args_raw(message)
+        if not args:
+            await utils.answer(message, self.strings("common_invalid_chat_id"))
+            if message.out: await message.delete()
+            return
+
+        try:
+            target_chat_id = int(args)
+        except ValueError:
+            await utils.answer(message, self.strings("common_invalid_chat_id"))
+            if message.out: await message.delete()
+            return
+
+        sender = await message.get_sender()
+        sender_id = getattr(sender, 'id', None)
+        allowed_users = self.config["pin_unpin_allowed_user_ids"]
+        if allowed_users and sender_id not in allowed_users:
+            await utils.answer(message, self.strings("not_allowed_to_configure_chats"))
+            if message.out: await message.delete()
+            return
+
+        await utils.answer(message, self.strings("ajg_only_action_start_msg").format(action_text_verb="добавить", chat_id=target_chat_id))
+        _, result_msg = self._toggle_module_allowed_chat(target_chat_id, True)
+        await utils.answer(message, result_msg)
+        if message.out: await message.delete()
+
+    @loader.command(ru_doc="Удалить ID чата только из списка разрешенных чатов для модуля (allowed_chats).")
+    async def ajgunpinchat(self, message: Message):
+        """Удалить ID чата только из списка разрешенных чатов модуля (без изменения закрепления в Telegram)."""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"])
+
+        args = utils.get_args_raw(message)
+        if not args:
+            await utils.answer(message, self.strings("common_invalid_chat_id"))
+            if message.out: await message.delete()
+            return
+
+        try:
+            target_chat_id = int(args)
+        except ValueError:
+            await utils.answer(message, self.strings("common_invalid_chat_id"))
+            if message.out: await message.delete()
+            return
+
+        sender = await message.get_sender()
+        sender_id = getattr(sender, 'id', None)
+        allowed_users = self.config["pin_unpin_allowed_user_ids"]
+        if allowed_users and sender_id not in allowed_users:
+            await utils.answer(message, self.strings("not_allowed_to_configure_chats"))
+            if message.out: await message.delete()
+            return
+
+        await utils.answer(message, self.strings("ajg_only_action_start_msg").format(action_text_verb="удалить", chat_id=target_chat_id))
+        _, result_msg = self._toggle_module_allowed_chat(target_chat_id, False)
+        await utils.answer(message, result_msg)
+        if message.out: await message.delete()
+
+
+    @loader.command(ru_doc="Включить автовход в игру и автолинчевание")
+    async def ajgon(self, message: Message):
+        """Включить автовход в игру и автолинчевание"""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"])
+        self.set("enabled", True)
+        self.config["enabled"] = True
+        await utils.answer(message, self.strings("enabled"))
+        if message.out: await message.delete()
+
+
+    @loader.command(ru_doc="Выключить автовход в игру и автолинчевание")
+    async def ajgoff(self, message: Message):
+        """Выключить автовход в игру и автолинчевание"""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"])
+        self.set("enabled", False)
+        self.config["enabled"] = False
+        self.set("role_tracking_enabled", False)
+        self.config["role_tracking_enabled"] = False
+        self._player_nickname_to_lynch = None
+        self._role_tracking_active = False
+        self._role_tracking_start_time = None
+        self._tracked_roles_list = []
+        self._tracked_roles_lookup_set.clear()
+        self._processed_messages.clear()
+        if self._send_tracked_roles_task:
+            self._send_tracked_roles_task.cancel()
+            self._send_tracked_roles_task = None
+        await utils.answer(message, self.strings("disabled"))
+        if message.out: await message.delete()
+
+
+    @loader.command(ru_doc="Показать список найденных отслеживаемых ролей")
+    async def ajgshowtrackedroles(self, message: Message):
+        """Показать список найденных отслеживаемых ролей. Если настроен role_tracking_output_chat_id, список будет отправлен туда, иначе - в текущий чат."""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"])
+        active_roles_display = []
+        inactive_roles_display = []
+
+        for _, nickname, role_text, is_active in self._tracked_roles_list:
+            if is_active:
+                active_roles_display.append(f"• <code>{nickname}</code> (Роль: {role_text})")
+            else:
+                inactive_roles_display.append(f"• <code>{nickname}</code> (Роль: {role_text})")
+
+        active_section = self.strings("no_active_roles")
+        if active_roles_display:
+            active_section = self.strings("active_roles_header").format(count=len(active_roles_display)) + "\n" + "\n".join(active_roles_display)
+
+        inactive_section = self.strings("no_inactive_roles")
+        if inactive_roles_display:
+            inactive_section = self.strings("inactive_roles_header").format(count=len(inactive_roles_display)) + "\n" + "\n".join(inactive_roles_display)
+
+        message_text = self.strings("tracked_roles_list").format(
+            total_count=len(self._tracked_roles_list),
+            active_roles_section=active_section,
+            inactive_roles_section=inactive_section
+        )
+
+        output_chat_id = self.config["role_tracking_output_chat_id"]
+        # Use message.chat_id if output_chat_id is 0, or if it's explicitly the current chat.
+        # Otherwise, send to the configured output_chat_id.
+        target_chat_for_display = output_chat_id if output_chat_id != 0 else message.chat_id
+
+        try:
+            # Check if current chat is the target chat, or if explicit configured output chat is used
+            if target_chat_for_display == message.chat_id:
+                # If sending to current chat, use utils.answer
+                await utils.answer(message, message_text)
+            else:
+                # If sending to a different chat, use client.send_message
+                await self._client.send_message(target_chat_for_display, message_text)
+                await utils.answer(message, self.strings("tracked_roles_send_success").format(chat_id=target_chat_for_display))
+        except Exception as e:
+            logger.error(f"UniversalMafiaTools: AJG: Ошибка при отправке списка отслеживаемых ролей в чат {target_chat_for_display}: {e}")
+            await utils.answer(message, self.strings("tracked_roles_send_error").format(chat_id=target_chat_for_display, error=e))
+            # Fallback to current chat if sending to configured chat failed
+            if target_chat_for_display != message.chat_id:
+                await utils.answer(message, "⚠️ Попытка отправить в текущий чат из-за ошибки с настроенным.")
+                await utils.answer(message, message_text)
+        
+        if message.out: await message.delete()
+
+
+    @loader.command(ru_doc="Переключить активную конфигурацию ключевых слов для кнопок. Если ID_конфига не указан, покажет текущую активную конфигурацию и доступные ID.")
+    async def ajgset(self, message: Message):
+        """Переключить активную конфигурацию ключевых слов для кнопок.
+        Пример: .ajgset 1
+        Используйте без аргументов, чтобы увидеть текущую активную конфигурацию и доступные ID."""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"])
+
+        config_id = utils.get_args_raw(message)
+
+        if not self._parsed_button_keywords:
+            await utils.answer(message, self.strings("switch_keywords_no_configs"))
+            if message.out: await message.delete()
+            return
+
+        available_ids = ", ".join(self._parsed_button_keywords.keys())
+
+        if not config_id:
+            current_active_id = self.config["active_button_config_id"]
+            current_keywords = ", ".join(self._current_button_keywords_to_use)
+            await utils.answer(message, self.strings("switch_keywords_usage").format(
+                current_id=current_active_id,
+                current_keywords=current_keywords,
+                available_ids=available_ids
+            ))
+            if message.out: await message.delete()
+            return
+
+        if config_id == self.config["active_button_config_id"]:
+            await utils.answer(message, self.strings("switch_keywords_current").format(config_id=config_id))
+            if message.out: await message.delete()
+            return
+
+        if config_id in self._parsed_button_keywords:
+            self.set("active_button_config_id", config_id)
+            self.config["active_button_config_id"] = config_id
+            self._update_button_keywords_from_config()
+            await utils.answer(message, self.strings("switch_keywords_success").format(
+                config_id=config_id,
+                keywords=", ".join(self._current_button_keywords_to_use)
+            ))
+        else:
+            await utils.answer(message, self.strings("switch_keywords_not_found").format(
+                config_id=config_id,
+                available_ids=available_ids if available_ids else "нет"
+            ))
+        if message.out: await message.delete()
+
+
+    @loader.command(ru_doc="Показать статус автовхода и автолинчевания")
+    async def ajgstatus(self, message: Message):
+        """Показать статус автовхода и автолинчевания"""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"])
+        
+        # --- AutoJoinGame Status ---
+        status = "🟢 Включен" if self.config["enabled"] else "🔴 Выключен"
+
+        delays = self.config["delays"]
+        delay_display = f"[{', '.join(map(str, delays))}]" if len(delays) > 1 else str(delays[0])
+
+        lynch_delays = self.config["lynch_delay"]
+        lynch_delay_display = f"[{', '.join(map(str, lynch_delays))}]" if len(lynch_delays) > 1 else str(lynch_delays[0])
+
+        command_delay_display = str(self.config["command_delay"])
+
+        bot_ids_display = ", ".join(map(str, self.config["bot_ids"])) if self.config["bot_ids"] else "Не указаны (любой бот)"
+
+        allowed_chats = self.config["allowed_chats"]
+        allowed_chats_display = ", ".join(map(str, allowed_chats)) if allowed_chats else "Все чаты"
+
+        pin_unpin_allowed_user_ids_display = ", ".join(map(str, self.config["pin_unpin_allowed_user_ids"])) if self.config["pin_unpin_allowed_user_ids"] else self.strings("any_users")
+
+        button_keyword_configs_string_display = self.config["button_keyword_configs_string"] if self.config["button_keyword_configs_string"] else "(пусто)"
+        active_button_config_id_display = self.config["active_button_config_id"] if self.config["active_button_config_id"] else "(не задан)"
+        current_button_keywords_display = ", ".join(self._current_button_keywords_to_use) if self._current_button_keywords_to_use else "(пусто)"
+        available_config_ids_display = ", ".join(self._parsed_button_keywords.keys()) if self._parsed_button_keywords else "(нет)"
+
+        deep_link_status_display = "🟢 Активен (автоматически обрабатывает Deep-Link URL, если они есть у подходящих кнопок)"
+
+        lynch_target_marker_display = self.config["lynch_target_marker"] if self.config["lynch_target_marker"] else "(пусто)"
+
+        game_join_trigger_phrases_display = ", ".join(self.config["game_join_trigger_phrases"]) if self.config["game_join_trigger_phrases"] else "(пусто)"
+        lynch_trigger_phrases_display = ", ".join(self.config["lynch_trigger_phrases"]) if self.config["lynch_trigger_phrases"] else "(пусто)"
+        lynch_hang_trigger_phrases_display = ", ".join(self.config["lynch_hang_trigger_phrases"]) if self.config["lynch_hang_trigger_phrases"] else "(пусто)"
+
+        player_to_lynch_user_id_display = str(self.config["player_to_lynch_user_id"]) if self.config["player_to_lynch_user_id"] else "Отключено (0)"
+        lynch_player_voting_trigger_phrases_display = ", ".join(self.config["lynch_player_voting_trigger_phrases"]) if self.config["lynch_player_voting_trigger_phrases"] else "(пусто)"
+        current_player_nickname_display = self._player_nickname_to_lynch if self._player_nickname_to_lynch else "(нет)"
+
+        role_forward_chat_id_display = str(self.config["role_forward_chat_id"]) if self.config["role_forward_chat_id"] else self.strings("role_forward_chat_id_display")
+        role_trigger_phrases_display = ", ".join(self.config["role_trigger_phrases"]) if self.config["role_trigger_phrases"] else self.strings("role_forward_trigger_phrases_display")
+
+        role_tracking_status = self.strings("role_tracking_status_active") if self.config["role_tracking_enabled"] and self._role_tracking_active else self.strings("role_tracking_status_inactive")
+        role_tracking_duration_display = str(self.config["role_tracking_duration"])
+        tracked_roles_to_monitor_display = ", ".join(self.config["tracked_roles_to_monitor"]) if self.config["tracked_roles_to_monitor"] else "(пусто)"
+        role_announcement_phrases_display = ", ".join(self.config["role_announcement_phrases"]) if self.config["role_announcement_phrases"] else "(пусто)"
+        tracked_roles_count = len(self._tracked_roles_list)
+
+        time_remaining_display = self.strings("no_time_remaining")
+        if self._role_tracking_active and self._role_tracking_start_time:
+            time_elapsed = datetime.now() - self._role_tracking_start_time
+            remaining_seconds = self.config["role_tracking_duration"] - time_elapsed.total_seconds()
+            if remaining_seconds > 0:
+                minutes, seconds = divmod(int(remaining_seconds), 60)
+                time_remaining_display = self.strings("time_remaining_format").format(minutes=minutes, seconds=seconds)
+            else:
+                time_remaining_display = "Истекло"
+
+        role_tracking_output_chat_id_config = self.config["role_tracking_output_chat_id"]
+        if role_tracking_output_chat_id_config != 0:
+            role_tracking_output_chat_id_formatted = self.strings("role_tracking_output_chat_id_display_specific").format(role_tracking_output_chat_id_config)
+        else:
+            role_tracking_output_chat_id_formatted = self.strings("role_tracking_output_chat_id_display_default")
+        
+        send_tracked_roles_delay_display = str(self.config["send_tracked_roles_delay"]) if self.config["send_tracked_roles_delay"] > 0 else self.strings("send_tracked_roles_delay_display")
+
+        auto_track_roles_trigger_phrases_display = ", ".join(self.config["auto_track_roles_trigger_phrases"]) if self.config["auto_track_roles_trigger_phrases"] else self.strings("auto_track_roles_trigger_phrases_display")
+        auto_disable_track_roles_trigger_phrases_display = ", ".join(self.config["auto_disable_track_roles_trigger_phrases"]) if self.config["auto_disable_track_roles_trigger_phrases"] else self.strings("auto_disable_track_roles_trigger_phrases_display")
+
+        auto_role_tracking_trigger_chat_id_formatted = str(self.config["auto_role_tracking_trigger_chat_id"]) if self.config["auto_role_tracking_trigger_chat_id"] != 0 else self.strings("auto_role_tracking_trigger_chat_id_display_default")
+
+        # --- TagAll Status ---
+        tagall_users_per_message_display = str(self.config["USERS_PER_MESSAGE"])
+        tagall_delay_display = str(self.config["DELAY"])
+        tagall_delete_display = "✅ Да" if self.config["tagall_delete"] else "❌ Нет"
+        tagall_use_bot_display = "✅ Да" if self.config["tagall_use_bot"] else "❌ Нет"
+        tagall_silent_display = "✅ Да" if self.config["tagall_silent"] else "❌ Нет"
+        tagall_cycle_tagging_display = "✅ Да" if self.config["cycle_tagging"] else "❌ Нет"
+        tagall_cycle_delay_display = str(self.config["cycle_delay"])
+        tagall_duration_display = str(self.config["tagall_duration"]) + " сек" if self.config["tagall_duration"] > 0 else "Не ограничено"
+
+        tagall_stop_trigger_message_display = self.config["tagall_stop_trigger_message"] if self.config["tagall_stop_trigger_message"] else "(пусто)"
+        tagall_stop_trigger_user_id_display = self.config["tagall_stop_trigger_user_id"] if self.config["tagall_stop_trigger_user_id"] else self.strings("any_users")
+        tagall_activation_trigger_message_display = self.config["tagall_activation_trigger_message"] if self.config["tagall_activation_trigger_message"] else "(пусто)"
+        tagall_activation_trigger_user_id_display = self.config["tagall_activation_trigger_user_id"] if self.config["tagall_activation_trigger_user_id"] else self.strings("any_users")
+        tagall_exclude_user_ids_display = self.config["tagall_exclude_user_ids"] if self.config["tagall_exclude_user_ids"] else "(пусто)"
+        
+        tagall_allowed_chats_map = self._get_tagall_allowed_chat_ids_map()
+        tagall_allowed_chats_display = self._format_tagall_allowed_chats_list(tagall_allowed_chats_map) if tagall_allowed_chats_map else "Все чаты"
+
+
+        await utils.answer(message, self.strings("status").format(
+            status,
+            delay_display,
+            lynch_delay_display,
+            command_delay_display,
+            bot_ids_display,
+            allowed_chats_display,
+            pin_unpin_allowed_user_ids_display,
+            button_keyword_configs_string_display,
+            active_button_config_id_display,
+            current_button_keywords_display,
+            available_config_ids_display,
+            deep_link_status_display,
+            lynch_target_marker_display,
+            game_join_trigger_phrases_display,
+            lynch_trigger_phrases_display,
+            lynch_hang_trigger_phrases_display,
+            player_to_lynch_user_id_display,
+            lynch_player_voting_trigger_phrases_display,
+            current_player_nickname_display,
+            role_forward_chat_id_display,
+            role_trigger_phrases_display,
+            role_tracking_status,
+            role_tracking_duration_display,
+            tracked_roles_to_monitor_display,
+            role_announcement_phrases_display,
+            tracked_roles_count,
+            time_remaining_display,
+            role_tracking_output_chat_id_formatted,
+            send_tracked_roles_delay_display,
+            auto_track_roles_trigger_phrases_display,
+            auto_disable_track_roles_trigger_phrases_display,
+            auto_role_tracking_trigger_chat_id_formatted,
+            # TagAll specific status fields
+            tagall_users_per_message_display,
+            tagall_delay_display,
+            tagall_delete_display,
+            tagall_use_bot_display,
+            tagall_silent_display,
+            tagall_cycle_tagging_display,
+            tagall_cycle_delay_display,
+            tagall_duration_display,
+            tagall_stop_trigger_message_display,
+            tagall_stop_trigger_user_id_display,
+            tagall_activation_trigger_message_display,
+            tagall_activation_trigger_user_id_display,
+            tagall_exclude_user_ids_display,
+            tagall_allowed_chats_display,
+        ))
+        if message.out: await message.delete()
+
+
+    @loader.command(ru_doc="Показать справку")
+    async def ajghelp(self, message: Message):
+        """Показать справку"""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"])
+        await utils.answer(message, self.strings("help_text"))
+        if message.out: await message.delete()
+
+
+    @loader.command(ru_doc="Проверить последнее сообщение с набором")
+    async def ajgtest(self, message: Message):
+        """Проверить последнее сообщение с набором в текущем чате"""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"])
+        current_chat_id = message.chat_id
+        configured_bot_ids = self.config["bot_ids"]
+
+        keywords_to_check_for_test = self._current_button_keywords_to_use
+
+        deep_link_status_test_display = "🟢 Активен (автоматически обрабатывает Deep-Link URL, если они есть у подходящих кнопок)"
+
+        game_join_phrases_for_test = self.config["game_join_trigger_phrases"]
+        lynch_phrases_for_test = self.config["lynch_trigger_phrases"] + self.config["lynch_hang_trigger_phrases"]
+        player_lynch_phrases_for_test = self.config["lynch_player_voting_trigger_phrases"]
+
+        all_trigger_phrases_for_test = game_join_phrases_for_test + lynch_phrases_for_test + player_lynch_phrases_for_test
+
+        trigger_phrases_str = ", ".join(all_trigger_phrases_for_test) if all_trigger_phrases_for_test else "Не указаны"
+
+        await utils.answer(message, f"<emoji document_id=5874960879434338403>🔎</emoji> Ищу сообщения, содержащие одну из фраз: \"{trigger_phrases_str}\" (регистронезависимо) в последних 500 сообщениях в текущем чате (ID: <code>{current_chat_id}</code>) от ботов/пользователя.\nРежим Deep-Link: {deep_link_status_test_display}...")
+
+        try:
+            results = []
+            count = 0
+
+            temp_player_nickname_for_test = None
+
+            if self.config["player_to_lynch_user_id"] != 0:
+                async for msg_check_nickname in self._client.iter_messages(current_chat_id, limit=500):
+                    sender_check_nickname = await msg_check_nickname.get_sender()
+                    sender_id_check_nickname = getattr(sender_check_nickname, 'id', None)
+                    if sender_id_check_nickname == self.config["player_to_lynch_user_id"] and getattr(msg_check_nickname, 'text', None):
+                        nickname_raw = msg_check_nickname.text.strip()
+                        if nickname_raw.startswith('!'):
+                            temp_player_nickname_for_test = nickname_raw[1:].strip()
+                        else:
+                            temp_player_nickname_for_test = nickname_raw
+                        results.append(self.strings("ajgtest_player_nickname_would_be_set").format(
+                            msg_id=msg_check_nickname.id,
+                            sender_id=sender_id_check_nickname,
+                            nickname=temp_player_nickname_for_test
+                        ))
+                        break
+                if temp_player_nickname_for_test:
+                    results.append(self.strings("ajgtest_player_nickname_used").format(nickname=temp_player_nickname_for_test))
+                else:
+                    results.append(self.strings("ajgtest_player_nickname_not_set_yet"))
+            else:
+                results.append(self.strings("ajgtest_player_lynch_disabled"))
+
+            async for msg in self._client.iter_messages(current_chat_id, limit=500):
+                count += 1
+
+                if not getattr(msg, 'text', None):
+                    continue
+
+                sender = await msg.get_sender()
+                sender_id = getattr(sender, 'id', None)
+
+                is_general_bot_message = getattr(sender, 'bot', False) and (
+                    not configured_bot_ids or sender_id in configured_bot_ids
+                )
+
+                if not is_general_bot_message:
+                    continue
+
+                msg_text_lower = msg.text.lower()
+
+                is_game_join_test_message = any(phrase.lower() in msg_text_lower for phrase in game_join_phrases_for_test)
+                is_general_lynch_test_message = any(phrase.lower() in msg_text_lower for phrase in lynch_phrases_for_test)
+                is_player_voting_test_message = (
+                    self.config["player_to_lynch_user_id"] != 0 and
+                    is_general_bot_message and
+                    any(phrase.lower() in msg_text_lower for phrase in player_lynch_phrases_for_test)
+                )
+
+
+                if is_game_join_test_message or is_general_lynch_test_message or is_player_voting_test_message:
+                    info_msg = f"✅ Найдено сообщение ID <code>{msg.id}</code> от <code>{sender_id if sender_id is not None else 'Неизвестно'}</code>:\n"
+                    text_preview = msg.text[:100] + "..." if len(msg.text) > 100 else msg.text
+                    info_msg += f"💬 Текст: <code>{text_preview}</code>\n"
+
+                    if getattr(msg, 'buttons', None):
+                        info_msg += "🔘 Есть кнопки: Да\n"
+                        info_msg += "Список кнопок:\n"
+                        button_matched_in_test = False
+
+                        if is_player_voting_test_message:
+                            if temp_player_nickname_for_test:
+                                info_msg += f"  <emoji document_id=5935968647901089910>🔫</emoji> (Режим голосования за игрока: ищу ник <code>{temp_player_nickname_for_test}</code>)\n"
+                                for row_idx, row in enumerate(msg.buttons):
+                                    for btn_idx, btn in enumerate(row):
+                                        btn_text = str(getattr(btn, 'text', f'Кнопка {btn_idx}'))
+                                        if temp_player_nickname_for_test.lower() in btn_text.lower():
+                                            info_msg += f"  • <code>{btn_text}</code> (✅ ПОДХОДИТ! Действие: *была бы* нажата кнопка с ником <code>{temp_player_nickname_for_test}</code>)\n"
+                                            button_matched_in_test = True
+                                        else:
+                                            info_msg += f"  • <code>{btn_text}</code>\n"
+                                if not button_matched_in_test:
+                                    info_msg += f"\n⚠️ Кнопка с ником <code>{temp_player_nickname_for_test}</code> не найдена.\n"
+                            else:
+                                info_msg += self.strings("ajgtest_player_nickname_not_set_yet") + "\n"
+
+                        elif is_general_lynch_test_message:
+                            lynch_marker = self.config["lynch_target_marker"]
+                            target_emoji = "👎" if lynch_marker and lynch_marker in msg.text else "👍"
+                            info_msg += f"  <emoji document_id=5935968647901089910>🔫</emoji> (Режим линчевания/повешения: ищу '{target_emoji}')\n"
+                            for row_idx, row in enumerate(msg.buttons):
+                                for btn_idx, btn in enumerate(row):
+                                    btn_text = str(getattr(btn, 'text', f'Кнопка {btn_idx}'))
+                                    if target_emoji in btn_text:
+                                        info_msg += f"  • <code>{btn_text}</code> (✅ ПОДХОДИТ! Действие: *была бы* нажата '{target_emoji}')\n"
+                                        button_matched_in_test = True
+                                    else:
+                                        info_msg += f"  • <code>{btn_text}</code>\n"
+                            if not button_matched_in_test:
+                                info_msg += f"\n⚠️ Кнопка '{target_emoji}' не найдена.\n"
+                        elif is_game_join_test_message:
+                            info_msg += "  <emoji document_id=5935847413859225147>🏀</emoji> (Режим входа в игру: ищу ключевые слова с приоритетом)\n"
+
+                            deprioritized_keyword_test = "присоединиться"
+                            high_priority_keywords_test = [k for k in keywords_to_check_for_test if k.lower() != deprioritized_keyword_test.lower()]
+                            low_priority_keywords_test = [k for k in keywords_to_check_for_test if k.lower() == deprioritized_keyword_test.lower()]
+
+                            temp_target_button_text = None
+                            temp_target_button_url = None
+
+                            all_buttons_info = []
+
+                            # Simulate priority check for testing
+                            found_high_priority = False
+                            for row in msg.buttons:
+                                for btn in row:
+                                    btn_text_test = str(getattr(btn, 'text', ''))
+                                    btn_url_test = getattr(btn, 'url', None)
+
+                                    button_info = {
+                                        "text": btn_text_test,
+                                        "url": btn_url_test,
+                                        "match_type": "нет",
+                                        "action": ""
+                                    }
+
+                                    if any(keyword in btn_text_test.lower() for keyword in high_priority_keywords_test):
+                                        button_info["match_type"] = "✅ ВЫСОКИЙ ПРИОРИТЕТ!"
+                                        if not found_high_priority: # Capture the first high-priority match
+                                            temp_target_button_text = btn_text_test
+                                            temp_target_button_url = btn_url_test
+                                            found_high_priority = True
+                                            button_matched_in_test = True # Overall match for the test
+
+                                    all_buttons_info.append(button_info)
+
+                            if not found_high_priority and low_priority_keywords_test:
+                                for btn_info in all_buttons_info:
+                                    if any(keyword in btn_info["text"].lower() for keyword in low_priority_keywords_test):
+                                        btn_info["match_type"] = "✅ НИЗКИЙ ПРИОРИТЕТ (присоединиться)"
+                                        if not temp_target_button_text: # Capture the first low-priority match if no high-priority was found
+                                            temp_target_button_text = btn_info["text"]
+                                            temp_target_button_url = btn_info["url"]
+                                            button_matched_in_test = True # Overall match for the test
+
+
+                            for btn_info in all_buttons_info:
+                                url_display = f" (URL: <code>{btn_info['url'][:50]}...</code>)" if btn_info['url'] and len(btn_info['url']) > 50 else (f" (URL: <code>{btn_info['url']}</code>)" if btn_info['url'] else " (URL: Нет, Callback кнопка)")
+
+                                action_suffix = ""
+                                if btn_info['text'] == temp_target_button_text and btn_info['url'] == temp_target_button_url and button_matched_in_test:
+                                    # This is the button that would be clicked
+                                    if btn_info['url']:
+                                        parsed_url = urllib.parse.urlparse(btn_info['url'])
+                                        query_params = urllib.parse.parse_qs(parsed_url.query)
+                                        start_param = query_params.get('start', [None])[0]
+
+                                        bot_username = None
+                                        if parsed_url.hostname in ['t.me', 'telegram.me'] and parsed_url.path:
+                                            path_parts = parsed_url.path.lstrip('/').split('/')
+                                            if path_parts and path_parts[0]:
+                                                bot_username = path_parts[0]
+                                        elif parsed_url.scheme == 'tg' and parsed_url.netloc == 'resolve':
+                                            query_params_tg = urllib.parse.parse_qs(parsed_url.query)
+                                            bot_username = query_params_tg.get('domain', [None])[0]
+
+                                        if bot_username and start_param:
+                                            action_suffix = f" (Действие Deep-Link: *была бы* отправлена <code>/start {start_param}</code> боту @{bot_username})"
+                                        else:
+                                            action_suffix = " (Действие: *была бы* нажата URL кнопка)"
+                                    else:
+                                        action_suffix = " (Действие: *была бы* нажата Callback кнопка)"
+
+                                info_msg += f"  • <code>{btn_info['text']}</code>{url_display} ({btn_info['match_type']}){action_suffix}\n"
+
+                            if not button_matched_in_test and keywords_to_check_for_test:
+                                info_msg += "\n⚠️ Ни одна кнопка не соответствует настроенным ключевым словам.\n"
+                            elif not keywords_to_check_for_test:
+                                info_msg += "\n⚠️ Список ключевых слов для кнопок пуст. Ни одна кнопка не будет активирована.\n"
+
+                    else:
+                        info_msg += "🔘 Есть кнопки: Нет\n"
+
+                    results.append(info_msg)
+
+            if not results:
+                await utils.answer(message, self.strings("ajgtest_no_matches").format(chat_id=current_chat_id, count=count))
+            else:
+                final_output = "\n---\n".join(results)
+                final_output += f"\n\n📊 Проверено сообщений: {count}"
+                await utils.answer(message, final_output)
+
+        except Exception as e:
+            logger.exception(f"Error in ajgtest: {e}")
+            error_text = str(e) if str(e) else "Неизвестная ошибка"
+            await utils.answer(message, self.strings("ajgtest_error").format(error=error_text))
+        
+        if message.out: await message.delete()
+
+
+    @loader.command(ru_doc="Показать список ID ботов для мафии")
+    async def ajgid(self, message: Message):
+        """Показать список ID ботов для мафии"""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"])
+        await utils.answer(message, self.strings("ajgid_bots_list"))
+        if message.out: await message.delete()
+
+
+    @loader.command(ru_doc="Показать информацию о регистрации на турниры")
+    async def ajgtournaments(self, message: Message):
+        """Показать информацию о регистрации на турниры"""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"])
+        await utils.answer(message, self.strings("ajgtournaments_text"))
+        if message.out: await message.delete()
+
+
+    # --- TagAll Commands ---
+
+    @loader.command(ru_doc=lambda self: self.strings("_cmd_tagall_doc"),
+                    de_doc=lambda self: self.strings("_cmd_tagall_doc"),
+                    tr_doc=lambda self: self.strings("_cmd_tagall_doc"),
+                    uz_doc=lambda self: self.strings("_cmd_tagall_doc"))
+    async def tagall(self, message: Message):
+        """[<номер чата>] [текст] - Отметить всех участников чата. [текст] будет отправлен вместе с тегами. Если текст не указан, будут отправлены только теги."""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"])
+
+        raw_args = utils.get_args_raw(message)
+        target_chat_id, message_prefix = await self._resolve_tagall_target_chat(message, raw_args)
+
+        if target_chat_id is None: # Ошибка при разрешении чата
+            if message.out:
+                await message.delete()
+            return
+        
+        # Explicit check for group before starting tagall
+        try:
+            chat_entity = await self._client.get_input_entity(target_chat_id)
+            if not isinstance(chat_entity, Channel) and not getattr(chat_entity, 'megagroup', False):
+                await utils.answer(message, self.strings("no_group"))
+                if message.out: await message.delete()
+                return
+        except Exception as e:
+            logger.error(f"UniversalMafiaTools: TagAll: Не удалось получить сущность чата {target_chat_id} для проверки типа: {e}")
+            await utils.answer(message, self.strings("tagall_chat_not_found").format(chat_id=target_chat_id))
+            if message.out: await message.delete()
+            return
+
+
+        if target_chat_id in self._tagall_events and self._tagall_events[target_chat_id].state:
+            await utils.answer(message, self.strings("tagall_already_running"))
+            if message.out: await message.delete()
+            return
+
+        # Если команда была исходящей, удаляем ее, чтобы не засорять чат
+        if message.out:
+            await message.delete()
+
+        event = StopEvent(target_chat_id)
+        self._tagall_events[target_chat_id] = event
+
+        await utils.answer(message, self.strings("gathering"))
+        self._client.loop.create_task(self._run_tagall_process(target_chat_id, message_prefix, event, False)) # Pass silent_start=False for commands
+
+
+    @loader.command(ru_doc=lambda self: self.strings("_cmd_stoptagall_doc"),
+                    de_doc=lambda self: self.strings("_cmd_stoptagall_doc"),
+                    tr_doc=lambda self: self.strings("_cmd_stoptagall_doc"),
+                    uz_doc=lambda self: self.strings("_cmd_stoptagall_doc"))
+    async def stoptagall(self, message: Message):
+        """[<номер чата>] - Остановить запущенный процесс TagAll в <b>указанном или текущем чате</b>."""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"])
+
+        raw_args = utils.get_args_raw(message)
+        target_chat_id, _ = await self._resolve_tagall_target_chat(message, raw_args)
+
+        if target_chat_id is None: # Ошибка при разрешении чата
+            if message.out:
+                await message.delete()
+            return
+
+        event = self._tagall_events.get(target_chat_id)
+
+        if event and event.state:
+            event.stop()
+            await utils.answer(message, self.strings("stopped"))
+        else:
+            await utils.answer(message, self.strings("tagall_not_running"))
+
+        # Если команда была исходящей, удаляем ее, чтобы не засорять чат
+        if message.out:
+            await message.delete()
+
+
+    @loader.command(ru_doc=lambda self: self.strings("_cmd_autotagall_doc"),
+                    de_doc=lambda self: self.strings("_cmd_autotagall_doc"),
+                    tr_doc=lambda self: self.strings("_cmd_autotagall_doc"),
+                    uz_doc=lambda self: self.strings("_cmd_autotagall_doc"))
+    async def autotagall(self, message: Message):
+        """[<номер чата>] [on|off] - Включить или выключить триггеры для запуска/остановки TagAll в <b>указанном или текущем чате</b>. Используйте `on` для включения, `off` для выключения. Без аргументов покажет статус триггеров."""
+        if self.config["command_delay"] > 0:
+            await asyncio.sleep(self.config["command_delay"])
+
+        raw_args = utils.get_args_raw(message)
+        target_chat_id, args = await self._resolve_tagall_target_chat(message, raw_args)
+
+        if target_chat_id is None: # Ошибка при разрешении чата
+            if message.out:
+                await message.delete()
+            return
+
+        args = args.lower().strip()
+
+        if args == "on":
+            self._db.set(self.name, f"tagall_stop_triggers_enabled_{target_chat_id}", True)
+            self._db.set(self.name, f"tagall_activation_triggers_enabled_{target_chat_id}", True)
+            await utils.answer(message, self.strings("triggers_state_enabled").format(chat_id=target_chat_id))
+        elif args == "off":
+            self._db.set(self.name, f"tagall_stop_triggers_enabled_{target_chat_id}", False)
+            self._db.set(self.name, f"tagall_activation_triggers_enabled_{target_chat_id}", False)
+            await utils.answer(message, self.strings("triggers_state_disabled").format(chat_id=target_chat_id))
+        elif not args:
+            is_enabled = self._db.get(self.name, f"tagall_stop_triggers_enabled_{target_chat_id}", False) # Check one of them for status
+            if is_enabled:
+                await utils.answer(message, self.strings("triggers_status_enabled").format(chat_id=target_chat_id))
+            else:
+                await utils.answer(message, self.strings("triggers_status_disabled").format(chat_id=target_chat_id))
+        else:
+            await utils.answer(message, self.strings("invalid_trigger_arg"))
+
+        # Если команда была исходящей, удаляем ее, чтобы не засорять чат
+        if message.out:
+            await message.delete()
