@@ -22,13 +22,15 @@ class TagAllMod(loader.Module):
 
     def __init__(self):
         self.config = loader.ModuleConfig(
-            USERS_PER_MESSAGE=loader.ConfigValue(
-                default=5,
+            loader.ConfigValue(
+                "USERS_PER_MESSAGE",
+                5,
                 doc="Количество пользователей, которых нужно тегать в одном сообщении",
                 validator=loader.validators.Integer(),
             ),
-            DELAY=loader.ConfigValue(
-                default=3.0,
+            loader.ConfigValue(
+                "DELAY",
+                3.0,
                 doc="Задержка между сообщениями в секундах (не рекомендуется ставить меньше 2.0-3.0)",
                 validator=loader.validators.Float(),
             ),
