@@ -25,16 +25,14 @@ class TagAllMod(loader.Module):
             loader.ConfigValue(
                 "USERS_PER_MESSAGE",
                 5,
-                lambda x: isinstance(x, int) and x > 0,
+                "Количество пользователей, которых нужно тегать в одном сообщении",
                 validator=loader.validators.Integer(),
-                doc="Количество пользователей, которых нужно тегать в одном сообщении",
             ),
             loader.ConfigValue(
                 "DELAY",
                 3.0,
-                lambda x: isinstance(x, (int, float)) and x >= 0.5,
+                "Задержка между сообщениями в секундах (не рекомендуется ставить меньше 2.0-3.0 во избежание лимитов Telegram)",
                 validator=loader.validators.Float(),
-                doc="Задержка между сообщениями в секундах (не рекомендуется ставить меньше 2.0-3.0 во избежание лимитов Telegram)",
             ),
         )
         self.active_tasks = {}
