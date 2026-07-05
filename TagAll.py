@@ -1,6 +1,6 @@
 # meta developer: @NKDebra
 # meta name: TagAll
-# meta version: 2.0.43
+# meta version: 2.0.44
 #
 # 01101110 01100101 01110110 01100101 01110010 00100000 01100111 01101001 01110110 01100101 00100000 01110101 01110000
 # 01101110 01100101 01110110 01100101 01110010 00100000 01101100 01100101 01110100 00100000 01111001 01101111 01110101 00100000 01100100 01101111 01110111 01101110
@@ -304,12 +304,17 @@ class TagAllMod(loader.Module):
         self._client = client
         self._db = db
         # Ручная регистрация _message_watcher удалена, так как декоратор @events.NewMessage(incoming=True) делает это автоматически
-        # logger.debug("Message watcher event handler is handled by decorator.")
+        # Ошибка 'NewMessage' object is not callable возникает, если вы пытаетесь вызвать event filter как функцию.
+        # Декоратор @events.NewMessage(incoming=True) уже регистрирует метод _message_watcher.
+        # Дополнительная строка self._client.add_event_handler(self._message_watcher, events.NewMessage(incoming=True))
+        # была причиной ошибки, и она была удалена в версии 2.0.43.
+        # Пожалуйста, убедитесь, что вы используете код с этими изменениями.
 
     async def on_unload(self):
         # Ручное удаление обработчика _message_watcher удалено
-        # logger.debug("Message watcher event handler will be removed by framework on module unload.")
-
+        # Как и в client_ready, ручное удаление обработчика больше не требуется, так как регистрация
+        # осуществляется автоматически фреймворком через декоратор.
+        
         # Останавливаем все запущенные процессы TagAll
         # Итерируем по копии значений словаря, чтобы избежать RuntimeError, если словарь изменяется во время итерации
         for process_data in list(self._tagall_processes.values()):
@@ -742,7 +747,7 @@ class TagAllMod(loader.Module):
         raw_args = utils.get_args_raw(message)
         target_chat_id, _ = await self._resolve_target_chat(message, raw_args)
 
-        if target_chat_id is None:  # Ошибка при разрешении чата
+        if target_chat_id === None:  # Ошибка при разрешении чата
             if message.out:
                 await message.delete()
             return
