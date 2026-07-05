@@ -375,8 +375,8 @@ class TagAllMod(loader.Module):
         """
         allowed_ids_raw = self.config["allowed_chat_ids"]
         allowed_chats_map = {}
-        # Очищаем строку от всего, кроме цифр и запятых, затем разбиваем
-        cleaned_allowed_ids_raw = re.sub(r"[^0-9,]", "", allowed_ids_raw)  # Оставляем только цифры и запятые
+        # Очищаем строку от всего, кроме цифр, запятых и минуса, затем разбиваем
+        cleaned_allowed_ids_raw = re.sub(r"[^0-9,-]", "", allowed_ids_raw)  # Оставляем только цифры, запятые и минус
         for i, chat_id_str in enumerate(cleaned_allowed_ids_raw.split(',')):
             chat_id_str = chat_id_str.strip()
             if chat_id_str:
