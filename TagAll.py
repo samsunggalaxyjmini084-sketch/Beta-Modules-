@@ -1,6 +1,6 @@
 # meta developer: @NKDebra
 # meta name: TagAll
-# meta version: 2.0.47
+# meta version: 2.0.48
 #
 # 01101110 01100101 01110110 01100101 01110010 00100000 01100111 01101001 01110110 01100101 00100000 01110101 01110000
 # 01101110 01100101 01110110 01100101 01110010 00100000 01101100 01100101 01110100 00100000 01111001 01101111 01110101 00100000 01100100 01101111 01110111 01101110
@@ -55,7 +55,7 @@ class TagAllMod(loader.Module):
         "_cfg_doc_allowed_chat_ids": "ID чата(ов), в которых разрешено использовать команды модуля TagAll. Разделяйте запятыми. Если указан только один ID, команды, запущенные в других чатах, будут автоматически перенаправлены в этот чат. Если пусто, команды разрешены во всех чатах.",
         # Документация для новой системы триггеров
         "_cfg_doc_enable_triggers": "Включить систему триггеров для автоматического запуска TagAll.",
-        "_cfg_doc_trigger_message_text": "Текст сообщения, которое будет служить триггером для TagAll. Можно использовать частичный текст, регистр игнорируется. Если сообщение пользователя содержит этот текст, TagAll будет запущен.",
+        "_cfg_doc_trigger_message_text": "Текст сообщения, которое будет служить триггером для TagAll. Можно использовать частичный текст, регистр игнорируется. Если сообщение пользователя содержит этот текст, TagAll будет запущен. Оставьте пустым, чтобы отключить триггер по тексту.",
         "_cfg_doc_trigger_user_ids": "ID пользователя(ей), чьи сообщения могут активировать триггер. Разделяйте запятыми. Если пусто, любой пользователь может активировать триггер.",
         "_cfg_doc_trigger_target_chat_id": "ID чата, в котором будет запущен TagAll по триггеру. Установите 0 для запуска в чате, где сработало сообщение-триггер.",
         "_cfg_doc_trigger_prefix": "Текст, который будет добавлен перед тегами при запуске TagAll по триггеру. Если пусто, текст не будет добавлен.",
@@ -100,7 +100,7 @@ class TagAllMod(loader.Module):
         "_cfg_doc_exclude_user_ids": "Benutzer-ID(s), die nicht erwähnt werden sollen. Kommagetrennt eingeben. Zum Beispiel: <code>123456789, 987654321</code>",
         "_cfg_doc_allowed_chat_ids": "Chat-ID(s), in denen die TagAll-Modulbefehle verwendet werden dürfen. Durch Kommas getrennt eingeben. Wenn nur eine ID angegeben ist, werden Befehle, die in anderen Chats ausgeführt werden, automatisch in diesen Chat umgeleitet. Wenn leer, sind Befehle in allen Chats erlaubt.",
         "_cfg_doc_enable_triggers": "Trigger-System für den automatischen Start von TagAll aktivieren.",
-        "_cfg_doc_trigger_message_text": "Der Nachrichtentext, der als Trigger für TagAll dient. Teiltext ist erlaubt, Groß-/Kleinschreibung wird ignoriert. Wenn die Nachricht eines Benutzers diesen Text enthält, wird TagAll gestartet.",
+        "_cfg_doc_trigger_message_text": "Der Nachrichtentext, der als Trigger für TagAll dient. Teiltext ist erlaubt, Groß-/Kleinschreibung wird ignoriert. Wenn die Nachricht eines Benutzers diesen Text enthält, wird TagAll gestartet. Leer lassen, um den Text-Trigger zu deaktivieren.",
         "_cfg_doc_trigger_user_ids": "Benutzer-ID(s), deren Nachrichten den Trigger aktivieren können. Kommagetrennt eingeben. Wenn leer, kann jeder Benutzer den Trigger aktivieren.",
         "_cfg_doc_trigger_target_chat_id": "Die Chat-ID, in der TagAll durch den Trigger gestartet wird. Setzen Sie 0, um im Chat zu starten, in dem die Trigger-Nachricht aufgetreten ist.",
         "_cfg_doc_trigger_prefix": "Text, der vor den Tags hinzugefügt wird, wenn TagAll durch einen Trigger gestartet wird. Wenn leer, wird kein Text hinzugefügt.",
@@ -139,7 +139,7 @@ class TagAllMod(loader.Module):
         "_cfg_doc_exclude_user_ids": "Etiketlenmeyecek kullanıcı kimliği(leri). Virgülle ayırın. Örneğin: <code>123456789, 987654321</code>",
         "_cfg_doc_allowed_chat_ids": "TagAll modül komutlarının kullanılabileceği sohbet kimliği(leri). Virgülle ayırın. Yalnızca bir kimlik belirtilirse, diğer sohbetlerde başlatılan komutlar otomatik olarak bu sohbete yönlendirilecektir. Boş bırakılırsa, komutlara tüm sohbetlerde izin verilir.",
         "_cfg_doc_enable_triggers": "TagAll'u otomatik başlatmak için tetikleyici sistemini etkinleştir.",
-        "_cfg_doc_trigger_message_text": "TagAll için tetikleyici görevi görecek mesaj metni. Kısmi metin kullanılabilir, büyük/küçük harf duyarlılığı yoktur. Kullanıcının mesajı bu metni içeriyorsa, TagAll başlatılır.",
+        "_cfg_doc_trigger_message_text": "TagAll için tetikleyici görevi görecek mesaj metni. Kısmi metin kullanılabilir, büyük/küçük harf duyarlılığı yoktur. Kullanıcının mesajı bu metni içeriyorsa, TagAll başlatılır. Boş bırakılırsa, metin tetikleyicisi devre dışı bırakılır.",
         "_cfg_doc_trigger_user_ids": "Mesajları tetikleyiciyi etkinleştirebilecek kullanıcı kimliği(leri). Virgülle ayırın. Boş bırakılırsa, herhangi bir kullanıcı tetikleyiciyi etkinleştirebilir.",
         "_cfg_doc_trigger_target_chat_id": "TagAll'un tetikleyici tarafından başlatılacağı sohbet kimliği. Tetikleyici mesajının oluştuğu sohbette başlatmak için 0 olarak ayarlayın.",
         "_cfg_doc_trigger_prefix": "TagAll bir tetikleyici tarafından başlatıldığında etiketlerin önüne eklenecek metin. Boş bırakılırsa, metin eklenmez.",
@@ -182,7 +182,7 @@ class TagAllMod(loader.Module):
         "_cfg_doc_exclude_user_ids": "Etiketlanmaydigan foydalanuvchi ID(lar)i. Vergul bilan ajrating. Misol uchun: <code>123456789, 987654321</code>",
         "_cfg_doc_allowed_chat_ids": "TagAll modul buyruqlaridan foydalanishga ruxsat berilgan chat ID(lar)i. Vergul bilan ajrating. Agar faqat bitta ID ko'rsatilgan bo'lsa, boshqa chatlarda ishga tushirilgan buyruqlar avtomatik ravishda ushbu chatga yo'naltiriladi. Bo'sh bo'lsa, buyruqlarga barcha chatlarda ruxsat beriladi.",
         "_cfg_doc_enable_triggers": "TagAllni avtomatik ishga tushirish uchun trigger tizimini yoqish.",
-        "_cfg_doc_trigger_message_text": "TagAll uchun trigger bo'lib xizmat qiladigan xabar matni. Qisman matn ishlatilishi mumkin, katta/kichik harflar e'tiborga olinmaydi. Agar foydalanuvchining xabari bu matnni o'z ichiga olsa, TagAll ishga tushiriladi.",
+        "_cfg_doc_trigger_message_text": "TagAll uchun trigger bo'lib xizmat qiladigan xabar matni. Qisman matn ishlatilishi mumkin, katta/kichik harflar e'tiborga olinmaydi. Agar foydalanuvchining xabari bu matnni o'z ichiga olsa, TagAll ishga tushiriladi. Bo'sh qoldirilsa, matn triggeri o'chiriladi.",
         "_cfg_doc_trigger_user_ids": "Xabarlari triggerni faollashtira oladigan foydalanuvchi ID(lar)i. Vergul bilan ajrating. Bo'sh bo'lsa, istalgan foydalanuvchi triggerni faollashtirishi mumkin.",
         "_cfg_doc_trigger_target_chat_id": "Trigger orqali TagAll ishga tushiriladigan chat IDsi. Trigger xabari kelgan chatda ishga tushirish uchun 0 ga o'rnating.",
         "_cfg_doc_trigger_prefix": "Trigger orqali TagAll ishga tushirilganda teglar oldiga qo'shiladigan matn. Bo'sh bo'lsa, matn qo'shilmaydi.",
@@ -274,9 +274,9 @@ class TagAllMod(loader.Module):
             ),
             loader.ConfigValue(
                 "trigger_message_text",
-                "",
+                "", # Default to empty string (inactive)
                 lambda: self.strings("_cfg_doc_trigger_message_text"),
-                validator=loader.validators.String(min_len=3, max_len=256), # Enforce min length to prevent accidental triggers
+                validator=loader.validators.String(max_len=256), # Removed min_len=3
             ),
             loader.ConfigValue(
                 "trigger_user_ids",
@@ -304,7 +304,8 @@ class TagAllMod(loader.Module):
         self._client = client
         self._db = db
         # Ручная регистрация обработчика событий
-        if self._message_watcher_handle is None: # Регистрируем только если еще не зарегистрирован
+        # Проверяем, что обработчик еще не был зарегистрирован (например, при перезагрузке модуля)
+        if self._message_watcher_handle is None:
             try:
                 self._message_watcher_handle = self._client.add_event_handler(
                     self._message_watcher,
@@ -484,6 +485,7 @@ class TagAllMod(loader.Module):
         timeout_data["last_timeout"] = current_timeout
         return current_timeout
 
+    # УДАЛЕН ДЕКОРАТОР @events.NewMessage(incoming=True)
     async def _message_watcher(self, message: Message):
         """Обработчик входящих сообщений для активации TagAll по триггеру."""
         if not self.config["enable_triggers"]:
@@ -495,8 +497,11 @@ class TagAllMod(loader.Module):
             return
 
         trigger_message_text = self.config["trigger_message_text"].strip()
-        if not trigger_message_text or len(trigger_message_text) < 3: # Enforce min length
-            # logger.debug("Trigger message text is too short or empty, ignoring trigger.")
+        # Изменено: теперь пустая строка означает, что текстовый триггер отключен
+        if not trigger_message_text: # No trigger message set
+            return
+        
+        if len(trigger_message_text) < 3: # Enforce min length only if it's not empty
             return
 
         # Проверка на наличие триггерного текста (без учета регистра)
