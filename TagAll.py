@@ -1,6 +1,6 @@
 # meta developer: @NKDebra
 # meta name: TagAll
-# meta version: 2.0.46
+# meta version: 2.0.47
 #
 # 01101110 01100101 01110110 01100101 01110010 00100000 01100111 01101001 01110110 01100101 00100000 01110101 01110000
 # 01101110 01100101 01110110 01100101 01110010 00100000 01101100 01100101 01110100 00100000 01111001 01101111 01110101 00100000 01100100 01101111 01110111 01101110
@@ -298,24 +298,33 @@ class TagAllMod(loader.Module):
             ),
         )
         self._tagall_processes: dict[int, dict] = {}
+        self._message_watcher_handle = None # Для хранения объекта обработчика, возвращаемого add_event_handler
 
     async def client_ready(self, client, db):
         self._client = client
         self._db = db
-        # Ручная регистрация _message_watcher удалена, так как декоратор @events.NewMessage(incoming=True) делает это автоматически.
-        # Ошибка 'NewMessage' object is not callable возникает, если вы пытаетесь вызвать event filter как функцию.
-        # Декоратор @events.NewMessage(incoming=True) уже регистрирует метод _message_watcher.
-        # Дополнительная строка self._client.add_event_handler(self._message_watcher, events.NewMessage(incoming=True))
-        # была причиной ошибки, и она была удалена в версии 2.0.43.
-        # Пожалуйста, убедитесь, что вы используете код с этими изменениями.
+        # Ручная регистрация обработчика событий
+        if self._message_watcher_handle is None: # Регистрируем только если еще не зарегистрирован
+            try:
+                self._message_watcher_handle = self._client.add_event_handler(
+                    self._message_watcher,
+                    events.NewMessage(incoming=True)
+                )
+                logger.debug("Message watcher event handler manually added.")
+            except Exception as e:
+                logger.error(f"Failed to add message watcher event handler: {e}")
 
     async def on_unload(self):
-        # Ручное удаление обработчика _message_watcher удалено.
-        # Как и в client_ready, ручное удаление обработчика больше не требуется, так как регистрация
-        # осуществляется автоматически фреймворком через декоратор.
+        # Ручное удаление обработчика событий
+        if self._client and self._message_watcher_handle:
+            try:
+                self._client.remove_event_handler(self._message_watcher_handle)
+                self._message_watcher_handle = None
+                logger.debug("Message watcher event handler manually removed.")
+            except Exception as e:
+                logger.error(f"Failed to remove message watcher event handler: {e}")
         
         # Останавливаем все запущенные процессы TagAll
-        # Итерируем по копии значений словаря, чтобы избежать RuntimeError, если словарь изменяется во время итерации
         for process_data in list(self._tagall_processes.values()):
             task = process_data.get("task")
             if task and not task.done():
@@ -475,7 +484,6 @@ class TagAllMod(loader.Module):
         timeout_data["last_timeout"] = current_timeout
         return current_timeout
 
-    @events.NewMessage(incoming=True)
     async def _message_watcher(self, message: Message):
         """Обработчик входящих сообщений для активации TagAll по триггеру."""
         if not self.config["enable_triggers"]:
@@ -746,7 +754,7 @@ class TagAllMod(loader.Module):
         raw_args = utils.get_args_raw(message)
         target_chat_id, _ = await self._resolve_target_chat(message, raw_args)
 
-        if target_chat_id is None:  # Исправлено: заменено === на is
+        if target_chat_id is None:  # Ошибка при разрешении чата
             if message.out:
                 await message.delete()
             return
