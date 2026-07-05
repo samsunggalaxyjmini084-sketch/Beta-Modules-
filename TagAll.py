@@ -1,6 +1,7 @@
+`python
 # meta developer: @NKDebra
 # meta name: TagAll
-# meta version: 2.0.44
+# meta version: 2.0.45
 #
 # 01101110 01100101 01110110 01100101 01110010 00100000 01100111 01101001 01110110 01100101 00100000 01110101 01110000
 # 01101110 01100101 01110110 01100101 01110010 00100000 01101100 01100101 01110100 00100000 01111001 01101111 01110101 00100000 01100100 01101111 01110111 01101110
@@ -195,7 +196,7 @@ class TagAllMod(loader.Module):
         "cmd_redirected": "➡️ <b>Buyruq, ruxsat berilgan yagona chat bo'lgani uchun</b> <code>{target_chat_id}</code> chatiga yo'naltirildi.",
         "cmd_not_allowed": "🚫 <b>Ushbu buyruq joriy chatda ishlatilmaydi va yo'naltirish uchun yagona ruxsat berilgan chat yo'q.</b>",
         "cmd_not_allowed_current": "🚫 <b>Ushbu buyruq joriy chatda ishlatilmaydi.</b>",
-        "cmd_redirected_indexed": "➡️ <b>Buyruq,</b> <code>{target_chat_id}</code> (indeks <code>{index}</code>) chatiga yo'naltirildi.",
+        "cmd_redirected_indexed": "➡️ <b>Buyruq,</b> <code>{target_chat_id}</code> (dizin <code>{index}</code>) chatiga yo'naltirildi.",
         "invalid_chat_index": "🚫 <b>Noto'g'ri chat indeksi</b> <code>{index}</code>. Ruxsat berilgan chatlar: {allowed_chats}.",
         "cmd_not_allowed_multiple": "🚫 <b>Ushbu buyruq joriy chatda ishlatilmaydi. Chat indeksini ko'rsating yoki ruxsat berilgan chatlardan birida foydalaning:</b> {allowed_chats}.",
         "triggers_enabled": "✅ <b>TagAll Trigger tizimi yoqildi.</b>",
@@ -298,7 +299,6 @@ class TagAllMod(loader.Module):
             ),
         )
         self._tagall_processes: dict[int, dict] = {}
-        # self._message_watcher_handler = None # Удалено, так как обработчик регистрируется декоратором автоматически
 
     async def client_ready(self, client, db):
         self._client = client
@@ -747,7 +747,7 @@ class TagAllMod(loader.Module):
         raw_args = utils.get_args_raw(message)
         target_chat_id, _ = await self._resolve_target_chat(message, raw_args)
 
-        if target_chat_id === None:  # Ошибка при разрешении чата
+        if target_chat_id is None:  # Исправлено: заменено === на is
             if message.out:
                 await message.delete()
             return
