@@ -346,10 +346,15 @@ class TagAllMod(loader.Module):
         )
         self._tagall_events: dict[int, StopEvent] = {}
         self._message_watcher_handler = None  # Для хранения ссылки на обработчик событий
+        # Новая система хранения состояния триггеров для каждого чата
+        self._chat_trigger_states: dict[int, dict[str, bool]] = {}
 
     async def client_ready(self, client, db):
         self._client = client
         self._db = db
+        # Загружаем состояние триггеров из базы данных
+        self._chat_trigger_states = self._db.get(self.name, "chat_trigger_states", {})
+
         # Убедитесь, что обработчик событий добавлен только один раз
         if not self._message_watcher_handler:
             self._message_watcher_handler = self._client.add_event_handler(self._message_watcher, events.NewMessage(incoming=True))
@@ -367,6 +372,15 @@ class TagAllMod(loader.Module):
                 event.stop()
         self._tagall_events.clear()
         logger.info("Все процессы TagAll остановлены из-за выгрузки модуля.")
+
+    def _get_chat_trigger_settings(self, chat_id: int) -> dict[str, bool]:
+        """Возвращает настройки триггеров для указанного чата. Если их нет, возвращает значения по умолчанию."""
+        return self._chat_trigger_states.get(chat_id, {"stop_enabled": False, "activation_enabled": False})
+
+    def _set_chat_trigger_settings(self, chat_id: int, stop_enabled: bool, activation_enabled: bool):
+        """Устанавливает настройки триггеров для указанного чата и сохраняет их в БД."""
+        self._chat_trigger_states[chat_id] = {"stop_enabled": stop_enabled, "activation_enabled": activation_enabled}
+        self._db.set(self.name, "chat_trigger_states", self._chat_trigger_states)
 
     def _get_allowed_chat_ids_map(self) -> dict[int, int]:
         """
@@ -542,9 +556,10 @@ class TagAllMod(loader.Module):
         current_tagall_event = self._tagall_events.get(chat_id)
         message_text_lower = message.text.strip().lower()
 
-        # Получаем настройки триггеров для каждого чата
-        stop_triggers_enabled = self._db.get(self.name, f"stop_triggers_enabled_{chat_id}", False)
-        activation_triggers_enabled = self._db.get(self.name, f"activation_triggers_enabled_{chat_id}", False)
+        # Получаем настройки триггеров для текущего чата из новой системы
+        chat_settings = self._get_chat_trigger_settings(chat_id)
+        stop_triggers_enabled = chat_settings["stop_enabled"]
+        activation_triggers_enabled = chat_settings["activation_enabled"]
 
         # --- Обработка триггера ОСТАНОВКИ ---
         if stop_triggers_enabled:
@@ -886,18 +901,18 @@ class TagAllMod(loader.Module):
             return
 
         args = args.lower().strip()
+        current_settings = self._get_chat_trigger_settings(target_chat_id)
 
         if args == "on":
-            self._db.set(self.name, f"stop_triggers_enabled_{target_chat_id}", True)
-            self._db.set(self.name, f"activation_triggers_enabled_{target_chat_id}", True)
+            self._set_chat_trigger_settings(target_chat_id, True, True)
             await utils.answer(message, self.strings("triggers_state_enabled").format(chat_id=target_chat_id))
         elif args == "off":
-            self._db.set(self.name, f"stop_triggers_enabled_{target_chat_id}", False)
-            self._db.set(self.name, f"activation_triggers_enabled_{target_chat_id}", False)
+            self._set_chat_trigger_settings(target_chat_id, False, False)
             await utils.answer(message, self.strings("triggers_state_disabled").format(chat_id=target_chat_id))
         elif not args:
-            is_enabled = self._db.get(self.name, f"stop_triggers_enabled_{target_chat_id}", False)
-            if is_enabled:
+            # Для сохранения поведения, соответствующего оригинальной логике, проверяем только 'stop_enabled'
+            # так как она использовалась для определения общего статуса триггеров в чате.
+            if current_settings["stop_enabled"]:
                 await utils.answer(message, self.strings("triggers_status_enabled").format(chat_id=target_chat_id))
             else:
                 await utils.answer(message, self.strings("triggers_status_disabled").format(chat_id=target_chat_id))
