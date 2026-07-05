@@ -1,4 +1,3 @@
-`python
 # meta developer: @NKDebra
 # meta name: TagAll
 # meta version: 2.0.45
