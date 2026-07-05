@@ -1,6 +1,6 @@
 # meta developer: @NKDebra
 # meta name: TagAll
-# meta version: 2.0.42
+# meta version: 2.0.43
 #
 # 01101110 01100101 01110110 01100101 01110010 00100000 01100111 01101001 01110110 01100101 00100000 01110101 01110000
 # 01101110 01100101 01110110 01100101 01110010 00100000 01101100 01100101 01110100 00100000 01111001 01101111 01110101 00100000 01100100 01101111 01110111 01101110
@@ -298,22 +298,17 @@ class TagAllMod(loader.Module):
             ),
         )
         self._tagall_processes: dict[int, dict] = {}
-        self._message_watcher_handler = None # Re-added
+        # self._message_watcher_handler = None # Удалено, так как обработчик регистрируется декоратором автоматически
 
     async def client_ready(self, client, db):
         self._client = client
         self._db = db
-        # Re-add event handler for _message_watcher
-        if not self._message_watcher_handler:
-            self._message_watcher_handler = self._client.add_event_handler(self._message_watcher, events.NewMessage(incoming=True))
-            logger.debug("Message watcher event handler added.")
+        # Ручная регистрация _message_watcher удалена, так как декоратор @events.NewMessage(incoming=True) делает это автоматически
+        # logger.debug("Message watcher event handler is handled by decorator.")
 
     async def on_unload(self):
-        # Remove event handler for _message_watcher
-        if self._client and self._message_watcher_handler:
-            self._client.remove_event_handler(self._message_watcher_handler)
-            self._message_watcher_handler = None
-            logger.debug("Message watcher event handler removed.")
+        # Ручное удаление обработчика _message_watcher удалено
+        # logger.debug("Message watcher event handler will be removed by framework on module unload.")
 
         # Останавливаем все запущенные процессы TagAll
         # Итерируем по копии значений словаря, чтобы избежать RuntimeError, если словарь изменяется во время итерации
@@ -340,7 +335,7 @@ class TagAllMod(loader.Module):
                     chat_id = int(chat_id_str)
                     allowed_chats_map[i + 1] = chat_id  # 1-based index
                 except ValueError:
-                    logger.warning(f"Неверный ID чата в конфигурации 'allowed_chat_ids' после очистки: '{chat_id_str}'. Должен быть целым числом.")
+                    logger.warning(f"Неверный ID чата в конфигурации 'allowed_chat_ids': '{chat_id_str}'. Должен быть целым числом.")
         return allowed_chats_map
 
     def _format_allowed_chats_list(self, allowed_chats_map: dict[int, int]) -> str:
