@@ -5,7 +5,7 @@
 # 01101110 01100101 01110110 01100101 01110010 00100000 01100111 01101001 01110110 01100101 00100000 01110101 01110000
 # 01101110 01100101 01110110 01100101 01110010 00100000 01101100 01100101 01110100 00100000 01111001 01101111 01110101 00100000 01100100 01101111 01110111 01101110
 # 01101110 01100101 01110110 01100101 01110010 00100000 01110010 01110101 01101110 00100000 01100001 01110010 01101111 01110101 01101110 01100100 00100000 01100001 01101110 01100100 00100000 01100100 01100101 01110011 01100101 01110010 01110100 00100000 01111001 01101111 01110101
-# 01101110 01100101 01110110 01100101 01110010 00100000 01101101 01100001 01101011 01100101 00100000 01111001 01101111 01110101 00100000 01100011 01110010 01111001 00100000 01101110 01100101 01110110 01100101 01110010 00100000 01110011 01100001 01111001 00100000 01100111 01101111 01101111 01100100 01100010 01111001 01100101
+# 01101110 01100101 01110110 01100101 01110010 00100000 01101101 01100001 01101011 01100101 00100000 01111001 01101111 01110101 00100000 01100011 01110010 01111001 00100000 01101110 01100101 01110110 01100101 01110010 00100000 01110011 01100001 01111001 00100000 01100111 01101111 01100100 01100010 01111001 01100101
 # 01101110 01100101 01110110 01100101 01110010 00100000 01110100 01100101 01101100 00100000 01100001 01101100 01101100 00100000 01100001 00100000 01101100 01101001 01100101 00100000 01100001 01110010 01101111 01110101 01101110 01100100 00100000 01100001 01101110 00100000 01101000 01110101 01110010 01110100 01111001 01101111 01110101
 # (Rick Astley - Never Gonna Give You Up)
 
@@ -19,7 +19,7 @@ import re
 # Заменены импорты hikkatl на telethon
 from telethon.tl.functions.channels import InviteToChannelRequest
 from telethon.tl.types import Message
-from telethon import events # <--- RE-ADDED
+from telethon import events
 
 # Эти импорты предполагают, что модуль запускается в userbot-фреймворке,
 # который предоставляет 'loader' и 'utils' (возможно, на базе Telethon).
@@ -315,20 +315,22 @@ class TagAllMod(loader.Module):
             ),
         )
         self._tagall_processes: dict[int, dict] = {}
-        self._message_watcher_handler = None # <--- RE-ADDED
+        # self._message_watcher_handler = None # <--- УДАЛЕНА ИНИЦИАЛИЗАЦИЯ
 
     async def client_ready(self, client, db):
         self._client = client
         self._db = db
-        # Add event handler for _message_watcher
-        if not self._message_watcher_handler:
-            self._message_watcher_handler = self._client.add_event_handler(self._message_watcher, events.NewMessage(incoming=True)) # <--- RE-ADDED
+        # Обработчик _message_watcher уже регистрируется благодаря декоратору @events.NewMessage.
+        # Удаляем ручное добавление обработчика.
+        # if not self._message_watcher_handler:
+        #     self._message_watcher_handler = self._client.add_event_handler(self._message_watcher, events.NewMessage(incoming=True)) # <--- ЭТА СТРОКА БЫЛА ИСТОЧНИКОМ ОШИБКИ
 
     async def on_unload(self):
-        # Remove event handler for _message_watcher
-        if self._client and self._message_watcher_handler:
-            self._client.remove_event_handler(self._message_watcher_handler)
-            self._message_watcher_handler = None # <--- RE-ADDED
+        # Обработчик _message_watcher будет отменен автоматически фреймворком.
+        # Удаляем ручное удаление обработчика.
+        # if self._client and self._message_watcher_handler:
+        #     self._client.remove_event_handler(self._message_watcher_handler)
+        #     self._message_watcher_handler = None # <--- УДАЛЕНА СТРОКА
 
         # Останавливаем все запущенные процессы TagAll
         for process_data in list(self._tagall_processes.values()):
@@ -414,7 +416,7 @@ class TagAllMod(loader.Module):
                 await utils.answer(message, self.strings("cmd_not_allowed_multiple").format(allowed_chats=self._format_allowed_chats_list(allowed_chats_map)))
                 return None, None
 
-    def _parse_trigger_string(self, trigger_str: str) -> tuple[bool, str]: # <--- RE-ADDED
+    def _parse_trigger_string(self, trigger_str: str) -> tuple[bool, str]:
         """Парсит строку триггера, проверяя префикс re: для регулярных выражений."""
         if trigger_str.lower().startswith("re:"):
             return True, trigger_str[3:].strip()
@@ -496,7 +498,7 @@ class TagAllMod(loader.Module):
         timeout_data["last_timeout"] = current_timeout
         return current_timeout
 
-    @events.NewMessage(incoming=True) # <--- RE-ADDED _message_watcher
+    @events.NewMessage(incoming=True)
     async def _message_watcher(self, event):
         """Отслеживает входящие сообщения для активации или деактивации TagAll по триггерам."""
         if not self.config["autotagall_enabled"] or not event.text:
@@ -569,7 +571,7 @@ class TagAllMod(loader.Module):
                 logger.warning(f"TagAll not running in chat {chat_id}, ignoring deactivation trigger.")
             return
 
-    async def _run_tagall_process(self, chat_id: int, message_prefix: str, silent_start: bool = False): # <--- MODIFIED
+    async def _run_tagall_process(self, chat_id: int, message_prefix: str, silent_start: bool = False):
         """Внутренняя функция для обработки основной логики TagAll."""
         deleted_message_ids_telethon = []
         deleted_message_ids_bot_client = []
@@ -764,7 +766,7 @@ class TagAllMod(loader.Module):
             await message.delete()
 
         # Запускаем процесс TagAll и сохраняем задачу
-        task = self._client.loop.create_task(self._run_tagall_process(target_chat_id, message_prefix, silent_start=False)) # <--- MODIFIED
+        task = self._client.loop.create_task(self._run_tagall_process(target_chat_id, message_prefix, silent_start=False))
         self._tagall_processes[target_chat_id] = {"task": task, "last_timeout": None}
 
 
@@ -789,7 +791,7 @@ class TagAllMod(loader.Module):
         if process_data and not process_data["task"].done():
             process_data["task"].cancel()  # Отменяем задачу
             logger.info(f"Команда stoptagall: процесс TagAll для чата {target_chat_id} был отменен.")
-            await utils.answer(message, f"✅ <b>TagAll в чате {target_chat_id} остановлен.</b>") # <--- REVERTED, now it sends the message.
+            await utils.answer(message, f"✅ <b>TagAll в чате {target_chat_id} остановлен.</b>")
         else:
             await utils.answer(message, self.strings("tagall_not_running").format(chat_id=target_chat_id))
 
@@ -797,7 +799,7 @@ class TagAllMod(loader.Module):
         if message.out:
             await message.delete()
 
-    @loader.command( # <--- RE-ADDED autotagall command
+    @loader.command(
         ru_doc=lambda self: self.strings("_cmd_autotagall_doc"),
         de_doc=lambda self: self.strings("_cmd_autotagall_doc"),
         tr_doc=lambda self: self.strings("_cmd_autotagall_doc"),
