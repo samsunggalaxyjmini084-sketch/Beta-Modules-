@@ -61,7 +61,7 @@ class TagAllMod(loader.Module):
         "tagall_not_running": "🚫 <b>TagAll не запущен в чате {chat_id}.</b>",
         "tagall_already_running": "🚫 <b>TagAll уже запущен в чате {chat_id}.</b>",
         "no_eligible_participants": "🚫 <b>Нет подходящих участников.</b>",
-        "cmd_redirected": "➡️ <b>Команда перенаправлена в чат</b> <code>{target_chat_id}</code>, так как он единственный разрешенный.",
+        "cmd_redirected": "➡️ <b>Команда перенаправлена в чат</b> <code>{target_chat_id}</code>, так как он единственный разрешенный.", # Эта строка останется для возможных будущих запросов, но не будет использоваться.
         "cmd_not_allowed_multiple": "🚫 <b>Чат не в белом списке. Разрешенные:</b> {allowed_chats}.",
         "trigger_not_allowed": "🚫 <b>Вам не разрешено использовать триггеры для TagAll.</b>",
         "autotagall_enabled": "✅ <b>Работа триггеров TagAll включена.</b>",
@@ -73,6 +73,7 @@ class TagAllMod(loader.Module):
         "cmd_not_allowed_current": "🚫 <b>Эта команда не может быть использована в текущем чате.</b>",
         "cmd_redirected_indexed": "➡️ <b>Команда перенаправлена в чат</b> <code>{target_chat_id}</code> (индекс <code>{index}</code>).",
         "invalid_chat_index": "🚫 <b>Неверный индекс чата</b> <code>{index}</code>. Разрешенные чаты: {allowed_chats}.",
+        "tagall_stopped_silently": "✅ <b>TagAll в чате {chat_id} остановлен.</b>", # Сохраняем для возможного использования, но не выводим
     }
 
     strings_de = { 
@@ -111,6 +112,7 @@ class TagAllMod(loader.Module):
         "autotagall_enabled": "✅ <b>Die TagAll-Triggerfunktion ist aktiviert.</b>",
         "autotagall_disabled": "❌ <b>Die TagAll-Triggerfunktion ist deaktiviert.</b>",
         "_cmd_autotagall_doc": "TagAll-Triggerfunktion (in .cfg eingestellt) aktivieren/deaktivieren",
+        "tagall_stopped_silently": "✅ <b>TagAll in Chat {chat_id} gestoppt.</b>",
     }
 
     strings_tr = { 
@@ -147,6 +149,7 @@ class TagAllMod(loader.Module):
         "autotagall_enabled": "✅ <b>TagAll tetikleyicileri etkinleştirildi.</b>",
         "autotagall_disabled": "❌ <b>TagAll tetikleyicileri devre dışı bırakıldı.</b>",
         "_cmd_autotagall_doc": "TagAll tetikleyicilerinin (yapılandırmada ayarlanmış) çalışmasını aç/kapat",
+        "tagall_stopped_silently": "✅ <b>TagAll {chat_id} sohbetinde durduruldu.</b>",
     }
 
     strings_uz = { 
@@ -185,6 +188,7 @@ class TagAllMod(loader.Module):
         "autotagall_enabled": "✅ <b>TagAll triggerlari yoqildi.</b>",
         "autotagall_disabled": "❌ <b>TagAll triggerlari o‘chirildi.</b>",
         "_cmd_autotagall_doc": "TagAll triggerlarining (konfiguratsiyada o'rnatilgan) ishlashini yoqish/o'chirish",
+        "tagall_stopped_silently": "✅ <b>TagAll {chat_id} chatida to'xtatildi.</b>",
     }
 
     def __init__(self):
@@ -235,12 +239,21 @@ class TagAllMod(loader.Module):
         if not isinstance(message, Message) or not message.text:
             return
 
+        # Проверяем allowed_chat_ids для триггеров
+        allowed_chats_map = self._get_allowed_chat_ids_map()
+        if allowed_chats_map: # Если список разрешенных чатов не пуст
+            allowed_chat_ids_set = set(allowed_chats_map.values())
+            if message.chat_id not in allowed_chat_ids_set:
+                # Чат не в белом списке для триггеров, игнорируем
+                return
+
         # Проверяем, разрешено ли отправителю использовать триггеры
         allowed_trigger_ids_raw = self.config["allowed_trigger_user_ids"]
         allowed_trigger_ids = {int(x.strip()) for x in allowed_trigger_ids_raw.split(",") if x.strip().isdigit()}
 
         # Если allowed_trigger_user_ids настроен и отправитель не в списке, игнорируем триггер
         if allowed_trigger_ids and message.sender_id not in allowed_trigger_ids:
+            # Не отправляем сообщение "trigger_not_allowed", чтобы триггеры были бесшумными
             return
 
         message_text_lower = message.text.lower()
@@ -256,7 +269,7 @@ class TagAllMod(loader.Module):
         # Сначала проверяем стоп-триггер
         for trigger in stop_triggers:
             if trigger and trigger in message_text_lower:
-                await self._stop_logic(message, "")
+                await self._stop_logic(message, "", send_confirmation=False) # Убрано подтверждение
                 return
 
         # Затем старт-триггер
@@ -314,8 +327,9 @@ class TagAllMod(loader.Module):
         
         if len(allowed_chat_ids_set) == 1:
             target_id = next(iter(allowed_chat_ids_set))
-            if target_id != original_chat_id: 
-                await utils.answer(message, self.strings("cmd_redirected").format(target_chat_id=target_id))
+            # Удаляем сообщение о перенаправлении, так как оно не требуется пользователем
+            # if target_id != original_chat_id: 
+            #     await utils.answer(message, self.strings("cmd_redirected").format(target_chat_id=target_id))
             return target_id, remaining_args
 
         await utils.answer(message, self.strings("cmd_not_allowed_multiple").format(
@@ -341,7 +355,7 @@ class TagAllMod(loader.Module):
         self._tagall_events[target_chat_id] = event
         self._client.loop.create_task(self._run_tagall_process(target_chat_id, message_prefix, event))
 
-    async def _stop_logic(self, message: Message, args: str):
+    async def _stop_logic(self, message: Message, args: str, send_confirmation: bool = True):
         target_chat_id, _ = await self._resolve_target_chat(message, args)
         if target_chat_id is None:
             # Сообщение не удаляется, так как это является запросом пользователя
@@ -353,12 +367,14 @@ class TagAllMod(loader.Module):
         if event and event.state:
             event.stop()
             logger.info(f"Команда stoptagall: процесс TagAll для чата {target_chat_id} был остановлен.")
-            await utils.answer(message, f"✅ <b>TagAll в чате {target_chat_id} остановлен.</b>")
+            if send_confirmation: # Отправлять подтверждение только если send_confirmation=True
+                await utils.answer(message, self.strings("tagall_stopped_silently").format(chat_id=target_chat_id))
             # Исходное сообщение-триггер/команда больше не удаляется
             # if message.out:
             #     with contextlib.suppress(Exception): await message.delete()
         else:
-            await utils.answer(message, self.strings("tagall_not_running").format(chat_id=target_chat_id))
+            if send_confirmation: # Отправлять сообщение, только если send_confirmation=True
+                await utils.answer(message, self.strings("tagall_not_running").format(chat_id=target_chat_id))
             # Сообщение не удаляется, так как это является запросом пользователя
             # if message.out:
             #     with contextlib.suppress(Exception): await message.delete()
@@ -382,7 +398,7 @@ class TagAllMod(loader.Module):
     )
     async def stoptagall(self, message: Message):
         """[<номер чата>] - Остановить запущенный процесс TagAll в <b>указанном или текущем чате</b>."""
-        await self._stop_logic(message, utils.get_args_raw(message))
+        await self._stop_logic(message, utils.get_args_raw(message), send_confirmation=False) # Теперь send_confirmation=False по умолчанию для команды
 
     @loader.command(
         ru_doc=lambda self: self.strings("_cmd_autotagall_doc"),
