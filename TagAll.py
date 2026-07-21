@@ -66,9 +66,11 @@ class TagAllMod(loader.Module):
         "trigger_not_allowed": "🚫 <b>Вам не разрешено использовать триггеры для TagAll.</b>",
         "autotagall_enabled": "✅ <b>Работа триггеров TagAll включена.</b>",
         "autotagall_disabled": "❌ <b>Работа триггеров TagAll выключена.</b>",
+        "autotagall_enabled_timed": "✅ <b>Работа триггеров TagAll включена на {duration}.</b>",
+        "autotagall_disabled_auto": "❌ <b>Работа триггеров TagAll автоматически отключена.</b>",
         "_cmd_tagall_doc": "[<номер чата>] [текст] - Отметить всех участников чата. [текст] будет отправлен вместе с тегами. Если текст не указан, будут отправлены только теги.",
         "_cmd_stoptagall_doc": "[<номер чата>] - Остановить запущенный процесс TagAll в <b>указанном или текущем чате</b>.",
-        "_cmd_autotagall_doc": "Включить/выключить работу триггеров TagAll (установленных в .cfg)",
+        "_cmd_autotagall_doc": "Включить/выключить работу триггеров TagAll (установленных в .cfg). [<время>] (например, '10s', '5m', '1h') - включить триггеры на указанное время, затем автоматически отключить.",
         "cmd_not_allowed": "🚫 <b>Эта команда не может быть использована в текущем чате, и нет единственного разрешенного чата для перенаправления.</b>",
         "cmd_not_allowed_current": "🚫 <b>Эта команда не может быть использована в текущем чате.</b>",
         "cmd_redirected_indexed": "➡️ <b>Команда перенаправлена в чат</b> <code>{target_chat_id}</code> (индекс <code>{index}</code>).",
@@ -111,7 +113,9 @@ class TagAllMod(loader.Module):
         "trigger_not_allowed": "🚫 <b>Ihnen ist es nicht gestattet, Trigger für TagAll zu verwenden.</b>",
         "autotagall_enabled": "✅ <b>Die TagAll-Triggerfunktion ist aktiviert.</b>",
         "autotagall_disabled": "❌ <b>Die TagAll-Triggerfunktion ist deaktiviert.</b>",
-        "_cmd_autotagall_doc": "TagAll-Triggerfunktion (in .cfg eingestellt) aktivieren/deaktivieren",
+        "autotagall_enabled_timed": "✅ <b>Die TagAll-Triggerfunktion ist für {duration} aktiviert.</b>",
+        "autotagall_disabled_auto": "❌ <b>Die TagAll-Triggerfunktion wurde automatisch deaktiviert.</b>",
+        "_cmd_autotagall_doc": "TagAll-Triggerfunktion (in .cfg eingestellt) aktivieren/deaktivieren. [<Zeit>] (z. B. '10s', '5m', '1h') - Trigger für die angegebene Zeit aktivieren, dann automatisch deaktivieren.",
         "tagall_stopped_silently": "✅ <b>TagAll in Chat {chat_id} gestoppt.</b>",
     }
 
@@ -148,7 +152,9 @@ class TagAllMod(loader.Module):
         "trigger_not_allowed": "🚫 <b>Size TagAll için tetikleyici kullanma izni verilmiyor.</b>",
         "autotagall_enabled": "✅ <b>TagAll tetikleyicileri etkinleştirildi.</b>",
         "autotagall_disabled": "❌ <b>TagAll tetikleyicileri devre dışı bırakıldı.</b>",
-        "_cmd_autotagall_doc": "TagAll tetikleyicilerinin (yapılandırmada ayarlanmış) çalışmasını aç/kapat",
+        "autotagall_enabled_timed": "✅ <b>TagAll tetikleyicileri {duration} boyunca etkinleştirildi.</b>",
+        "autotagall_disabled_auto": "❌ <b>TagAll tetikleyicileri otomatik olarak devre dışı bırakıldı.</b>",
+        "_cmd_autotagall_doc": "TagAll tetikleyicilerinin (yapılandırmada ayarlanmış) çalışmasını aç/kapat. [<Süre>] (örn. '10s', '5m', '1h') - Tetikleyicileri belirtilen süre için etkinleştirin, ardından otomatik olarak devre dışı bırakın.",
         "tagall_stopped_silently": "✅ <b>TagAll {chat_id} sohbetinde durduruldu.</b>",
     }
 
@@ -187,7 +193,9 @@ class TagAllMod(loader.Module):
         "trigger_not_allowed": "🚫 <b>Sizga TagAll uchun triggerlardan foydalanishga ruxsat berilmagan.</b>",
         "autotagall_enabled": "✅ <b>TagAll triggerlari yoqildi.</b>",
         "autotagall_disabled": "❌ <b>TagAll triggerlari o‘chirildi.</b>",
-        "_cmd_autotagall_doc": "TagAll triggerlarining (konfiguratsiyada o'rnatilgan) ishlashini yoqish/o'chirish",
+        "autotagall_enabled_timed": "✅ <b>TagAll triggerlari {duration} davomida yoqildi.</b>",
+        "autotagall_disabled_auto": "❌ <b>TagAll triggerlari avtomatik ravishda o'chirildi.</b>",
+        "_cmd_autotagall_doc": "TagAll triggerlarining (konfiguratsiyada o'rnatilgan) ishlashini yoqish/o'chirish. [<Vaqt>] (masalan, '10s', '5m', '1h') - Triggerlarni ko'rsatilgan vaqtga yoqish, so'ngra avtomatik o'chirish.",
         "tagall_stopped_silently": "✅ <b>TagAll {chat_id} chatida to'xtatildi.</b>",
     }
 
@@ -220,6 +228,7 @@ class TagAllMod(loader.Module):
             ),
         )
         self._tagall_events: dict[int, StopEvent] = {}
+        self._autotagall_disable_task: asyncio.Task | None = None # Новая переменная для задачи автоотключения
 
     async def client_ready(self, client, db):
         self._client = client
@@ -229,6 +238,9 @@ class TagAllMod(loader.Module):
         for event in list(self._tagall_events.values()):
             event.stop()
         self._tagall_events.clear()
+        if self._autotagall_disable_task:
+            self._autotagall_disable_task.cancel()
+            self._autotagall_disable_task = None
         logger.info("Все процессы TagAll остановлены из-за выгрузки модуля.")
 
     @loader.watcher()
@@ -407,15 +419,70 @@ class TagAllMod(loader.Module):
         uz_doc=lambda self: self.strings("_cmd_autotagall_doc"), 
     )
     async def autotagall(self, message: Message):
-        """Включить/выключить работу триггеров TagAll (установленных в .cfg)"""
-        self.config["enable_watcher"] = not self.config["enable_watcher"]
-        if self.config["enable_watcher"]:
-            await utils.answer(message, self.strings("autotagall_enabled"))
+        """Включить/выключить работу триггеров TagAll (установленных в .cfg). [<время>] (например, '10s', '5m', '1h') - включить триггеры на указанное время, затем автоматически отключить."""
+        args = utils.get_args_raw(message)
+        duration_seconds = 0
+        parsed_duration_str = None
+
+        if args:
+            match = re.match(r"(\d+)\s*([smhSMH])?", args.strip())
+            if match:
+                value = int(match.group(1))
+                unit = (match.group(2) or "s").lower() # По умолчанию секунды, если единица не указана
+
+                if unit == 's':
+                    duration_seconds = value
+                    parsed_duration_str = f"{value} секунд"
+                elif unit == 'm':
+                    duration_seconds = value * 60
+                    parsed_duration_str = f"{value} минут"
+                elif unit == 'h':
+                    duration_seconds = value * 3600
+                    parsed_duration_str = f"{value} часов"
+                else:
+                    duration_seconds = 0 # Неверная единица, вернемся к переключению
+            else:
+                duration_seconds = 0 # Аргументы присутствуют, но не являются допустимым временем, вернемся к переключению
+
+        if duration_seconds > 0:
+            if self._autotagall_disable_task:
+                self._autotagall_disable_task.cancel()
+                self._autotagall_disable_task = None
+                logger.info("Предыдущая задача автоотключения TagAll отменена.")
+
+            self.config["enable_watcher"] = True
+            await utils.answer(message, self.strings("autotagall_enabled_timed").format(duration=parsed_duration_str))
+            
+            # Сохраняем chat_id, чтобы отправить сообщение об отключении в тот же чат, где была вызвана команда
+            self._autotagall_disable_task = self._client.loop.create_task(
+                self._schedule_autotagall_disable(message.chat_id, duration_seconds)
+            )
         else:
-            await utils.answer(message, self.strings("autotagall_disabled"))
-        # Исходное сообщение-команда больше не удаляется
-        # if message.out:
-        #     with contextlib.suppress(Exception): await message.delete()
+            if self._autotagall_disable_task:
+                self._autotagall_disable_task.cancel()
+                self._autotagall_disable_task = None
+                logger.info("Задача автоотключения TagAll отменена из-за ручного переключения.")
+
+            self.config["enable_watcher"] = not self.config["enable_watcher"]
+            if self.config["enable_watcher"]:
+                await utils.answer(message, self.strings("autotagall_enabled"))
+            else:
+                await utils.answer(message, self.strings("autotagall_disabled"))
+
+    async def _schedule_autotagall_disable(self, origin_chat_id: int, duration_seconds: int):
+        """Фоновая задача для автоматического отключения триггеров TagAll."""
+        try:
+            await asyncio.sleep(duration_seconds)
+            # Отключаем только если watcher все еще был включен
+            if self.config["enable_watcher"]: 
+                self.config["enable_watcher"] = False
+                logger.info(f"TagAll триггеры автоматически отключены после {duration_seconds} секунд.")
+                # Отправляем сообщение в чат, где была вызвана команда
+                await self._client.send_message(origin_chat_id, self.strings("autotagall_disabled_auto"))
+        except asyncio.CancelledError:
+            logger.info("Автоматическое отключение TagAll отменено.")
+        finally:
+            self._autotagall_disable_task = None
 
 
     def _get_random_timeout(self, event: StopEvent) -> float:
