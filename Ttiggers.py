@@ -9,6 +9,7 @@
 # 01000110 01101001 01111000 01100101 01100100 00100000 01110011 01110100 01101111 01110000 00101101 01110111 01101111 01110010 01100100 00100000 01100011 01100001 01101110 01100011 01100101 01101100 01101100 01100001 01110100 01101001 01101111 01101110 00100000 01100001 01101110 01100100 00100000 01101101 01101001 01100111 01110010 01100001 01110100 01101001 01101111 01101110 00100000 01101100 01101111 01100111 01101001 01100011 00101110 00110001 00101110 00110011 00101110 00110001
 # 01000100 01100101 01101100 01100001 01111001 00100000 01101100 01101111 01100111 01101001 01100011 00100000 01110101 01110000 01100100 01100001 01110100 01100101 01100100 00100000 01110100 01101111 00100000 01110011 01110101 01110000 01110000 01101111 01110010 01110100 00100000 01101101 01110101 01101100 01110100 01101001 01110000 01101100 01100101 00100000 01110010 01100001 01101110 01100100 01101111 01101101 00100000 01100100 01100101 01101100 01100001 01111001 01110011 00101110 00110001 00101110 00110100 00101110 00110000
 # 01010101 01110000 01100100 01100001 01110100 01100101 01100100 00100000 01110111 01101001 01110100 01101000 00100000 01010011 01110100 01101111 01110000 00100000 01010111 01101111 01110010 01100100 00100000 01010100 01100001 01110010 01100111 01100101 01110100 00100000 01010101 01110011 01100101 01110010 00100000 01000110 01100101 01100001 01110100 01110101 01110010 01100101 00101110 00110001 00101110 00110101 00101110 00110000
+# 01000001 01100100 01100100 01100101 01100100 00100000 01000100 01100101 01101100 01100001 01111001 00100000 01010010 01100001 01101110 01100111 01100101 00100000 01000110 01100101 01100001 01110100 01110101 01110010 01100101 00101110 00110001 00101110 00110101 00101110 00110001
 
 import asyncio
 import time
@@ -28,7 +29,7 @@ class TriggersMod(loader.Module):
     """
     Триггеры на сообщения (можно добавить фото, видео, файл и тд.).
     Поддерживает замену {NAME} на ник пользователя, активировавшего триггер.
-    Добавлена возможность установки задержки (или нескольких случайных задержек) для срабатывания триггера и стоп-слова для отмены.
+    Добавлена возможность установки задержки (или нескольких случайных задержек, или диапазона задержек) для срабатывания триггера и стоп-слова для отмены.
     Теперь можно установить целевого пользователя для стоп-слова, чтобы оно срабатывало только для определённого пользователя.
     """
     strings = {
@@ -86,19 +87,21 @@ class TriggersMod(loader.Module):
         "set_target_user_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Чтобы установить целевого пользователя для триггера <code>{}</code> в чате <b>{}</b>, используй команду:\n\n<code>.trig {} {} ID_ПОЛЬЗОВАТЕЛЯ_ИЛИ_@ЮЗЕРНЕЙМ</code>\n\nИли ответь на сообщение пользователя этой же командой.\n\n(<i>ID триггера</i> - это цифра перед названием триггера в <code>.triglist</code>, <i>ID_чата</i> опционально, если триггер находится не в текущем чате)",
         "empty_trigger_name": "<emoji document_id=5778527486270770928>❌</emoji> Укажи слово или фразу для триггера.",
         "invalid_ban_args": "<emoji document_id=5778527486270770928>❌</emoji> Укажи ID/юзернейм пользователя или ответь на его сообщение.",
-        "invalid_trig_args": "<emoji document_id=5778527486270770928>❌</emoji> Неверные аргументы. Используй: <code>.trig &lt;ID_триггера&gt; [ID_чата] [ID_пользователя/@username/clear | delay ЧИСЛО_СЕКУНД_1,ЧИСЛО_СЕКУНД_2,... | stopword СТОП_СЛОВО/clear | stopworduser ID_ПОЛЬЗОВАТЕЛЯ/@username/clear]</code>",
+        "invalid_trig_args": "<emoji document_id=5778527486270770928>❌</emoji> Неверные аргументы. Используй: <code>.trig &lt;ID_триггера&gt; [ID_чата] [ID_пользователя/@username/clear | delay ЧИСЛО_СЕКУНД_1,ЧИСЛО_СЕКУНД_2,.../ЧИСЛО_МИН-ЧИСЛО_МАКС/0 | stopword СТОП_СЛОВО/clear | stopworduser ID_ПОЛЬЗОВАТЕЛЯ/@username/clear]</code>",
         "invalid_trigadd_args": "<emoji document_id=5778527486270770928>❌</emoji> Неверные аргументы. Используй: <code>.trigadd [ID_чата] &lt;фраза_триггера&gt;</code> (ответом на сообщение)",
         "invalid_trigdel_args": "<emoji document_id=5778527486270770928>❌</emoji> Неверные аргументы. Используй: <code>.trigdel &lt;ID_триггера&gt; [ID_чата]</code>",
         "triglist_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Используй: <code>.triglist [ID_чата]</code>",
         "trigger_source_msg_deleted": "<emoji document_id=5778527486270770928>❌</emoji> Исходное сообщение триггера (ID: <code>{}</code>) в чате <b>{}</b> было удалено или недоступно.",
         "trigger_source_msg_empty": "<emoji document_id=5778527486270770928>❌</emoji> Исходное сообщение триггера (ID: <code>{}</code>) в чате <b>{}</b> не содержит ни текста, ни медиа для отправки.",
         "delay_info_none": "<emoji document_id=5776213190387961618>🕓</emoji> Задержка: Нет",
+        "delay_info_single": "<emoji document_id=5776213190387961618>🕓</emoji> Задержка: <b>{}</b> секунд",
         "delay_info_multiple": "<emoji document_id=5776213190387961618>🕓</emoji> Задержки: <b>{}</b> секунд (выбирается случайно)",
+        "delay_info_range": "<emoji document_id=5776213190387961618>🕓</emoji> Задержка: <b>{} - {}</b> секунд (выбирается случайно)",
         "set_delay_btn": "<emoji document_id=5776213190387961618>🕓</emoji> Установить задержку",
-        "delay_set_multiple": "<emoji document_id=5825794181183836432>✔️</emoji> Задержки для триггера <code>{}</code> установлены на <b>{}</b> секунд в чате <b>{}</b>",
+        "delay_set_updated": "<emoji document_id=5825794181183836432>✔️</emoji> Задержка для триггера <code>{}</code> установлена на <b>{}</b> в чате <b>{}</b>",
         "delay_removed": "<emoji document_id=5825794181183836432>✔️</emoji> Задержка для триггера <code>{}</code> удалена из чата <b>{}</b>",
-        "invalid_delay_value": "<emoji document_id=5778527486270770928>❌</emoji> Укажи корректное число или список чисел через запятую для задержки (в секундах). Значения должны быть неотрицательными.",
-        "set_delay_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Чтобы установить задержку (или несколько) для триггера <code>{}</code> в чате <b>{}</b>, используй команду:\n\n<code>.trig {} {} delay ЧИСЛО_СЕКУНД_1,ЧИСЛО_СЕКУНД_2,...</code>\n\nЧтобы удалить задержку, используй <code>.trig {} {} delay 0</code>\n\n(<i>ID триггера</i> - это цифра перед названием триггера в <code>.triglist</code>, <i>ID_чата</i> опционально, если триггер находится не в текущем чате)",
+        "invalid_delay_value": "<emoji document_id=5778527486270770928>❌</emoji> Укажи корректное число, список чисел через запятую или диапазон ЧИСЛО_1-ЧИСЛО_2 для задержки (в секундах). Значения должны быть неотрицательными.",
+        "set_delay_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Чтобы установить задержку (или несколько, или диапазон) для триггера <code>{}</code> в чате <b>{}</b>, используй команду:\n\n<code>.trig {} {} delay ЧИСЛО_СЕКУНД_1,ЧИСЛО_СЕКУНД_2,...</code>\nили <code>.trig {} {} delay ЧИСЛО_МИН-ЧИСЛО_МАКС</code>\n\nЧтобы удалить задержку, используй <code>.trig {} {} delay 0</code>\n\n(<i>ID триггера</i> - это цифра перед названием триггера в <code>.triglist</code>, <i>ID_чата</i> опционально, если триггер находится не в текущем чате)",
         "stop_word_info": "<emoji document_id=5872829476143894491>🚫</emoji> Стоп-слово: <b>{}</b>",
         "stop_word_info_none": "<emoji document_id=5872829476143894491>🚫</emoji> Стоп-слово: Нет",
         "set_stop_word_btn": "<emoji document_id=5872829476143894491>🚫</emoji> Установить стоп-слово",
@@ -114,8 +117,6 @@ class TriggersMod(loader.Module):
         "remove_stop_word_target_user_btn": "<emoji document_id=5872829476143894491>🚫</emoji> Удалить пользователя для стоп-слова",
         "stop_word_target_user_set": "<emoji document_id=5825794181183836432>✔️</emoji> Целевой пользователь <b>{}</b> установлен для стоп-слова триггера <code>{}</code> в чате <b>{}</b>",
         "stop_word_target_user_removed": "<emoji document_id=5825794181183836432>✔️</emoji> Целевой пользователь для стоп-слова удалён для триггера <code>{}</code> из чата <b>{}</b>",
-        "confirm_remove_target_user": "<emoji document_id=5881702736843511327>⚠️</emoji> Ты уверен что хочешь удалить целевого пользователя для триггера <code>{}</code>?",
-        "confirm_remove_stop_word": "<emoji document_id=5881702736843511327>⚠️</emoji> Ты уверен что хочешь удалить стоп-слово для триггера <code>{}</code>?",
         "confirm_remove_stop_word_target_user": "<emoji document_id=5881702736843511327>⚠️</emoji> Ты уверен что хочешь удалить целевого пользователя для стоп-слова триггера <code>{}</code>?",
         "set_stop_word_target_user_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Чтобы установить целевого пользователя для стоп-слова триггера <code>{}</code> в чате <b>{}</b>, используй команду:\n\n<code>.trig {} {} stopworduser ID_ПОЛЬЗОВАТЕЛЯ_ИЛИ_@ЮЗЕРНЕЙМ</code>\n\nИли ответь на сообщение пользователя этой же командой.\n\n(<i>ID триггера</i> - это цифра перед названием триггера в <code>.triglist</code>, <i>ID_чата</i> опционально, если триггер находится не в текущем чате)",
     }
@@ -158,35 +159,74 @@ class TriggersMod(loader.Module):
                     data["target_user_id"] = None
                     triggers_changed = True
                 
+                # --- Delay migration logic start ---
                 if "delay" not in data:
                     data["delay"] = [0]
                     triggers_changed = True
-                elif isinstance(data["delay"], (int, float)):
-                    data["delay"] = [int(data["delay"])]
-                    triggers_changed = True
-                elif isinstance(data["delay"], str):
-                    try:
-                        parsed_delays = [int(x.strip()) for x in data["delay"].split(',') if x.strip().isdigit()]
-                        data["delay"] = [d for d in parsed_delays if d >= 0]
-                        if not data["delay"]:
-                            data["delay"] = [0]
-                        triggers_changed = True
-                    except ValueError:
-                        data["delay"] = [0]
-                        triggers_changed = True
-                elif isinstance(data["delay"], list):
-                    original_list = data["delay"]
-                    cleaned_list = []
-                    for item in original_list:
+                
+                current_delay_value = data.get("delay")
+                normalized_delay = []
+
+                if isinstance(current_delay_value, (int, float)):
+                    val = int(current_delay_value)
+                    normalized_delay = [val if val >= 0 else 0]
+                elif isinstance(current_delay_value, str):
+                    # Try to parse as a range X-Y
+                    if '-' in current_delay_value:
+                        parts = current_delay_value.split('-', 1)
+                        if len(parts) == 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
+                            min_val = int(parts[0].strip())
+                            max_val = int(parts[1].strip())
+                            if min_val >= 0 and max_val >= 0:
+                                normalized_delay = sorted([min_val, max_val]) # Ensure min, max order
+                                if normalized_delay[0] == normalized_delay[1]:
+                                    normalized_delay = [normalized_delay[0]] # Convert [X,X] to [X]
+                    
+                    # If not parsed as range or invalid, try as comma-separated or single digit
+                    if not normalized_delay: # only if range parsing failed
+                        parsed_values_str = [x.strip() for x in current_delay_value.split(',') if x.strip().isdigit()]
+                        temp_discrete_delays = []
+                        for val_str in parsed_values_str:
+                            val = int(val_str)
+                            if val >= 0:
+                                temp_discrete_delays.append(val)
+                        
+                        if temp_discrete_delays:
+                            normalized_delay = sorted(list(set(temp_discrete_delays)))
+                        elif current_delay_value.strip().isdigit(): # Handle single digit string like "5"
+                             val = int(current_delay_value.strip())
+                             if val >= 0:
+                                 normalized_delay = [val]
+
+                elif isinstance(current_delay_value, list):
+                    temp_list = []
+                    for item in current_delay_value:
                         try:
                             val = int(item)
                             if val >= 0:
-                                cleaned_list.append(val)
+                                temp_list.append(val)
                         except (ValueError, TypeError):
                             pass
-                    data["delay"] = cleaned_list if cleaned_list else [0]
-                    if data["delay"] != original_list:
-                        triggers_changed = True
+                    
+                    if len(temp_list) == 2 and temp_list[0] <= temp_list[1]: # Could be a range or just two discrete. Normalize.
+                        temp_list = sorted(temp_list)
+                        if temp_list[0] == temp_list[1]:
+                            normalized_delay = [temp_list[0]]
+                        else:
+                            normalized_delay = temp_list
+                    elif len(temp_list) > 1: # Multiple discrete
+                        normalized_delay = sorted(list(set(temp_list)))
+                    else: # Single or empty
+                        normalized_delay = temp_list
+                
+                # Final check: if still empty, default to [0]
+                if not normalized_delay:
+                    normalized_delay = [0]
+                
+                if data["delay"] != normalized_delay: # Check if a change actually occurred
+                    data["delay"] = normalized_delay
+                    triggers_changed = True
+                # --- Delay migration logic end ---
 
                 if "stop_word" not in data:
                     data["stop_word"] = None
@@ -405,7 +445,7 @@ class TriggersMod(loader.Module):
             "chat_id": str(reply_msg.chat_id),
             "message_id": reply_msg.id,
             "target_user_id": None,
-            "delay": [0],
+            "delay": [0], # Default to no delay
             "stop_word": None,
             "stop_word_target_user_id": None,
         }
@@ -454,8 +494,13 @@ class TriggersMod(loader.Module):
 
         delay_list = trigger_data.get("delay", [0])
         delay_info_str = self.strings["delay_info_none"]
-        if any(d > 0 for d in delay_list):
-            delay_info_str = self.strings["delay_info_multiple"].format(", ".join(map(str, delay_list)))
+        
+        if len(delay_list) == 1 and delay_list[0] > 0:
+            delay_info_str = self.strings["delay_info_single"].format(delay_list[0])
+        elif len(delay_list) == 2 and delay_list[0] >= 0 and delay_list[1] >= 0 and delay_list[0] < delay_list[1]:
+            delay_info_str = self.strings["delay_info_range"].format(delay_list[0], delay_list[1])
+        elif any(d > 0 for d in delay_list): # For multiple discrete positive delays
+            delay_info_str = self.strings["delay_info_multiple"].format(", ".join(map(str, sorted(list(set(d for d in delay_list if d > 0))))))
 
         stop_word_val = trigger_data.get("stop_word")
         stop_word_info_str = self.strings["stop_word_info_none"]
@@ -516,13 +561,14 @@ class TriggersMod(loader.Module):
 
     async def trigcmd(self, message):
         """Показать информацию о триггере по ID или установить/удалить целевого пользователя/задержку/стоп-слово/целевого пользователя стоп-слова.
-        Использование: .trig <ID_триггера> [ID_чата] [ID_пользователя/@username/clear | delay ЧИСЛО_СЕКУНД_1,ЧИСЛО_СЕКУНД_2,... | stopword СТОП_СЛОВО/clear | stopworduser ID_ПОЛЬЗОВАТЕЛЯ/@username/clear]
+        Использование: .trig <ID_триггера> [ID_чата] [ID_пользователя/@username/clear | delay ЧИСЛО_СЕКУНД_1,ЧИСЛО_СЕКУНД_2,.../ЧИСЛО_МИН-ЧИСЛО_МАКС/0 | stopword СТОП_СЛОВО/clear | stopworduser ID_ПОЛЬЗОВАТЕЛЯ/@username/clear]
         Пример: .trig 10 (показать инфо о триггере 10 в текущем чате)
         Пример: .trig 10 -1001234567890 (показать инфо о триггере 10 в указанном чате)
         Установить целевого пользователя: .trig 10 @username / ID / (ответом на сообщение)
         Удалить целевого пользователя: .trig 10 clear
         Установить задержку: .trig 10 delay 5 (5 секунд задержки)
         Установить несколько задержек: .trig 10 delay 5,10,15
+        Установить диапазон задержки: .trig 10 delay 5-240
         Удалить задержку: .trig 10 delay 0
         Установить стоп-слово: .trig 10 stopword отмена
         Удалить стоп-слово: .trig 10 stopword clear
@@ -551,12 +597,11 @@ class TriggersMod(loader.Module):
             await utils.answer(message, self.strings["invalid_trigger_id"], link_preview=False)
             return
 
-        args_for_action_index = 1
         if len(args) > 1 and self._is_chat_id_string(args[1]):
             target_chat_id_str = args[1]
-            args_for_action_index = 2
-        
-        args_for_action = args[args_for_action_index:]
+            args_for_action = args[2:]
+        else:
+            args_for_action = args[1:]
         
         if len(args_for_action) >= 1:
             if args_for_action[0].lower() == "delay":
@@ -624,32 +669,68 @@ class TriggersMod(loader.Module):
         elif action_type == "delay":
             chat_name = await self._get_chat_name(target_chat_id_str)
             try:
-                delay_values_str_list = [v.strip() for v in action_value.split(',') if v.strip()]
-                
-                if not delay_values_str_list or (len(delay_values_str_list) == 1 and delay_values_str_list[0] == '0'):
+                final_delay_list = []
+                action_value_lower = action_value.lower().strip()
+
+                if action_value_lower == "0" or action_value_lower == "clear":
                     final_delay_list = [0]
-                    message_key = "delay_removed"
+                elif '-' in action_value_lower:
+                    # Try to parse as a range X-Y
+                    parts = action_value_lower.split('-', 1)
+                    if len(parts) == 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
+                        min_val = int(parts[0].strip())
+                        max_val = int(parts[1].strip())
+                        if min_val < 0 or max_val < 0:
+                            raise ValueError("Delay values must be non-negative.")
+                        if min_val > max_val: # Swap if min > max
+                            min_val, max_val = max_val, min_val
+                        
+                        if min_val == max_val:
+                            final_delay_list = [min_val] # Treat as single fixed delay
+                        else:
+                            final_delay_list = [min_val, max_val]
+                    else:
+                        raise ValueError("Invalid delay range format. Use X-Y.")
                 else:
-                    final_delay_list = []
+                    # Try to parse as comma-separated values or a single value
+                    delay_values_str_list = [v.strip() for v in action_value.split(',') if v.strip()]
+                    
+                    temp_parsed_delays = []
                     for val_str in delay_values_str_list:
+                        if not val_str.isdigit():
+                            raise ValueError("All discrete delay values must be digits.")
                         val = int(val_str)
                         if val < 0:
-                            raise ValueError("Отрицательное значение задержки не допускается.")
-                        final_delay_list.append(val)
+                            raise ValueError("Delay values must be non-negative.")
+                        temp_parsed_delays.append(val)
                     
-                    if not final_delay_list:
+                    if not temp_parsed_delays:
                         final_delay_list = [0]
-                        message_key = "delay_removed"
+                    elif len(temp_parsed_delays) == 1:
+                        final_delay_list = [temp_parsed_delays[0]]
                     else:
-                        message_key = "delay_set_multiple"
+                        final_delay_list = sorted(list(set(temp_parsed_delays))) # Unique and sorted for consistency
 
                 self.triggers[target_chat_id_str][trigger_name]["delay"] = final_delay_list
                 self.db.set("Triggers", "triggers", self.triggers)
                 
-                delay_display = ", ".join(map(str, final_delay_list))
+                delay_display = ""
+                if len(final_delay_list) == 0 or (len(final_delay_list) == 1 and final_delay_list[0] == 0):
+                    message_key = "delay_removed"
+                    delay_display = self.strings["delay_info_none"].split(': ')[1] # "Нет"
+                elif len(final_delay_list) == 1:
+                    message_key = "delay_set_updated"
+                    delay_display = f"{final_delay_list[0]} секунд"
+                elif len(final_delay_list) == 2 and final_delay_list[0] < final_delay_list[1]:
+                    message_key = "delay_set_updated"
+                    delay_display = f"{final_delay_list[0]}-{final_delay_list[1]} секунд"
+                else: # multiple discrete values
+                    message_key = "delay_set_updated"
+                    delay_display = f"{', '.join(map(str, final_delay_list))} секунд"
+                
                 await utils.answer(message, self.strings[message_key].format(trigger_name, delay_display, chat_name), link_preview=False)
-            except ValueError:
-                await utils.answer(message, self.strings["invalid_delay_value"], link_preview=False)
+            except ValueError as e:
+                await utils.answer(message, self.strings["invalid_delay_value"] + f" ({e})", link_preview=False)
             return
         elif action_type == "stopword":
             chat_name = await self._get_chat_name(target_chat_id_str)
@@ -756,7 +837,7 @@ class TriggersMod(loader.Module):
         chat_id_arg_for_command = chat_id_str if chat_id_str != str(call.chat_id) else ""
 
         await call.edit(
-            self.strings["set_delay_instructions"].format(trigger_id, chat_name, trigger_id, chat_id_arg_for_command, trigger_id, chat_id_arg_for_command),
+            self.strings["set_delay_instructions"].format(trigger_id, chat_name, trigger_id, chat_id_arg_for_command, trigger_id, chat_id_arg_for_command, trigger_id, chat_id_arg_for_command),
             reply_markup=[
                 [{
                     "text": self.strings["back_to_trigger"],
@@ -771,7 +852,7 @@ class TriggersMod(loader.Module):
         chat_name = await self._get_chat_name(chat_id_str)
         if is_stop_word_set:
             await call.edit(
-                self.strings["confirm_remove_stop_word"].format(trigger_name),
+                self.strings["confirm_remove_target_user"].format(trigger_name),
                 reply_markup=[
                     [{
                         "text": self.strings["confirm_delete_yes"],
@@ -1350,9 +1431,18 @@ class TriggersMod(loader.Module):
     async def _send_delayed_response(self, original_message, trigger_data, trigger_name, activation_id, cancel_event):
         """Отправляет ответ на триггер после задержки, если он не был отменен."""
         delay_list = trigger_data.get("delay", [0])
+        selected_delay = 0
         
-        positive_delays = [d for d in delay_list if d > 0]
-        selected_delay = random.choice(positive_delays) if positive_delays else 0
+        if len(delay_list) == 2 and delay_list[0] >= 0 and delay_list[1] >= 0 and delay_list[0] < delay_list[1]:
+            # Range delay: random integer between min and max (inclusive)
+            selected_delay = random.randint(delay_list[0], delay_list[1])
+        elif len(delay_list) >= 1 and delay_list[0] > 0:
+            # Single fixed delay or multiple discrete delays
+            positive_delays = [d for d in delay_list if d > 0]
+            if positive_delays:
+                selected_delay = random.choice(positive_delays)
+            # else: selected_delay remains 0 (no positive delays found)
+        # else: selected_delay remains 0 (delay_list is [0] or empty/invalid)
         
         if selected_delay > 0:
             await asyncio.sleep(selected_delay)
