@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: Triggers
-# meta version: 1.5.0
+# meta version: 1.5.1
 # meta lang: ru
 # 01001001 01101110 01101001 01110100 01101001 01100001 01101100 01101001 01111000 01100101 01100100 00100000 01010100 01110010 01101001 01100111 01100111 01100101 01110010 01110011 00100000 01001101 01101111 01100100 01110101 01101100 01100101
 # 01000111 01100101 01101110 01100101 01110010 01100001 01110100 01101111 01110010 00100000 01000001 01001001 00100000 01010010 01100101 01101100 01100101 01100001 01110011 01100101 00100000 00110001 00101110 00110001
@@ -10,10 +10,12 @@
 # 01000100 01100101 01101100 01100001 01111001 00100000 01101100 01101111 01100111 01101001 01100011 00100000 01110101 01110000 01100100 01100001 01110100 01100101 01100100 00100000 01110100 01101111 00100000 01110011 01110101 01110000 01110000 01101111 01110010 01110100 00100000 01101101 01110101 01101100 01110100 01101001 01110000 01101100 01100101 00100000 01110010 01100001 01101110 01100100 01101111 01101101 00100000 01100100 01100101 01101100 01100001 01111001 01110011 00101110 00110001 00101110 00110100 00101110 00110000
 # 01010101 01110000 01100100 01100001 01110100 01100101 01100100 00100000 01110111 01101001 01110100 01101000 00100000 01010011 01110100 01101111 01110000 00100000 01010111 01101111 01110010 01100100 00100000 01010100 01100001 01110010 01100111 01100101 01110100 00100000 01010101 01110011 01100101 01110010 00100000 01000110 01100101 01100001 01110100 01110101 01110010 01100101 00101110 00110001 00101110 00110101 00101110 00110000
 # 01000001 01100100 01100100 01100101 01100100 00100000 01000100 01100101 01101100 01100001 01111001 00100000 01010010 01100001 01101110 01100111 01100101 00100000 01000110 01100101 01100001 01110100 01110101 01110010 01100101 00101110 00110001 00101110 00110101 00101110 00110001
+# 01000001 01100100 01100100 01100101 01100100 00100000 01010100 01101001 01101101 01100101 01100100 00100000 01010100 01110010 01101001 01100111 01100111 01100101 01110010 01110011 00100000 01000001 01100011 01110100 01101001 01110110 01100001 01110100 01101001 01101111 01101110 00101110 00110001 00101110 00110101 00101110 00110001
 
 import asyncio
 import time
 import random
+import re
 from telethon.tl.types import (
     MessageMediaPhoto,
     MessageMediaDocument,
@@ -23,6 +25,46 @@ from telethon.tl.types import (
 )
 
 from .. import loader, utils
+
+# Regex to parse duration, e.g., "30s", "5m", "1h"
+DURATION_PATTERN = re.compile(r"(\d+)([smh])")
+
+def _parse_duration_string(duration_str):
+    """Parses a duration string like '30s', '5m', '1h' into seconds."""
+    match = DURATION_PATTERN.fullmatch(duration_str.lower())
+    if not match:
+        return None
+    
+    value = int(match.group(1))
+    unit = match.group(2)
+    
+    if unit == 's':
+        return value
+    elif unit == 'm':
+        return value * 60
+    elif unit == 'h':
+        return value * 3600
+    return None # Should not happen due to regex, but good for safety
+
+def _format_duration_for_display(seconds):
+    """Formats a duration in seconds into a human-readable string (e.g., '1ч 30м 15с')."""
+    if seconds <= 0:
+        return "" # Should be handled by string table already
+    
+    hours = seconds // 3600
+    minutes = (seconds % 3600) // 60
+    secs = seconds % 60
+
+    parts = []
+    if hours > 0:
+        parts.append(f"{hours}ч")
+    if minutes > 0:
+        parts.append(f"{minutes}м")
+    if secs > 0 or not parts: # Include seconds if no larger units or if it's 0 seconds
+        parts.append(f"{secs}с")
+    
+    return " ".join(parts)
+
 
 @loader.tds
 class TriggersMod(loader.Module):
@@ -36,9 +78,14 @@ class TriggersMod(loader.Module):
         "name": "Triggers",
         "chat_enabled": "<emoji document_id=5825794181183836432>✔️</emoji> Триггеры включены",
         "chat_disabled": "<emoji document_id=5778527486270770928>❌</emoji> Триггеры отключены",
+        "chat_enabled_timed": "<emoji document_id=5825794181183836432>✔️</emoji> Триггеры включены на <b>{}</b>",
+        "chat_disabled_expired": "<emoji document_id=5778527486270770928>❌</emoji> Триггеры отключены (время истекло)",
         "chat_status_current": "<emoji document_id=5839200986022812209>🔄</emoji> Триггеры в этом чате: {}",
+        "chat_status_current_timed": "<emoji document_id=5839200986022812209>🔄</emoji> Триггеры в этом чате: {} (осталось <b>{}</b>)",
         "chat_status_other_chat": "<emoji document_id=5839200986022812209>🔄</emoji> Триггеры в чате <b>{}</b>: {}",
+        "chat_status_other_chat_timed": "<emoji document_id=5839200986022812209>🔄</emoji> Триггеры в чате <b>{}</b>: {} (осталось <b>{}</b>)",
         "invalid_chat_id_arg": "<emoji document_id=5778527486270770928>❌</emoji> Укажи корректный ID чата (цифры) или не указывай ничего, чтобы управлять текущим чатом.",
+        "invalid_duration_format": "<emoji document_id=5778527486270770928>❌</emoji> Неверный формат времени. Используй число с 's', 'm' или 'h' (например, '30s', '5m', '1h').",
         "need_reply": "<emoji document_id=5778527486270770928>❌</emoji> Ответь на сообщение для создания триггера. Например чтобы добавить триггер который на слово <b>привет</b> будет отвечать <b>Привет как дела</b>, то напиши сообщение <code>Привет как дела</code> и на него ответь командой <code>trigadd привет</code>",
         "trigger_added": "<emoji document_id=5825794181183836432>✔️</emoji> Триггер <code>{}</code> добавлен (ID: <code>{}</code>) в чат <b>{}</b>",
         "trigger_exists": "<emoji document_id=5881702736843511327>⚠️</emoji> Триггер <code>{}</code> уже есть в чате <b>{}</b>",
@@ -146,6 +193,20 @@ class TriggersMod(loader.Module):
 
         triggers_changed = False
         current_id_for_missing = max_existing_id_across_all + 1 
+
+        # Migrate old chat status format
+        chats_db = self.db.get("Triggers", "chats", {})
+        new_chats_db = {}
+        for chat_id_str, status_value in chats_db.items():
+            if isinstance(status_value, bool):
+                new_chats_db[chat_id_str] = {"enabled": status_value, "expires_at": None}
+                triggers_changed = True # Indicate a change for DB update
+            elif isinstance(status_value, dict) and "enabled" in status_value:
+                new_chats_db[chat_id_str] = status_value
+            else: # Fallback for malformed data
+                new_chats_db[chat_id_str] = {"enabled": False, "expires_at": None}
+                triggers_changed = True
+        self.db.set("Triggers", "chats", new_chats_db)
 
         for chat_id_str in list(self.triggers.keys()):
             for trigger_name, data in list(self.triggers[chat_id_str].items()):
@@ -327,28 +388,60 @@ class TriggersMod(loader.Module):
         return isinstance(s, str) and (s.lstrip('-').isdigit())
 
     async def trigchatcmd(self, message):
-        """Включить/выключить триггеры в текущем чате или в указанном по ID.
+        """Включить/выключить триггеры в текущем чате или в указанном по ID на определённое время.
         Использование:
-        .trigchat - для текущего чата
-        .trigchat <chat_id> - для указанного чата"""
+        .trigchat                                   - для переключения статуса в текущем чате
+        .trigchat <chat_id>                         - для переключения статуса в указанном чате
+        .trigchat [chat_id] <время(s/m/h)>          - для включения триггеров на время (например, 30s, 5m, 1h)"""
         
-        args_raw = utils.get_args_raw(message)
+        args = utils.get_args_raw(message).split(maxsplit=2)
         target_chat_id_str = str(message.chat_id)
+        duration_str = None
 
-        if args_raw:
-            if self._is_chat_id_string(args_raw):
-                target_chat_id_str = args_raw
-            else:
-                await utils.answer(message, self.strings["invalid_chat_id_arg"], link_preview=False)
-                return
-        
+        if len(args) == 1:
+            # Check if arg is chat_id or duration
+            if self._is_chat_id_string(args[0]):
+                target_chat_id_str = args[0]
+            else: # Must be duration for current chat
+                duration_str = args[0]
+        elif len(args) == 2:
+            # First arg must be chat_id, second is duration
+            if self._is_chat_id_string(args[0]):
+                target_chat_id_str = args[0]
+                duration_str = args[1]
+            else: # Probably something like ".trigchat invalid_arg duration"
+                 await utils.answer(message, self.strings["invalid_chat_id_arg"], link_preview=False)
+                 return
+        elif len(args) > 2:
+            await utils.answer(message, self.strings["invalid_trigchat_args_too_many"], link_preview=False) # Add this string if needed
+            return
+
         chats = self.db.get("Triggers", "chats", {})
-        new_status = not chats.get(target_chat_id_str, False)
-        chats[target_chat_id_str] = new_status
-        self.db.set("Triggers", "chats", chats)
-        
-        status_text = self.strings["chat_enabled"] if new_status else self.strings["chat_disabled"]
-        
+        chat_status_data = chats.get(target_chat_id_str, {"enabled": False, "expires_at": None})
+
+        if duration_str:
+            duration_seconds = _parse_duration_string(duration_str)
+            if duration_seconds is None:
+                await utils.answer(message, self.strings["invalid_duration_format"], link_preview=False)
+                return
+            
+            expires_at = time.time() + duration_seconds
+            chat_status_data["enabled"] = True
+            chat_status_data["expires_at"] = expires_at
+            chats[target_chat_id_str] = chat_status_data
+            self.db.set("Triggers", "chats", chats)
+            
+            status_text = self.strings["chat_enabled_timed"].format(_format_duration_for_display(duration_seconds))
+        else:
+            # Toggle logic
+            new_status = not chat_status_data["enabled"]
+            chat_status_data["enabled"] = new_status
+            chat_status_data["expires_at"] = None # Clear expiration if toggled manually
+            chats[target_chat_id_str] = chat_status_data
+            self.db.set("Triggers", "chats", chats)
+            
+            status_text = self.strings["chat_enabled"] if new_status else self.strings["chat_disabled"]
+
         if target_chat_id_str == str(message.chat_id):
             final_status_message = self.strings["chat_status_current"].format(status_text)
         else:
@@ -374,15 +467,29 @@ class TriggersMod(loader.Module):
                 return
         
         chats = self.db.get("Triggers", "chats", {})
-        current_status = chats.get(target_chat_id_str, False)
+        chat_status_data = chats.get(target_chat_id_str, {"enabled": False, "expires_at": None})
+        current_status = chat_status_data["enabled"]
+        expires_at = chat_status_data.get("expires_at")
         
         status_text = self.strings["chat_enabled"] if current_status else self.strings["chat_disabled"]
         
+        remaining_time_str = ""
+        if current_status and expires_at and expires_at > time.time():
+            remaining_seconds = int(expires_at - time.time())
+            remaining_time_str = _format_duration_for_display(remaining_seconds)
+            status_text = self.strings["chat_enabled_timed"].format(remaining_time_str) # Override status_text for clarity
+
         if target_chat_id_str == str(message.chat_id):
-            final_status_message = self.strings["chat_status_current"].format(status_text)
+            if remaining_time_str:
+                final_status_message = self.strings["chat_status_current_timed"].format(status_text, remaining_time_str)
+            else:
+                final_status_message = self.strings["chat_status_current"].format(status_text)
         else:
             chat_name = await self._get_chat_name(target_chat_id_str)
-            final_status_message = self.strings["chat_status_other_chat"].format(chat_name, status_text)
+            if remaining_time_str:
+                final_status_message = self.strings["chat_status_other_chat_timed"].format(chat_name, status_text, remaining_time_str)
+            else:
+                final_status_message = self.strings["chat_status_other_chat"].format(chat_name, status_text)
         
         await utils.answer(message, final_status_message, link_preview=False)
 
@@ -1463,6 +1570,7 @@ class TriggersMod(loader.Module):
         chat_id_str = str(message.chat_id)
         incoming_text_lower = message.text.lower()
 
+        # Check for pending trigger cancellations first
         for activation_id, pending_info in list(self.pending_triggers.items()):
             pending_chat_id_str, _, _ = activation_id
             
@@ -1473,11 +1581,25 @@ class TriggersMod(loader.Module):
                 if stop_word and stop_word.lower() in incoming_text_lower:
                     if stop_word_target_user_id is None or message.sender_id == stop_word_target_user_id:
                         pending_info['cancel_event'].set()
+                        # Removed the self.client.send_message for stop_word_detected to avoid spam
                         if activation_id in self.pending_triggers:
                             del self.pending_triggers[activation_id]
         
         chats = self.db.get("Triggers", "chats", {})
-        if not chats.get(chat_id_str, False):
+        chat_status_data = chats.get(chat_id_str, {"enabled": False, "expires_at": None})
+        
+        # Check for timed activation expiration
+        if chat_status_data["enabled"] and chat_status_data["expires_at"] is not None:
+            if time.time() > chat_status_data["expires_at"]:
+                chat_status_data["enabled"] = False
+                chat_status_data["expires_at"] = None
+                chats[chat_id_str] = chat_status_data
+                self.db.set("Triggers", "chats", chats)
+                # Optionally notify chat about expiration, but for now just disable quietly
+                # await self.client.send_message(message.chat_id, self.strings["chat_disabled_expired"], link_preview=False)
+                return # Triggers are now disabled for this chat
+
+        if not chat_status_data["enabled"]:
             return
         
         if chat_id_str not in self.triggers or not self.triggers[chat_id_str]:
