@@ -1,4 +1,3 @@
-``python
 # meta developer: @yourhandle
 # meta name: Triggers
 # meta version: 1.6.3
