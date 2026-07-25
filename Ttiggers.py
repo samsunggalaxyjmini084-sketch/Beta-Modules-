@@ -1,6 +1,6 @@
 # meta developer: @yourhandle
 # meta name: Triggers
-# meta version: 1.6.0
+# meta version: 1.6.2
 # meta lang: ru
 # 01001001 01101110 01101001 01110100 01101001 01100001 01101100 01101001 01111000 01100101 01100100 00100000 01010100 01110010 01101001 01100111 01100111 01100101 01110010 01110011 00100000 01001101 01101111 01100100 01110101 01101100 01100101
 # 01000111 01100101 01101110 01100101 01110010 01100001 01110100 01101111 01110010 00100000 01000001 01001001 00100000 01010011 01101111 01100110 01110100 01110111 01100001 01110010 01100101 00100000 00110001 00101110 00110001
@@ -12,11 +12,14 @@
 # 01000001 01100100 01100100 01100101 01100100 00100000 01000100 01100101 01101100 01100001 01111001 00100000 01010010 01100001 01101110 01100111 01100101 00100000 01000110 01100101 01100001 01110100 01110101 01110010 01100101 00101110 00110001 00101110 00110101 00101110 00110001
 # 01000001 01100100 01100100 01100101 01100100 00100000 01010100 01101001 01101101 01100101 01100100 00100000 01010100 01110010 01101001 01100111 01100111 01100101 01110010 01110011 00100000 01000001 01100011 01110100 01101001 01110110 01100001 01110100 01101001 01101111 01101110 00101110 00110001 00101110 00110101 00101110 00110001
 # 01000001 01100100 01100100 01100101 01100100 00100000 01001101 01110101 01101100 01110100 01101001 01110000 01101100 01100101 00100000 01010100 01110010 01101001 01100111 01100111 01100101 01110010 00100000 01010000 01101000 01110010 01100001 01110011 01100101 01110011 00100000 01000110 01100101 01100001 01110100 01110101 01110010 01100101 00101110 00110001 00101110 00110110 00101110 00110000
+# 01001001 01100111 01101110 01101111 01110010 01100101 00100000 01000110 01101111 01110010 01101101 01100001 01110100 01110100 01101001 01101111 01101110 00100000 01101001 01101110 00100000 01010100 01110010 01101001 01100111 01100111 01100101 01110010 00100000 01000001 01100011 01110100 01101001 01110110 01100001 01110100 01101001 01101111 01101110 00101110 00110001 00101110 00110110 00110001
+# 01000001 01100100 01100100 01100101 01100100 00100000 01001101 01110101 01101100 01110100 01101001 01110000 01101100 01100101 00100000 01010100 01100001 01110010 01100111 01100101 01110100 00100000 01010101 01110011 01100101 01110010 01110011 00101100 00100000 01001101 01110101 01101100 01110100 01101001 01110000 01101100 01100101 00100000 01010011 01110100 01101111 01110000 00100000 01010111 01101111 01110010 01100100 01110011 00100000 01100001 01101110 01100100 00100000 01010000 01100101 01110010 00101101 01010011 01110100 01101111 01110000 00101101 01010111 01101111 01110010 01100100 00100000 01010100 01100001 01110010 01100111 01100101 01110100 00100000 01010101 01110011 01100101 01110010 01110011 00101110 00110001 00101110 00110110 00110010
 
 import asyncio
 import time
 import random
 import re
+import shlex # For robust argument parsing
 from telethon.tl.types import (
     MessageMediaPhoto,
     MessageMediaDocument,
@@ -70,11 +73,13 @@ def _format_duration_for_display(seconds):
 @loader.tds
 class TriggersMod(loader.Module):
     """
-    Триггеры на сообщения (можно добавить фото, видео, файл и тд.).
+    Триггеры на сообщения (можно добавить фото, видео, файл и т.д.).
     Поддерживает замену {NAME} на ник пользователя, активировавшего триггер.
     Добавлена возможность установки задержки (или нескольких случайных задержек, или диапазона задержек) для срабатывания триггера и стоп-слова для отмены.
     Теперь можно установить целевого пользователя для стоп-слова, чтобы оно срабатывало только для определённого пользователя.
     Поддерживает несколько фраз-активаторов для одного триггера.
+    Теперь триггеры срабатывают независимо от форматирования текста (жирный, курсив и т.д.).
+    Добавлена возможность установить несколько стоп-слов для триггера, несколько целевых пользователей для триггера и несколько целевых пользователей для каждого стоп-слова.
     """
     strings = {
         "name": "Triggers",
@@ -96,8 +101,8 @@ class TriggersMod(loader.Module):
         "trigger_deleted": "<emoji document_id=5825794181183836432>✔️</emoji> Триггер с ID <code>{}</code> удалён из чата <b>{}</b>",
         "trigger_not_found": "<emoji document_id=5778527486270770928>❌</emoji> Триггер с ID <code>{}</code> не найден в чате <b>{}</b>",
         "mode_changed": "<emoji document_id=5825794181183836432>✔️</emoji> Режим триггеров изменён на: {}",
-        "trigger_list": "<emoji document_id=5877316724830768997>🗃</emoji> Список триггеров ({}):\n\n{}\n\n🔒 - Строгий режим\n🔍 - Частичный режим\n🔐 - Приватный режим\n🎯 - Целевой пользователь установлен\n⏱ - Задержка установлена\n🛑 - Стоп-слово установлено\n👤🛑 - Целевой пользователь стоп-слова установлен\n\nℹ️ Изменить режим, задержку, стоп-слово, целевого пользователя или фразы можно командой <code>.trig</code> ID (<i>ID это цифра перед названием триггера</i>)",
-        "trigger_list_in_chat": "<emoji document_id=5877316724830768997>🗃</emoji> Список триггеров ({} в чате <b>{}</b>):\n\n{}\n\n🔒 - Строгий режим\n🔍 - Частичный режим\n🔐 - Приватный режим\n🎯 - Целевой пользователь установлен\n⏱ - Задержка установлена\n🛑 - Стоп-слово установлено\n👤🛑 - Целевой пользователь стоп-слова установлен\n\nℹ️ Изменить режим, задержку, стоп-слово, целевого пользователя или фразы можно командой <code>.trig</code> ID (<i>ID это цифра перед названием триггера</i>)",
+        "trigger_list": "<emoji document_id=5877316724830768997>🗃</emoji> Список триггеров ({}):\n\n{}\n\n🔒 - Строгий режим\n🔍 - Частичный режим\n🔐 - Приватный режим\n🎯 - Целевые пользователи установлены\n⏱ - Задержка установлена\n🛑 - Стоп-слова установлены\n👤🛑 - Целевые пользователи стоп-слова установлены\n\nℹ️ Изменить режим, задержку, стоп-слово, целевого пользователя или фразы можно командой <code>.trig</code> ID (<i>ID это цифра перед названием триггера</i>)",
+        "trigger_list_in_chat": "<emoji document_id=5877316724830768997>🗃</emoji> Список триггеров ({} в чате <b>{}</b>):\n\n{}\n\n🔒 - Строгий режим\n🔍 - Частичный режим\n🔐 - Приватный режим\n🎯 - Целевые пользователи установлены\n⏱ - Задержка установлена\n🛑 - Стоп-слова установлены\n👤🛑 - Целевые пользователи стоп-слова установлены\n\nℹ️ Изменить режим, задержку, стоп-слово, целевого пользователя или фразы можно командой <code>.trig</code> ID (<i>ID это цифра перед названием триггера</i>)",
         "no_triggers": "<emoji document_id=5879785854284599288>ℹ️</emoji> В этом чате нет триггеров",
         "no_triggers_in_chat": "<emoji document_id=5879785854284599288>ℹ️</emoji> В чате <b>{}</b> нет триггеров",
         "mode_menu": "<emoji document_id=5875431869842985304>🎛</emoji> Выбери режим работы триггеров:\n\n🔒 Строгий - Срабатывает только при точном совпадении фразы или слова\n\n🔍 Частичный - Срабатывает при наличии слова/фразы в тексте\n\n🔐 Приватный - Срабатывает только на твои сообщения\n\nℹ️ Смена режима работает только на новые триггеры, чтобы изменить режим уже созданных триггеров пиши <code>.trig</code> ID триггера",
@@ -113,7 +118,7 @@ class TriggersMod(loader.Module):
         "not_banned": "<emoji document_id=5881702736843511327>⚠️</emoji> Пользователя нет в чёрном списке",
         "ban_list": "<emoji document_id=5877316724830768997>🗃</emoji> Чёрный список пользователей:\n\n{}",
         "empty_ban_list": "<emoji document_id=5879785854284599288>ℹ️</emoji> Чёрный список пользователей пуст",
-        "trigger_info": "<emoji document_id=5944940516754853337>📍</emoji> Триггер #{}\n\n📝 Реагирует на: {}\n\n💬 Текст к триггеру: {}{}\n📊 Тип триггера: {}\n{}\n{}\n{}\n{}",
+        "trigger_info": "<emoji document_id=5944940516754853337>📍</emoji> Триггер #{}\n\n📝 Реагирует на: {}\n\n💬 Текст к триггеру: {}{}\n📊 Тип триггера: {}\n{}\n{}\n{}\n", # Removed last {} for stop_word_target_user_info_str
         "single_phrase_info": "слово/фраза: <code>{}</code>",
         "multiple_phrases_info": "слова/фразы: <code>{}</code>",
         "trigger_mode_changed": "<emoji document_id=5825794181183836432>✔️</emoji> Режим триггера изменён на: {}",
@@ -129,18 +134,58 @@ class TriggersMod(loader.Module):
         "reply_mode_enabled": "<emoji document_id=5825794181183836432>✔️</emoji> Триггеры будут отвечать на сообщения",
         "reply_mode_disabled": "<emoji document_id=5778527486270770928>❌</emoji> Триггеры будут отправлять сообщения в чат",
         "reply_mode_status": "<emoji document_id=5839200986022812209>🔄</emoji> Режим ответа триггеров: {}",
-        "target_user_info": "<emoji document_id=5771887475421090729>👤</emoji> Работает для: {} (<code>{}</code>)",
+        
+        # New/Updated strings for multiple target users
+        "target_users_info": "<emoji document_id=5771887475421090729>👤</emoji> Работает для: {} (ID: <code>{}</code>)", # Updated string for multiple IDs
         "target_user_none": "<emoji document_id=5771887475421090729>👤</emoji> Работает для: Всех",
-        "set_target_user_btn": "<emoji document_id=5944940516754853337>📍</emoji> Установить целевого пользователя",
-        "remove_target_user_btn": "<emoji document_id=5872829476143894491>🚫</emoji> Удалить целевого пользователя",
-        "target_user_set": "<emoji document_id=5825794181183836432>✔️</emoji> Целевой пользователь <b>{}</b> установлен для триггера <code>{}</code> в чате <b>{}</b>",
-        "target_user_removed": "<emoji document_id=5825794181183836432>✔️</emoji> Целевой пользователь удалён для триггера <code>{}</code> из чата <b>{}</b>",
-        "user_not_found": "<emoji document_id=5778527486270770928>❌</emoji> Не удалось найти пользователя по указанным данным.",
-        "confirm_remove_target_user": "<emoji document_id=5881702736843511327>⚠️</emoji> Ты уверен что хочешь удалить целевого пользователя для триггера <code>{}</code>?",
-        "set_target_user_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Чтобы установить целевого пользователя для триггера <code>{}</code> в чате <b>{}</b>, используй команду:\n\n<code>.trig {} {} ID_ПОЛЬЗОВАТЕЛЯ_ИЛИ_@ЮЗЕРНЕЙМ</code>\n\nИли ответь на сообщение пользователя этой же командой.\n\n(<i>ID триггера</i> - это цифра перед названием триггера в <code>.triglist</code>, <i>ID_чата</i> опционально, если триггер находится не в текущем чате)",
+        "manage_target_users_btn": "<emoji document_id=5771887475421090729>👤</emoji> Управление целевыми пользователями",
+        "add_target_user_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Чтобы добавить целевого пользователя для триггера <code>{}</code> в чате <b>{}</b>, используй команду:\n\n<code>.trig {} {} targetuser add ID_ПОЛЬЗОВАТЕЛЯ_ИЛИ_@ЮЗЕРНЕЙМ</code>\n\nИли ответь на сообщение пользователя этой же командой.\n\n(<i>ID триггера</i> - это цифра перед названием триггера в <code>.triglist</code>, <i>ID_чата</i> опционально, если триггер находится не в текущем чате)",
+        "remove_target_user_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Чтобы удалить целевого пользователя для триггера <code>{}</code> в чате <b>{}</b>, используй команду:\n\n<code>.trig {} {} targetuser del ID_ПОЛЬЗОВАТЕЛЯ_ИЛИ_@ЮЗЕРНЕЙМ</code>",
+        "clear_target_users_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Чтобы очистить всех целевых пользователей для триггера <code>{}</code> в чате <b>{}</b>, используй команду:\n\n<code>.trig {} {} targetuser clear</code>",
+        "target_user_added_to_trigger": "<emoji document_id=5825794181183836432>✔️</emoji> Целевой пользователь <b>{}</b> (<code>{}</code>) добавлен к триггеру <code>{}</code> в чате <b>{}</b>",
+        "target_user_removed_from_trigger": "<emoji document_id=5825794181183836432>✔️</emoji> Целевой пользователь <b>{}</b> (<code>{}</code>) удалён из триггера <code>{}</code> в чате <b>{}</b>",
+        "all_target_users_cleared": "<emoji document_id=5825794181183836432>✔️</emoji> Все целевые пользователи удалены для триггера <code>{}</code> из чата <b>{}</b>",
+        "target_user_already_in_list": "<emoji document_id=5881702736843511327>⚠️</emoji> Пользователь <b>{}</b> (<code>{}</code>) уже является целевым для триггера <code>{}</code> в чате <b>{}</b>",
+        "target_user_not_found_in_list": "<emoji document_id=5778527486270770928>❌</emoji> Пользователь <b>{}</b> (<code>{}</code>) не найден в списке целевых для триггера <code>{}</code> в чате <b>{}</b>",
+        
+        # New/Updated strings for multiple stop words
+        "stop_words_list_header": "<emoji document_id=5872829476143894491>🚫</emoji> Стоп-слова:{}", # Header for a list
+        "stop_word_entry_all_users": "\n  • <b>{}</b> (от всех)",
+        "stop_word_entry_with_users": "\n  • <b>{}</b> (от: {})", # names of users or IDs
+        "manage_stop_words_btn": "<emoji document_id=5872829476143894491>🚫</emoji> Управление стоп-словами",
+        "add_stop_word_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Чтобы добавить стоп-слово к триггеру <code>{}</code> в чате <b>{}</b>, используй команду:\n\n<code>.trig {} {} stopword add &lt;новое_стоп_слово&gt;</code>",
+        "remove_stop_word_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Чтобы удалить стоп-слово из триггера <code>{}</code> в чате <b>{}</b>, используй команду:\n\n<code>.trig {} {} stopword del &lt;стоп_слово_для_удаления&gt;</code>",
+        "clear_stop_words_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Чтобы очистить все стоп-слова для триггера <code>{}</code> в чате <b>{}</b>, используй команду:\n\n<code>.trig {} {} stopword clear</code>",
+        "stop_word_added_to_trigger": "<emoji document_id=5825794181183836432>✔️</emoji> Стоп-слово <b>{}</b> добавлено к триггеру <code>{}</code> в чате <b>{}</b>",
+        "stop_word_removed_from_trigger": "<emoji document_id=5825794181183836432>✔️</emoji> Стоп-слово <b>{}</b> удалено из триггера <code>{}</code> в чате <b>{}</b>",
+        "all_stop_words_cleared": "<emoji document_id=5825794181183836432>✔️</emoji> Все стоп-слова удалены для триггера <code>{}</code> из чата <b>{}</b>",
+        "stop_word_already_in_list": "<emoji document_id=5881702736843511327>⚠️</emoji> Стоп-слово <b>{}</b> уже установлено для триггера <code>{}</code> в чате <b>{}</b>",
+        "stop_word_not_found_in_list": "<emoji document_id=5778527486270770928>❌</emoji> Стоп-слово <b>{}</b> не найдено среди стоп-слов триггера <code>{}</code> в чате <b>{}</b>",
+        
+        # New strings for managing stop word target users
+        "manage_sw_target_users_btn": "<emoji document_id=5771887475421090729>👤</emoji> Управление пользователями для стоп-слова '{}'",
+        "add_sw_target_user_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Чтобы добавить целевого пользователя для стоп-слова <b>{}</b> в триггере <code>{}</code> в чате <b>{}</b>, используй команду:\n\n<code>.trig {} {} stopworduser '{}' add ID_ПОЛЬЗОВАТЕЛЯ_ИЛИ_@ЮЗЕРНЕЙМ</code>",
+        "remove_sw_target_user_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Чтобы удалить целевого пользователя для стоп-слова <b>{}</b> в триггере <code>{}</code> в чате <b>{}</b>, используй команду:\n\n<code>.trig {} {} stopworduser '{}' del ID_ПОЛЬЗОВАТЕЛЯ_ИЛИ_@ЮЗЕРНЕЙМ</code>",
+        "clear_sw_target_users_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Чтобы очистить всех целевых пользователей для стоп-слова <b>{}</b> в триггере <code>{}</code> в чате <b>{}</b>, используй команду:\n\n<code>.trig {} {} stopworduser '{}' clear</code>",
+        "sw_target_user_added": "<emoji document_id=5825794181183836432>✔️</emoji> Целевой пользователь <b>{}</b> (<code>{}</code>) добавлен для стоп-слова <b>{}</b> триггера <code>{}</code> в чате <b>{}</b>",
+        "sw_target_user_removed": "<emoji document_id=5825794181183836432>✔️</emoji> Целевой пользователь <b>{}</b> (<code>{}</code>) удалён для стоп-слова <b>{}</b> триггера <code>{}</code> в чате <b>{}</b>",
+        "all_sw_target_users_cleared": "<emoji document_id=5825794181183836432>✔️</emoji> Все целевые пользователи удалены для стоп-слова <b>{}</b> триггера <code>{}</code> из чата <b>{}</b>",
+        "sw_target_user_already_in_list": "<emoji document_id=5881702736843511327>⚠️</emoji> Пользователь <b>{}</b> (<code>{}</code>) уже является целевым для стоп-слова <b>{}</b> триггера <code>{}</code> в чате <b>{}</b>",
+        "sw_target_user_not_found_in_list": "<emoji document_id=5778527486270770928>❌</emoji> Пользователь <b>{}</b> (<code>{}</code>) не найден в списке целевых для стоп-слова <b>{}</b> триггера <code>{}</code> в чате <b>{}</b>",
+        "stop_word_not_found_for_user_management": "<emoji document_id=5778527486270770928>❌</emoji> Стоп-слово <b>{}</b> не найдено в триггере <code>{}</code> в чате <b>{}</b>. Управление пользователями невозможно.",
+
         "empty_trigger_name": "<emoji document_id=5778527486270770928>❌</emoji> Укажи слово или фразу для триггера.",
         "invalid_ban_args": "<emoji document_id=5778527486270770928>❌</emoji> Укажи ID/юзернейм пользователя или ответь на его сообщение.",
-        "invalid_trig_args": "<emoji document_id=5778527486270770928>❌</emoji> Неверные аргументы. Используй: <code>.trig &lt;ID_триггера&gt; [ID_чата] [ID_пользователя/@username/clear | delay ЧИСЛО_СЕКУНД_1,ЧИСЛО_СЕКУНД_2,.../ЧИСЛО_МИН-ЧИСЛО_МАКС/0 | stopword СТОП_СЛОВО/clear | stopworduser ID_ПОЛЬЗОВАТЕЛЯ/@username/clear | phrase add/del &lt;фраза&gt;]</code>",
+        
+        # Updated invalid_trig_args for new commands
+        "invalid_trig_args": "<emoji document_id=5778527486270770928>❌</emoji> Неверные аргументы. Используй:\n"
+                             "  <code>.trig &lt;ID_триггера&gt; [ID_чата]</code> (показать инфо)\n"
+                             "  <code>.trig &lt;ID_триггера&gt; [ID_чата] targetuser &lt;add/del/clear&gt; [ID_ПОЛЬЗОВАТЕЛЯ_ИЛИ_@ЮЗЕРНЕЙМ]</code>\n"
+                             "  <code>.trig &lt;ID_триггера&gt; [ID_чата] delay ЧИСЛО_СЕКУНД_1,ЧИСЛО_СЕКУНД_2,.../ЧИСЛО_МИН-ЧИСЛО_МАКС/0</code>\n"
+                             "  <code>.trig &lt;ID_триггера&gt; [ID_чата] stopword &lt;add/del/clear&gt; &lt;СТОП_СЛОВО&gt;</code>\n"
+                             "  <code>.trig &lt;ID_триггера&gt; [ID_чата] stopworduser &lt;СТОП_СЛОВО&gt; &lt;add/del/clear&gt; [ID_ПОЛЬЗОВАТЕЛЯ_ИЛИ_@ЮЗЕРНЕЙМ]</code>\n"
+                             "  <code>.trig &lt;ID_триггера&gt; [ID_чата] phrase &lt;add/del&gt; &lt;фраза&gt;</code>",
+
         "invalid_trigadd_args": "<emoji document_id=5778527486270770928>❌</emoji> Неверные аргументы. Используй: <code>.trigadd [ID_чата] &lt;фраза_триггера_1 | фраза_триггера_2 | ...&gt;</code> (ответом на сообщение)",
         "invalid_trigdel_args": "<emoji document_id=5778527486270770928>❌</emoji> Неверные аргументы. Используй: <code>.trigdel &lt;ID_триггера&gt; [ID_чата]</code>",
         "triglist_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Используй: <code>.triglist [ID_чата]</code>",
@@ -155,23 +200,6 @@ class TriggersMod(loader.Module):
         "delay_removed": "<emoji document_id=5825794181183836432>✔️</emoji> Задержка для триггера <code>{}</code> удалена из чата <b>{}</b>",
         "invalid_delay_value": "<emoji document_id=5778527486270770928>❌</emoji> Укажи корректное число, список чисел через запятую или диапазон ЧИСЛО_1-ЧИСЛО_2 для задержки (в секундах). Значения должны быть неотрицательными.",
         "set_delay_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Чтобы установить задержку (или несколько, или диапазон) для триггера <code>{}</code> в чате <b>{}</b>, используй команду:\n\n<code>.trig {} {} delay ЧИСЛО_СЕКУНД_1,ЧИСЛО_СЕКУНД_2,...</code>\nили <code>.trig {} {} delay ЧИСЛО_МИН-ЧИСЛО_МАКС</code>\n\nЧтобы удалить задержку, используй <code>.trig {} {} delay 0</code>\n\n(<i>ID триггера</i> - это цифра перед названием триггера в <code>.triglist</code>, <i>ID_чата</i> опционально, если триггер находится не в текущем чате)",
-        "stop_word_info": "<emoji document_id=5872829476143894491>🚫</emoji> Стоп-слово: <b>{}</b>",
-        "stop_word_info_none": "<emoji document_id=5872829476143894491>🚫</emoji> Стоп-слово: Нет",
-        "set_stop_word_btn": "<emoji document_id=5872829476143894491>🚫</emoji> Установить стоп-слово",
-        "remove_stop_word_btn": "<emoji document_id=5825794181183836432>✔️</emoji> Удалить стоп-слово",
-        "stop_word_set": "<emoji document_id=5825794181183836432>✔️</emoji> Стоп-слово для триггера <code>{}</code> установлено на <b>{}</b> в чате <b>{}</b>",
-        "stop_word_removed": "<emoji document_id=5825794181183836432>✔️</emoji> Стоп-слово удалено для триггера <code>{}</code> из чата <b>{}</b>",
-        "invalid_stop_word_value": "<emoji document_id=5778527486270770928>❌</emoji> Укажи стоп-слово.",
-        "set_stop_word_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Чтобы установить стоп-слово для триггера <code>{}</code> в чате <b>{}</b>, используй команду:\n\n<code>.trig {} {} stopword СТОП_СЛОВО</code>\n\n(<i>ID триггера</i> - это цифра перед названием триггера в <code>.triglist</code>, <i>ID_чата</i> опционально, если триггер находится не в текущем чате)",
-        "stop_word_detected": "<emoji document_id=5872829476143894491>🚫</emoji> Срабатывание триггера <code>{}</code> отменено по стоп-слову.",
-        "stop_word_target_user_info": "<emoji document_id=5771887475421090729>👤</emoji> Стоп-слово от: {} (<code>{}</code>)",
-        "stop_word_target_user_none": "<emoji document_id=5771887475421090729>👤</emoji> Стоп-слово от: Всех",
-        "set_stop_word_target_user_btn": "<emoji document_id=5771887475421090729>👤</emoji> Установить пользователя для стоп-слова",
-        "remove_stop_word_target_user_btn": "<emoji document_id=5872829476143894491>🚫</emoji> Удалить пользователя для стоп-слова",
-        "stop_word_target_user_set": "<emoji document_id=5825794181183836432>✔️</emoji> Целевой пользователь <b>{}</b> установлен для стоп-слова триггера <code>{}</code> в чате <b>{}</b>",
-        "stop_word_target_user_removed": "<emoji document_id=5825794181183836432>✔️</emoji> Целевой пользователь для стоп-слова удалён для триггера <code>{}</code> из чата <b>{}</b>",
-        "confirm_remove_stop_word_target_user": "<emoji document_id=5881702736843511327>⚠️</emoji> Ты уверен что хочешь удалить целевого пользователя для стоп-слова триггера <code>{}</code>?",
-        "set_stop_word_target_user_instructions": "<emoji document_id=5879785854284599288>ℹ️</emoji> Чтобы установить целевого пользователя для стоп-слова триггера <code>{}</code> в чате <b>{}</b>, используй команду:\n\n<code>.trig {} {} stopworduser ID_ПОЛЬЗОВАТЕЛЯ_ИЛИ_@ЮЗЕРНЕЙМ</code>\n\nИли ответь на сообщение пользователя этой же командой.\n\n(<i>ID триггера</i> - это цифра перед названием триггера в <code>.triglist</code>, <i>ID_чата</i> опционально, если триггер находится не в текущем чате)",
         "set_phrases_btn": "<emoji document_id=5944940516754853337>📝</emoji> Управление фразами",
         "add_phrase_btn": "<emoji document_id=5825794181183836432>➕</emoji> Добавить фразу",
         "remove_phrase_btn": "<emoji document_id=5872829476143894491>➖</emoji> Удалить фразу",
@@ -195,20 +223,19 @@ class TriggersMod(loader.Module):
     async def client_ready(self, client, db):
         self.client = client
         self.db = db
-        # Load data, but then migrate to new structure if old format is detected
+        
         old_triggers = self.db.get("Triggers", "triggers", {})
         self.modes = {str(k): v for k, v in self.db.get("Triggers", "modes", {}).items()}
         self.reply_mode = self.db.get("Triggers", "reply_mode", True)
 
         max_existing_id_across_all = 0
         
-        # Determine max existing ID from any format
         for chat_id_str, chat_triggers in old_triggers.items():
             if isinstance(chat_triggers, dict):
                 for key, data in chat_triggers.items():
-                    if isinstance(key, str) and "id" in data: # Old format had trigger_name as key
+                    if isinstance(key, str) and "id" in data:
                         max_existing_id_across_all = max(max_existing_id_across_all, data["id"])
-                    elif isinstance(key, int): # New format has trigger_id as key
+                    elif isinstance(key, int):
                         max_existing_id_across_all = max(max_existing_id_across_all, key)
 
         triggers_changed = False
@@ -221,94 +248,146 @@ class TriggersMod(loader.Module):
             new_triggers_storage[chat_id_str] = {}
             new_phrase_map_storage[chat_id_str] = {}
 
-            if not isinstance(chat_triggers_data, dict): # Should not happen, but defensive
+            if not isinstance(chat_triggers_data, dict):
                 triggers_changed = True
                 continue
 
-            # Check if it's the old format (keys are trigger names) or new (keys are trigger IDs)
-            is_old_format = any(isinstance(k, str) and not k.isdigit() for k in chat_triggers_data.keys())
+            is_old_format_legacy_keys = any(isinstance(k, str) and not str(k).isdigit() for k in chat_triggers_data.keys())
 
-            if is_old_format: # Migrate from {trigger_name: data} to {trigger_id: data} with 'phrases' list
-                for old_trigger_name, data in chat_triggers_data.items():
-                    if "id" not in data:
-                        data["id"] = current_id_for_missing
+            for key, data in chat_triggers_data.items():
+                current_data = dict(data) # Work on a copy to detect changes
+
+                if is_old_format_legacy_keys:
+                    if "id" not in current_data:
+                        current_data["id"] = current_id_for_missing
                         current_id_for_missing += 1
                         triggers_changed = True
                     
-                    if "phrases" not in data:
-                        data["phrases"] = [old_trigger_name.lower()]
+                    if "phrases" not in current_data:
+                        current_data["phrases"] = [str(key).lower()]
                         triggers_changed = True
-                    elif isinstance(data["phrases"], str): # If it was a single string, make it a list
-                        data["phrases"] = [data["phrases"].lower()]
+                    elif isinstance(current_data["phrases"], str):
+                        current_data["phrases"] = [current_data["phrases"].lower()]
                         triggers_changed = True
-                    elif isinstance(data["phrases"], list): # Ensure all phrases are lower-cased and unique
-                        cleaned_phrases = sorted(list(set([p.lower() for p in data["phrases"] if isinstance(p, str) and p.strip()])))
-                        if not cleaned_phrases: # Ensure at least one phrase
-                            cleaned_phrases = [old_trigger_name.lower()]
+                    if isinstance(current_data.get("phrases"), list):
+                        cleaned_phrases = sorted(list(set([p.lower() for p in current_data["phrases"] if isinstance(p, str) and p.strip()])))
+                        if not cleaned_phrases:
+                            cleaned_phrases = [str(key).lower() if isinstance(key, str) else f"trigger_{current_data['id']}"]
                             triggers_changed = True
-                        if cleaned_phrases != data["phrases"]:
-                            data["phrases"] = cleaned_phrases
+                        if cleaned_phrases != current_data["phrases"]:
+                            current_data["phrases"] = cleaned_phrases
                             triggers_changed = True
-                    else: # Fallback
-                        data["phrases"] = [old_trigger_name.lower()]
-                        triggers_changed = True
                     
-                    new_triggers_storage[chat_id_str][data["id"]] = data
-                    for phrase in data["phrases"]:
-                        new_phrase_map_storage[chat_id_str][phrase] = data["id"]
-                triggers_changed = True # Always mark as changed if old format
-            else: # Already new format, just ensure completeness and populate phrase_map
-                for trigger_id_int, data in chat_triggers_data.items():
-                    if not isinstance(trigger_id_int, int): # Handle potential string keys that are actually IDs
-                        try:
-                            trigger_id_int = int(trigger_id_int)
-                        except ValueError:
+                    # Migrate single target_user_id to list target_user_ids
+                    if "target_user_id" in current_data:
+                        if current_data["target_user_id"] is not None:
+                            current_data["target_user_ids"] = [current_data["target_user_id"]]
                             triggers_changed = True
-                            continue # Skip malformed entry
+                        else:
+                            current_data["target_user_ids"] = []
+                            triggers_changed = True
+                        del current_data["target_user_id"]
+                    elif "target_user_ids" not in current_data:
+                        current_data["target_user_ids"] = []
+                        triggers_changed = True
 
-                    data["id"] = trigger_id_int # Ensure consistency
+                    # Migrate single stop_word and stop_word_target_user_id to list of dicts stop_words
+                    if "stop_word" in current_data or "stop_word_target_user_id" in current_data:
+                        new_stop_words_list = []
+                        if current_data.get("stop_word") is not None:
+                            sw_entry = {"word": str(current_data["stop_word"]).lower(), "target_user_ids": []}
+                            if current_data.get("stop_word_target_user_id") is not None:
+                                sw_entry["target_user_ids"].append(current_data["stop_word_target_user_id"])
+                            new_stop_words_list.append(sw_entry)
+                        current_data["stop_words"] = new_stop_words_list
+                        triggers_changed = True
+                        if "stop_word" in current_data: del current_data["stop_word"]
+                        if "stop_word_target_user_id" in current_data: del current_data["stop_word_target_user_id"]
+                    elif "stop_words" not in current_data:
+                        current_data["stop_words"] = []
+                        triggers_changed = True
+                else: # Already new-ish format (keys are trigger IDs), but ensure new fields are present
+                    trigger_id_int = int(key)
+                    current_data["id"] = trigger_id_int
                     
-                    if "phrases" not in data or not isinstance(data["phrases"], list) or not data["phrases"]:
-                        # This scenario is tricky for migration if no original phrase can be inferred.
-                        # For now, let's try to infer from a "name" field if it existed in previous versions
-                        # or default to a dummy if nothing is there.
-                        # Assume data was mostly well-formed in last version. If it hit this path,
-                        # it means `phrases` list is missing or empty. This is an edge case.
-                        # Let's try to recover from a 'trigger_name' field if it was preserved, otherwise default.
-                        dummy_phrase = f"trigger_{data['id']}"
-                        data["phrases"] = [dummy_phrase]
+                    # Ensure 'phrases' exists and is a list of lower-cased unique strings
+                    if "phrases" not in current_data or not isinstance(current_data["phrases"], list) or not current_data["phrases"]:
+                        current_data["phrases"] = [f"trigger_{current_data['id']}"]
                         triggers_changed = True
                     else:
-                        cleaned_phrases = sorted(list(set([p.lower() for p in data["phrases"] if isinstance(p, str) and p.strip()])))
-                        if not cleaned_phrases: # Ensure at least one valid phrase
-                            cleaned_phrases = [f"trigger_{data['id']}"]
+                        cleaned_phrases = sorted(list(set([p.lower() for p in current_data["phrases"] if isinstance(p, str) and p.strip()])))
+                        if not cleaned_phrases:
+                            cleaned_phrases = [f"trigger_{current_data['id']}"]
                             triggers_changed = True
-                        if cleaned_phrases != data["phrases"]:
-                            data["phrases"] = cleaned_phrases
+                        if cleaned_phrases != current_data["phrases"]:
+                            current_data["phrases"] = cleaned_phrases
                             triggers_changed = True
 
-                    new_triggers_storage[chat_id_str][data["id"]] = data
-                    for phrase in data["phrases"]:
-                        new_phrase_map_storage[chat_id_str][phrase] = data["id"]
-        
-        self.triggers = new_triggers_storage
-        self.phrase_map = new_phrase_map_storage
+                    # Ensure target_user_ids field and proper format
+                    if "target_user_id" in current_data: # If old single field still exists
+                        if current_data["target_user_id"] is not None:
+                            current_data["target_user_ids"] = [current_data["target_user_id"]]
+                        else:
+                            current_data["target_user_ids"] = []
+                        triggers_changed = True
+                        del current_data["target_user_id"]
+                    elif "target_user_ids" not in current_data:
+                        current_data["target_user_ids"] = []
+                        triggers_changed = True
+                    if not isinstance(current_data["target_user_ids"], list):
+                        current_data["target_user_ids"] = []
+                        triggers_changed = True
+                    else: # Clean up list
+                        cleaned_target_users = sorted(list(set([int(uid) for uid in current_data["target_user_ids"] if isinstance(uid, (int, str)) and str(uid).isdigit()])))
+                        if cleaned_target_users != current_data["target_user_ids"]:
+                            current_data["target_user_ids"] = cleaned_target_users
+                            triggers_changed = True
+                    
+                    # Ensure stop_words field and proper format
+                    if "stop_word" in current_data or "stop_word_target_user_id" in current_data: # If old single fields still exist
+                        new_stop_words_list = []
+                        if current_data.get("stop_word") is not None:
+                            sw_entry = {"word": str(current_data["stop_word"]).lower(), "target_user_ids": []}
+                            if current_data.get("stop_word_target_user_id") is not None:
+                                sw_entry["target_user_ids"].append(current_data["stop_word_target_user_id"])
+                            new_stop_words_list.append(sw_entry)
+                        current_data["stop_words"] = new_stop_words_list
+                        triggers_changed = True
+                        if "stop_word" in current_data: del current_data["stop_word"]
+                        if "stop_word_target_user_id" in current_data: del current_data["stop_word_target_user_id"]
+                    elif "stop_words" not in current_data:
+                        current_data["stop_words"] = []
+                        triggers_changed = True
+                    
+                    if not isinstance(current_data["stop_words"], list):
+                        current_data["stop_words"] = []
+                        triggers_changed = True
+                    else: # Clean up list of dicts
+                        cleaned_stop_words = []
+                        for sw_entry in current_data["stop_words"]:
+                            if isinstance(sw_entry, dict) and "word" in sw_entry:
+                                cleaned_word = str(sw_entry["word"]).lower().strip()
+                                if cleaned_word:
+                                    cleaned_sw_target_users = []
+                                    if isinstance(sw_entry.get("target_user_ids"), list):
+                                        cleaned_sw_target_users = sorted(list(set([int(uid) for uid in sw_entry["target_user_ids"] if isinstance(uid, (int, str)) and str(uid).isdigit()])))
+                                    cleaned_stop_words.append({"word": cleaned_word, "target_user_ids": cleaned_sw_target_users})
+                                    if cleaned_sw_target_users != sw_entry.get("target_user_ids"): # Check if sub-list changed
+                                        triggers_changed = True
+                                else: # Malformed word in stop_word entry
+                                    triggers_changed = True
+                            else: # Malformed stop_word entry itself
+                                triggers_changed = True
+                        if cleaned_stop_words != current_data["stop_words"]:
+                            current_data["stop_words"] = cleaned_stop_words
+                            triggers_changed = True
 
-        # Ensure all other fields are present and migrate them as before
-        for chat_id_str in list(self.triggers.keys()):
-            for trigger_id, data in list(self.triggers[chat_id_str].items()):
-                if "target_user_id" not in data:
-                    data["target_user_id"] = None
+                # Delay migration logic (robust from previous version)
+                if "delay" not in current_data:
+                    current_data["delay"] = [0]
                     triggers_changed = True
                 
-                # --- Delay migration logic start ---
-                # This part is largely already handled robustly in the previous version's client_ready
-                # but ensure it's still applied for any new data that might be missing fields.
-                if "delay" not in data:
-                    data["delay"] = [0]
-                    triggers_changed = True
-                
-                current_delay_value = data.get("delay")
+                current_delay_value = current_data.get("delay")
                 normalized_delay = []
 
                 if isinstance(current_delay_value, (int, float)):
@@ -324,6 +403,8 @@ class TriggersMod(loader.Module):
                                 normalized_delay = sorted([min_val, max_val])
                                 if normalized_delay[0] == normalized_delay[1]:
                                     normalized_delay = [normalized_delay[0]]
+                            else:
+                                normalized_delay = [0]
                     if not normalized_delay:
                         parsed_values_str = [x.strip() for x in current_delay_value.split(',') if x.strip().isdigit()]
                         temp_discrete_delays = []
@@ -359,23 +440,21 @@ class TriggersMod(loader.Module):
                 if not normalized_delay:
                     normalized_delay = [0]
                 
-                if data["delay"] != normalized_delay:
-                    data["delay"] = normalized_delay
-                    triggers_changed = True
-                # --- Delay migration logic end ---
-
-                if "stop_word" not in data:
-                    data["stop_word"] = None
+                if current_data["delay"] != normalized_delay:
+                    current_data["delay"] = normalized_delay
                     triggers_changed = True
                 
-                if "stop_word_target_user_id" not in data:
-                    data["stop_word_target_user_id"] = None
-                    triggers_changed = True
-                
-                if "chat_id" in data and not isinstance(data["chat_id"], str):
-                    data["chat_id"] = str(data["chat_id"])
+                if "chat_id" in current_data and not isinstance(current_data["chat_id"], str):
+                    current_data["chat_id"] = str(current_data["chat_id"])
                     triggers_changed = True
 
+
+                new_triggers_storage[chat_id_str][current_data["id"]] = current_data
+                for phrase in current_data["phrases"]:
+                    new_phrase_map_storage[chat_id_str][phrase] = current_data["id"]
+        
+        self.triggers = new_triggers_storage
+        self.phrase_map = new_phrase_map_storage
 
         stored_next_id = self.db.get("Triggers", "next_trigger_id", 1)
         self.next_trigger_id = max(stored_next_id, current_id_for_missing) 
@@ -394,12 +473,31 @@ class TriggersMod(loader.Module):
         for chat_id_str, status_value in chats_db.items():
             if isinstance(status_value, bool):
                 new_chats_db[chat_id_str] = {"enabled": status_value, "expires_at": None}
-                # no need to set triggers_changed here as this is for chats_db, not main triggers
             elif isinstance(status_value, dict) and "enabled" in status_value:
                 new_chats_db[chat_id_str] = status_value
             else: # Fallback for malformed data
                 new_chats_db[chat_id_str] = {"enabled": False, "expires_at": None}
         self.db.set("Triggers", "chats", new_chats_db)
+
+
+    def _clean_text_from_formatting(self, text):
+        """Removes common Telegram markdown/HTML formatting markers and normalizes whitespace from text.
+        This aims to make the text purely semantic for comparison, ignoring visual styling characters.
+        """
+        if not isinstance(text, str):
+            return ""
+        
+        text = text.replace('*', '')  # Bold
+        text = text.replace('_', '')  # Italic (Markdown)
+        text = text.replace('`', '')  # Monospace
+        text = text.replace('~', '')  # Strikethrough
+        text = text.replace('||', '') # Spoiler
+        
+        text = re.sub(r'<[^>]+>', '', text) # Remove HTML tags
+        
+        text = re.sub(r'\s+', ' ', text) # Normalise internal whitespace
+        
+        return text.strip() # Finally strip leading/trailing whitespace
 
 
     def check_spam(self, user_id, trigger_phrase): # Renamed trigger_name to trigger_phrase for clarity
@@ -493,17 +591,15 @@ class TriggersMod(loader.Module):
         duration_str = None
 
         if len(args) == 1:
-            # Check if arg is chat_id or duration
             if self._is_chat_id_string(args[0]):
                 target_chat_id_str = args[0]
-            else: # Must be duration for current chat
+            else:
                 duration_str = args[0]
         elif len(args) == 2:
-            # First arg must be chat_id, second is duration
             if self._is_chat_id_string(args[0]):
                 target_chat_id_str = args[0]
                 duration_str = args[1]
-            else: # Probably something like ".trigchat invalid_arg duration"
+            else:
                  await utils.answer(message, self.strings["invalid_chat_id_arg"], link_preview=False)
                  return
         elif len(args) > 2:
@@ -527,10 +623,9 @@ class TriggersMod(loader.Module):
             
             status_text = self.strings["chat_enabled_timed"].format(_format_duration_for_display(duration_seconds))
         else:
-            # Toggle logic
             new_status = not chat_status_data["enabled"]
             chat_status_data["enabled"] = new_status
-            chat_status_data["expires_at"] = None # Clear expiration if toggled manually
+            chat_status_data["expires_at"] = None
             chats[target_chat_id_str] = chat_status_data
             self.db.set("Triggers", "chats", chats)
             
@@ -571,8 +666,6 @@ class TriggersMod(loader.Module):
         if current_status and expires_at and expires_at > time.time():
             remaining_seconds = int(expires_at - time.time())
             remaining_time_str = _format_duration_for_display(remaining_seconds)
-            # Do not override status_text, it's used as a parameter.
-            # The timed status is added separately in format string.
 
         if target_chat_id_str == str(message.chat_id):
             if remaining_time_str:
@@ -629,7 +722,6 @@ class TriggersMod(loader.Module):
             await utils.answer(message, self.strings["empty_trigger_name"], link_preview=False)
             return
 
-        # Check for phrase conflicts
         for phrase_to_add in phrases_list:
             if target_chat_id_str in self.phrase_map and phrase_to_add in self.phrase_map[target_chat_id_str]:
                 existing_trigger_id = self.phrase_map[target_chat_id_str][phrase_to_add]
@@ -656,11 +748,10 @@ class TriggersMod(loader.Module):
             "mode": self.modes.get(str(message.sender_id), "strict"),
             "chat_id": str(reply_msg.chat_id),
             "message_id": reply_msg.id,
-            "target_user_id": None,
-            "delay": [0], # Default to no delay
-            "stop_word": None,
-            "stop_word_target_user_id": None,
-            "phrases": phrases_list, # Store all phrases
+            "target_user_ids": [], # Initialize as empty list for multiple target users
+            "delay": [0],
+            "stop_words": [], # Initialize as empty list for multiple stop words
+            "phrases": phrases_list,
         }
         
         self.triggers[target_chat_id_str][trigger_id] = data
@@ -668,7 +759,7 @@ class TriggersMod(loader.Module):
             self.phrase_map[target_chat_id_str][phrase] = trigger_id
         
         self.db.set("Triggers", "triggers", self.triggers)
-        self.db.set("Triggers", "phrase_map", self.phrase_map) # Save phrase map
+        self.db.set("Triggers", "phrase_map", self.phrase_map)
         
         chat_name = await self._get_chat_name(target_chat_id_str)
         display_phrase = phrases_list[0] if len(phrases_list) == 1 else ", ".join(phrases_list)
@@ -705,11 +796,15 @@ class TriggersMod(loader.Module):
             "private": self.strings["private_mode"]
         }.get(trigger_data["mode"], trigger_data["mode"])
         
-        target_user_id = trigger_data.get("target_user_id")
+        # Multiple Target Users for Trigger
+        target_user_ids = trigger_data.get("target_user_ids", [])
         target_user_info_str = self.strings["target_user_none"]
-        if target_user_id:
-            user_name = await self.get_user_name(target_user_id)
-            target_user_info_str = self.strings["target_user_info"].format(user_name, target_user_id)
+        if target_user_ids:
+            user_names = []
+            for uid in target_user_ids:
+                user_names.append(await self.get_user_name(uid))
+            target_user_info_str = self.strings["target_users_info"].format(", ".join(user_names), ", ".join(map(str, target_user_ids)))
+
 
         delay_list = trigger_data.get("delay", [0])
         delay_info_str = self.strings["delay_info_none"]
@@ -718,19 +813,27 @@ class TriggersMod(loader.Module):
             delay_info_str = self.strings["delay_info_single"].format(delay_list[0])
         elif len(delay_list) == 2 and delay_list[0] >= 0 and delay_list[1] >= 0 and delay_list[0] < delay_list[1]:
             delay_info_str = self.strings["delay_info_range"].format(delay_list[0], delay_list[1])
-        elif any(d > 0 for d in delay_list): # For multiple discrete positive delays
+        elif any(d > 0 for d in delay_list):
             delay_info_str = self.strings["delay_info_multiple"].format(", ".join(map(str, sorted(list(set(d for d in delay_list if d > 0))))))
 
-        stop_word_val = trigger_data.get("stop_word")
+        # Multiple Stop Words with per-stop-word target users
+        stop_words_list = trigger_data.get("stop_words", [])
         stop_word_info_str = self.strings["stop_word_info_none"]
-        if stop_word_val:
-            stop_word_info_str = self.strings["stop_word_info"].format(stop_word_val)
+        if stop_words_list:
+            stop_word_entries = []
+            for sw_entry in stop_words_list:
+                word = sw_entry["word"]
+                sw_target_uids = sw_entry.get("target_user_ids", [])
+                
+                if sw_target_uids:
+                    sw_user_names = []
+                    for uid in sw_target_uids:
+                        sw_user_names.append(await self.get_user_name(uid))
+                    stop_word_entries.append(self.strings["stop_word_entry_with_users"].format(word, ", ".join(sw_user_names)))
+                else:
+                    stop_word_entries.append(self.strings["stop_word_entry_all_users"].format(word))
+            stop_word_info_str = self.strings["stop_words_list_header"].format("".join(stop_word_entries))
 
-        stop_word_target_user_id = trigger_data.get("stop_word_target_user_id")
-        stop_word_target_user_info_str = self.strings["stop_word_target_user_none"]
-        if stop_word_target_user_id:
-            user_name = await self.get_user_name(stop_word_target_user_id)
-            stop_word_target_user_info_str = self.strings["stop_word_target_user_info"].format(user_name, stop_word_target_user_id)
 
         phrases = trigger_data.get("phrases", [])
         phrases_display = ", ".join([f"<code>{p}</code>" for p in phrases])
@@ -741,31 +844,30 @@ class TriggersMod(loader.Module):
 
         info_text = self.strings["trigger_info"].format(
             trigger_id,
-            reacts_on_info, # Changed to display multiple phrases
+            reacts_on_info,
             text_content,
             media_info,
             mode_name,
             target_user_info_str,
             delay_info_str,
-            stop_word_info_str,
-            stop_word_target_user_info_str
+            stop_word_info_str
         )
         
         reply_markup = [
             [{
                 "text": self.strings["change_trigger_mode"],
                 "callback": self.show_trigger_mode_menu,
-                "args": (chat_id_str, trigger_id), # Removed trigger_name
+                "args": (chat_id_str, trigger_id),
             }],
             [{
-                "text": self.strings["set_phrases_btn"], # New button for phrase management
+                "text": self.strings["set_phrases_btn"],
                 "callback": self.show_set_phrase_instructions,
                 "args": (chat_id_str, trigger_id),
             }],
             [{
-                "text": self.strings["set_target_user_btn"] if target_user_id is None else self.strings["remove_target_user_btn"],
-                "callback": self.manage_target_user_inline,
-                "args": (chat_id_str, trigger_id, target_user_id is not None),
+                "text": self.strings["manage_target_users_btn"],
+                "callback": self.show_manage_target_users_menu,
+                "args": (chat_id_str, trigger_id),
             }],
             [{
                 "text": self.strings["set_delay_btn"],
@@ -773,14 +875,9 @@ class TriggersMod(loader.Module):
                 "args": (chat_id_str, trigger_id),
             }],
             [{
-                "text": self.strings["set_stop_word_btn"] if stop_word_val is None else self.strings["remove_stop_word_btn"],
-                "callback": self.manage_stop_word_inline,
-                "args": (chat_id_str, trigger_id, stop_word_val is not None),
-            }],
-            [{
-                "text": self.strings["set_stop_word_target_user_btn"] if stop_word_target_user_id is None else self.strings["remove_stop_word_target_user_btn"],
-                "callback": self.manage_stop_word_target_user_inline,
-                "args": (chat_id_str, trigger_id, stop_word_target_user_id is not None),
+                "text": self.strings["manage_stop_words_btn"],
+                "callback": self.show_manage_stop_words_menu,
+                "args": (chat_id_str, trigger_id),
             }],
             [{
                 "text": self.strings["delete_trigger"],
@@ -792,29 +889,21 @@ class TriggersMod(loader.Module):
 
     async def trigcmd(self, message):
         """Показать информацию о триггере по ID или установить/удалить целевого пользователя/задержку/стоп-слово/целевого пользователя стоп-слова/фразы.
-        Использование: .trig <ID_триггера> [ID_чата] [ID_пользователя/@username/clear | delay ЧИСЛО_СЕКУНД_1,ЧИСЛО_СЕКУНД_2,.../ЧИСЛО_МИН-ЧИСЛО_МАКС/0 | stopword СТОП_СЛОВО/clear | stopworduser ID_ПОЛЬЗОВАТЕЛЯ/@username/clear | phrase add/del <фраза>]
-        Пример: .trig 10 (показать инфо о триггере 10 в текущем чате)
-        Пример: .trig 10 -1001234567890 (показать инфо о триггере 10 в указанном чате)
-        Установить целевого пользователя: .trig 10 @username / ID / (ответом на сообщение)
-        Удалить целевого пользователя: .trig 10 clear
-        Установить задержку: .trig 10 delay 5 (5 секунд задержки)
-        Установить несколько задержек: .trig 10 delay 5,10,15
-        Установить диапазон задержки: .trig 10 delay 5-240
-        Удалить задержку: .trig 10 delay 0
-        Установить стоп-слово: .trig 10 stopword отмена
-        Удалить стоп-слово: .trig 10 stopword clear
-        Установить целевого пользователя для стоп-слова: .trig 10 stopworduser @username / ID / (ответом на сообщение)
-        Удалить целевого пользователя для стоп-слова: .trig 10 stopworduser clear
-        Добавить фразу к триггеру: .trig 10 phrase add новая_фраза
-        Удалить фразу из триггера: .trig 10 phrase del старая_фраза"""
+        Использование: .trig <ID_триггера> [ID_чата] [targetuser <add/del/clear> [ID/@username] | delay ЧИСЛО_СЕКУНД_1,ЧИСЛО_СЕКУНД_2,.../ЧИСЛО_МИН-ЧИСЛО_МАКС/0 | stopword <add/del/clear> <СТОП_СЛОВО> | stopworduser <СТОП_СЛОВО> <add/del/clear> [ID/@username] | phrase <add/del> <фраза>]"""
         
-        args = utils.get_args_raw(message).split(maxsplit=4) # Increased maxsplit for phrase management
+        raw_args_str = utils.get_args_raw(message)
+        try:
+            args = shlex.split(raw_args_str)
+        except ValueError:
+            await utils.answer(message, self.strings["invalid_trig_args"], link_preview=False)
+            return
         
         target_chat_id_str = str(message.chat_id)
         trigger_id_str = None
         action_type = None
+        action_sub_type = None
         action_value = None
-        action_sub_type = None # For "phrase add/del"
+        stop_word_for_action = None # Used for stopworduser subcommands
 
         if not args:
             await utils.answer(message, self.strings["invalid_trig_args"], link_preview=False)
@@ -827,7 +916,7 @@ class TriggersMod(loader.Module):
         
         try:
             trigger_id = int(trigger_id_str)
-        except ValueError:
+        except ValueError: # Should be caught by isdigit already, but for safety
             await utils.answer(message, self.strings["invalid_trigger_id"], link_preview=False)
             return
 
@@ -836,85 +925,125 @@ class TriggersMod(loader.Module):
             target_chat_id_str = args[idx]
             idx += 1
         
-        args_for_action = args[idx:]
+        action_args = args[idx:]
 
-        if len(args_for_action) >= 1:
-            action_type_lower = args_for_action[0].lower()
-            if action_type_lower == "delay":
-                action_type = "delay"
-                if len(args_for_action) > 1:
-                    action_value = args_for_action[1]
-                else:
-                    await utils.answer(message, self.strings["invalid_delay_value"], link_preview=False)
-                    return
-            elif action_type_lower == "stopword":
-                action_type = "stopword"
-                if len(args_for_action) > 1:
-                    action_value = args_for_action[1]
-                else:
-                    await utils.answer(message, self.strings["invalid_stop_word_value"], link_preview=False)
-                    return
-            elif action_type_lower == "stopworduser":
-                action_type = "stopworduser"
-                if len(args_for_action) > 1:
-                    action_value = args_for_action[1]
-                else:
+        if not action_args: # No action, just display info
+            info_text, reply_markup, _ = await self._get_trigger_info_data(target_chat_id_str, trigger_id)
+            if info_text and reply_markup:
+                await self.inline.form(message=message, text=info_text, reply_markup=reply_markup, silent=True)
+            else:
+                chat_name = await self._get_chat_name(target_chat_id_str)
+                await utils.answer(message, self.strings["trigger_not_found"].format(trigger_id, chat_name), link_preview=False)
+            return
+
+        # Parse actions
+        action_type_lower = action_args[0].lower()
+
+        if action_type_lower == "targetuser":
+            action_type = "targetuser"
+            if len(action_args) < 2:
+                await utils.answer(message, self.strings["invalid_trig_args"], link_preview=False)
+                return
+            action_sub_type = action_args[1].lower()
+            if action_sub_type not in ["add", "del", "clear"]:
+                await utils.answer(message, self.strings["invalid_trig_args"], link_preview=False)
+                return
+            if action_sub_type != "clear":
+                if len(action_args) < 3:
                     await utils.answer(message, self.strings["invalid_ban_args"], link_preview=False)
                     return
-            elif action_type_lower == "phrase":
-                action_type = "phrase"
-                if len(args_for_action) > 1:
-                    action_sub_type = args_for_action[1].lower()
-                    if action_sub_type in ["add", "del"]:
-                        if len(args_for_action) > 2:
-                            action_value = args_for_action[2]
-                        else:
-                            await utils.answer(message, self.strings["set_phrase_instructions"].format(trigger_id, await self._get_chat_name(target_chat_id_str), trigger_id, (target_chat_id_str if target_chat_id_str != str(message.chat_id) else ""), trigger_id, (target_chat_id_str if target_chat_id_str != str(message.chat_id) else "")), link_preview=False)
-                            return
-                    else:
-                        await utils.answer(message, self.strings["set_phrase_instructions"].format(trigger_id, await self._get_chat_name(target_chat_id_str), trigger_id, (target_chat_id_str if target_chat_id_str != str(message.chat_id) else ""), trigger_id, (target_chat_id_str if target_chat_id_str != str(message.chat_id) else "")), link_preview=False)
-                        return
-                else:
-                    await utils.answer(message, self.strings["set_phrase_instructions"].format(trigger_id, await self._get_chat_name(target_chat_id_str), trigger_id, (target_chat_id_str if target_chat_id_str != str(message.chat_id) else ""), trigger_id, (target_chat_id_str if target_chat_id_str != str(message.chat_id) else "")), link_preview=False)
+                action_value = action_args[2]
+        elif action_type_lower == "delay":
+            action_type = "delay"
+            if len(action_args) < 2:
+                await utils.answer(message, self.strings["invalid_delay_value"], link_preview=False)
+                return
+            action_value = action_args[1]
+        elif action_type_lower == "stopword":
+            action_type = "stopword"
+            if len(action_args) < 2:
+                await utils.answer(message, self.strings["invalid_trig_args"], link_preview=False)
+                return
+            action_sub_type = action_args[1].lower()
+            if action_sub_type not in ["add", "del", "clear"]:
+                await utils.answer(message, self.strings["invalid_trig_args"], link_preview=False)
+                return
+            if action_sub_type != "clear":
+                if len(action_args) < 3:
+                    await utils.answer(message, self.strings["invalid_stop_word_value"], link_preview=False)
                     return
-            else:
-                action_type = "user"
-                action_value = args_for_action[0]
+                action_value = action_args[2]
+        elif action_type_lower == "stopworduser":
+            action_type = "stopworduser"
+            if len(action_args) < 3:
+                await utils.answer(message, self.strings["invalid_trig_args"], link_preview=False)
+                return
+            stop_word_for_action = action_args[1].lower() # The specific stop word
+            action_sub_type = action_args[2].lower()
+            if action_sub_type not in ["add", "del", "clear"]:
+                await utils.answer(message, self.strings["invalid_trig_args"], link_preview=False)
+                return
+            if action_sub_type != "clear":
+                if len(action_args) < 4:
+                    await utils.answer(message, self.strings["invalid_ban_args"], link_preview=False)
+                    return
+                action_value = action_args[3]
+        elif action_type_lower == "phrase":
+            action_type = "phrase"
+            if len(action_args) < 2:
+                await utils.answer(message, self.strings["set_phrase_instructions"].format(trigger_id, await self._get_chat_name(target_chat_id_str), trigger_id, (target_chat_id_str if target_chat_id_str != str(message.chat_id) else ""), trigger_id, (target_chat_id_str if target_chat_id_str != str(message.chat_id) else "")), link_preview=False)
+                return
+            action_sub_type = action_args[1].lower()
+            if action_sub_type not in ["add", "del"]:
+                await utils.answer(message, self.strings["set_phrase_instructions"].format(trigger_id, await self._get_chat_name(target_chat_id_str), trigger_id, (target_chat_id_str if target_chat_id_str != str(message.chat_id) else ""), trigger_id, (target_chat_id_str if target_chat_id_str != str(message.chat_id) else "")), link_preview=False)
+                return
+            if len(action_args) < 3:
+                await utils.answer(message, self.strings["empty_trigger_name"], link_preview=False)
+                return
+            action_value = action_args[2]
+        else:
+            await utils.answer(message, self.strings["invalid_trig_args"], link_preview=False)
+            return
+
         
         if target_chat_id_str not in self.triggers or trigger_id not in self.triggers[target_chat_id_str]:
             chat_name = await self._get_chat_name(target_chat_id_str)
             await utils.answer(message, self.strings["trigger_not_found"].format(trigger_id, chat_name), link_preview=False)
             return
         
-        # Now trigger_data is retrieved using trigger_id, not trigger_name
         trigger_data = self.triggers[target_chat_id_str][trigger_id]
-        # For display, get a primary phrase or generate one
         display_trigger_name = trigger_data["phrases"][0] if trigger_data.get("phrases") else str(trigger_id)
+        chat_name = await self._get_chat_name(target_chat_id_str)
 
-
-        if action_type == "user":
-            chat_name = await self._get_chat_name(target_chat_id_str)
-            if action_value.lower() == "clear":
-                if trigger_data.get("target_user_id") is None:
-                    await utils.answer(message, self.strings["target_user_removed"].format(display_trigger_name, chat_name), link_preview=False) 
+        if action_type == "targetuser":
+            user_id_to_manage = None
+            if action_sub_type != "clear":
+                user_id_to_manage = await self._resolve_user_id(message, action_value)
+                if not user_id_to_manage:
+                    await utils.answer(message, self.strings["user_not_found"], link_preview=False)
                     return
-                trigger_data["target_user_id"] = None
+                user_name = await self.get_user_name(user_id_to_manage)
+
+            if action_sub_type == "add":
+                if user_id_to_manage in trigger_data["target_user_ids"]:
+                    await utils.answer(message, self.strings["target_user_already_in_list"].format(user_name, user_id_to_manage, display_trigger_name, chat_name), link_preview=False)
+                    return
+                trigger_data["target_user_ids"].append(user_id_to_manage)
                 self.db.set("Triggers", "triggers", self.triggers)
-                await utils.answer(message, self.strings["target_user_removed"].format(display_trigger_name, chat_name), link_preview=False)
-                return
-            
-            target_user_id_to_set = await self._resolve_user_id(message, action_value)
-            
-            if target_user_id_to_set:
-                trigger_data["target_user_id"] = target_user_id_to_set
+                await utils.answer(message, self.strings["target_user_added_to_trigger"].format(user_name, user_id_to_manage, display_trigger_name, chat_name), link_preview=False)
+            elif action_sub_type == "del":
+                if user_id_to_manage not in trigger_data["target_user_ids"]:
+                    await utils.answer(message, self.strings["target_user_not_found_in_list"].format(user_name, user_id_to_manage, display_trigger_name, chat_name), link_preview=False)
+                    return
+                trigger_data["target_user_ids"].remove(user_id_to_manage)
                 self.db.set("Triggers", "triggers", self.triggers)
-                user_name = await self.get_user_name(target_user_id_to_set)
-                await utils.answer(message, self.strings["target_user_set"].format(user_name, display_trigger_name, chat_name), link_preview=False)
-            else:
-                await utils.answer(message, self.strings["user_not_found"], link_preview=False)
+                await utils.answer(message, self.strings["target_user_removed_from_trigger"].format(user_name, user_id_to_manage, display_trigger_name, chat_name), link_preview=False)
+            elif action_sub_type == "clear":
+                trigger_data["target_user_ids"] = []
+                self.db.set("Triggers", "triggers", self.triggers)
+                await utils.answer(message, self.strings["all_target_users_cleared"].format(display_trigger_name, chat_name), link_preview=False)
             return
         elif action_type == "delay":
-            chat_name = await self._get_chat_name(target_chat_id_str)
             try:
                 final_delay_list = []
                 action_value_lower = action_value.lower().strip()
@@ -922,24 +1051,22 @@ class TriggersMod(loader.Module):
                 if action_value_lower == "0" or action_value_lower == "clear":
                     final_delay_list = [0]
                 elif '-' in action_value_lower:
-                    # Try to parse as a range X-Y
                     parts = action_value_lower.split('-', 1)
                     if len(parts) == 2 and parts[0].strip().isdigit() and parts[1].strip().isdigit():
                         min_val = int(parts[0].strip())
                         max_val = int(parts[1].strip())
                         if min_val < 0 or max_val < 0:
                             raise ValueError("Delay values must be non-negative.")
-                        if min_val > max_val: # Swap if min > max
+                        if min_val > max_val:
                             min_val, max_val = max_val, min_val
                         
                         if min_val == max_val:
-                            final_delay_list = [min_val] # Treat as single fixed delay
+                            final_delay_list = [min_val]
                         else:
                             final_delay_list = [min_val, max_val]
                     else:
                         raise ValueError("Invalid delay range format. Use X-Y.")
                 else:
-                    # Try to parse as comma-separated values or a single value
                     delay_values_str_list = [v.strip() for v in action_value.split(',') if v.strip()]
                     
                     temp_parsed_delays = []
@@ -956,7 +1083,7 @@ class TriggersMod(loader.Module):
                     elif len(temp_parsed_delays) == 1:
                         final_delay_list = [temp_parsed_delays[0]]
                     else:
-                        final_delay_list = sorted(list(set(temp_parsed_delays))) # Unique and sorted for consistency
+                        final_delay_list = sorted(list(set(temp_parsed_delays)))
 
                 trigger_data["delay"] = final_delay_list
                 self.db.set("Triggers", "triggers", self.triggers)
@@ -964,14 +1091,14 @@ class TriggersMod(loader.Module):
                 delay_display = ""
                 if len(final_delay_list) == 0 or (len(final_delay_list) == 1 and final_delay_list[0] == 0):
                     message_key = "delay_removed"
-                    delay_display = self.strings["delay_info_none"].split(': ')[1] # "Нет"
+                    delay_display = self.strings["delay_info_none"].split(': ')[1]
                 elif len(final_delay_list) == 1:
                     message_key = "delay_set_updated"
                     delay_display = f"{final_delay_list[0]} секунд"
                 elif len(final_delay_list) == 2 and final_delay_list[0] < final_delay_list[1]:
                     message_key = "delay_set_updated"
                     delay_display = f"{final_delay_list[0]}-{final_delay_list[1]} секунд"
-                else: # multiple discrete values
+                else:
                     message_key = "delay_set_updated"
                     delay_display = f"{', '.join(map(str, final_delay_list))} секунд"
                 
@@ -980,48 +1107,64 @@ class TriggersMod(loader.Module):
                 await utils.answer(message, self.strings["invalid_delay_value"] + f" ({e})", link_preview=False)
             return
         elif action_type == "stopword":
-            chat_name = await self._get_chat_name(target_chat_id_str)
-            if action_value.lower() == "clear":
-                if trigger_data.get("stop_word") is None:
-                    await utils.answer(message, self.strings["stop_word_removed"].format(display_trigger_name, chat_name), link_preview=False)
+            word_to_manage = action_value.lower().strip() if action_value else None
+            
+            if action_sub_type == "add":
+                if any(sw["word"] == word_to_manage for sw in trigger_data["stop_words"]):
+                    await utils.answer(message, self.strings["stop_word_already_in_list"].format(word_to_manage, display_trigger_name, chat_name), link_preview=False)
                     return
-                trigger_data["stop_word"] = None
+                trigger_data["stop_words"].append({"word": word_to_manage, "target_user_ids": []})
                 self.db.set("Triggers", "triggers", self.triggers)
-                await utils.answer(message, self.strings["stop_word_removed"].format(display_trigger_name, chat_name), link_preview=False)
-                return
-            
-            stop_word_to_set = action_value.lower().strip()
-            if not stop_word_to_set:
-                await utils.answer(message, self.strings["invalid_stop_word_value"], link_preview=False)
-                return
-            
-            trigger_data["stop_word"] = stop_word_to_set
-            self.db.set("Triggers", "triggers", self.triggers)
-            await utils.answer(message, self.strings["stop_word_set"].format(display_trigger_name, stop_word_to_set, chat_name), link_preview=False)
+                await utils.answer(message, self.strings["stop_word_added_to_trigger"].format(word_to_manage, display_trigger_name, chat_name), link_preview=False)
+            elif action_sub_type == "del":
+                initial_len = len(trigger_data["stop_words"])
+                trigger_data["stop_words"] = [sw for sw in trigger_data["stop_words"] if sw["word"] != word_to_manage]
+                if len(trigger_data["stop_words"]) == initial_len:
+                    await utils.answer(message, self.strings["stop_word_not_found_in_list"].format(word_to_manage, display_trigger_name, chat_name), link_preview=False)
+                    return
+                self.db.set("Triggers", "triggers", self.triggers)
+                await utils.answer(message, self.strings["stop_word_removed_from_trigger"].format(word_to_manage, display_trigger_name, chat_name), link_preview=False)
+            elif action_sub_type == "clear":
+                trigger_data["stop_words"] = []
+                self.db.set("Triggers", "triggers", self.triggers)
+                await utils.answer(message, self.strings["all_stop_words_cleared"].format(display_trigger_name, chat_name), link_preview=False)
             return
         elif action_type == "stopworduser":
-            chat_name = await self._get_chat_name(target_chat_id_str)
-            if action_value.lower() == "clear":
-                if trigger_data.get("stop_word_target_user_id") is None:
-                    await utils.answer(message, self.strings["stop_word_target_user_removed"].format(display_trigger_name, chat_name), link_preview=False)
-                    return
-                trigger_data["stop_word_target_user_id"] = None
-                self.db.set("Triggers", "triggers", self.triggers)
-                await utils.answer(message, self.strings["stop_word_target_user_removed"].format(display_trigger_name, chat_name), link_preview=False)
+            stop_word_to_find = stop_word_for_action.lower().strip()
+            sw_entry_found = next((sw for sw in trigger_data["stop_words"] if sw["word"] == stop_word_to_find), None)
+
+            if not sw_entry_found:
+                await utils.answer(message, self.strings["stop_word_not_found_for_user_management"].format(stop_word_to_find, display_trigger_name, chat_name), link_preview=False)
                 return
             
-            target_user_id_to_set = await self._resolve_user_id(message, action_value)
-            
-            if target_user_id_to_set:
-                trigger_data["stop_word_target_user_id"] = target_user_id_to_set
+            user_id_to_manage = None
+            if action_sub_type != "clear":
+                user_id_to_manage = await self._resolve_user_id(message, action_value)
+                if not user_id_to_manage:
+                    await utils.answer(message, self.strings["user_not_found"], link_preview=False)
+                    return
+                user_name = await self.get_user_name(user_id_to_manage)
+
+            if action_sub_type == "add":
+                if user_id_to_manage in sw_entry_found["target_user_ids"]:
+                    await utils.answer(message, self.strings["sw_target_user_already_in_list"].format(user_name, user_id_to_manage, stop_word_to_find, display_trigger_name, chat_name), link_preview=False)
+                    return
+                sw_entry_found["target_user_ids"].append(user_id_to_manage)
                 self.db.set("Triggers", "triggers", self.triggers)
-                user_name = await self.get_user_name(target_user_id_to_set)
-                await utils.answer(message, self.strings["stop_word_target_user_set"].format(user_name, display_trigger_name, chat_name), link_preview=False)
-            else:
-                await utils.answer(message, self.strings["user_not_found"], link_preview=False)
+                await utils.answer(message, self.strings["sw_target_user_added"].format(user_name, user_id_to_manage, stop_word_to_find, display_trigger_name, chat_name), link_preview=False)
+            elif action_sub_type == "del":
+                if user_id_to_manage not in sw_entry_found["target_user_ids"]:
+                    await utils.answer(message, self.strings["sw_target_user_not_found_in_list"].format(user_name, user_id_to_manage, stop_word_to_find, display_trigger_name, chat_name), link_preview=False)
+                    return
+                sw_entry_found["target_user_ids"].remove(user_id_to_manage)
+                self.db.set("Triggers", "triggers", self.triggers)
+                await utils.answer(message, self.strings["sw_target_user_removed"].format(user_name, user_id_to_manage, stop_word_to_find, display_trigger_name, chat_name), link_preview=False)
+            elif action_sub_type == "clear":
+                sw_entry_found["target_user_ids"] = []
+                self.db.set("Triggers", "triggers", self.triggers)
+                await utils.answer(message, self.strings["all_sw_target_users_cleared"].format(stop_word_to_find, display_trigger_name, chat_name), link_preview=False)
             return
         elif action_type == "phrase":
-            chat_name = await self._get_chat_name(target_chat_id_str)
             phrase_to_manage = action_value.lower().strip()
 
             if not phrase_to_manage:
@@ -1032,7 +1175,6 @@ class TriggersMod(loader.Module):
                 if phrase_to_manage in trigger_data["phrases"]:
                     return await utils.answer(message, self.strings["phrase_already_exists"].format(phrase_to_manage, trigger_id, chat_name), link_preview=False)
                 
-                # Check if this phrase is already used by another trigger in this chat
                 if target_chat_id_str in self.phrase_map and phrase_to_manage in self.phrase_map[target_chat_id_str]:
                     existing_trigger_id = self.phrase_map[target_chat_id_str][phrase_to_manage]
                     return await utils.answer(message, self.strings["phrase_already_exists"].format(phrase_to_manage, existing_trigger_id, chat_name), link_preview=False)
@@ -1056,67 +1198,306 @@ class TriggersMod(loader.Module):
                 await utils.answer(message, self.strings["phrase_removed"].format(phrase_to_manage, trigger_id, chat_name), link_preview=False)
             return
 
+    # --- New inline menu handlers for trigger properties ---
 
-        info_text, reply_markup, _ = await self._get_trigger_info_data(target_chat_id_str, trigger_id) # Call with trigger_id
+    async def show_manage_target_users_menu(self, call, chat_id_str, trigger_id):
+        """Показывает меню управления целевыми пользователями триггера."""
+        chat_name = await self._get_chat_name(chat_id_str)
+        trigger_data = self.triggers[chat_id_str][trigger_id]
+        display_trigger_name = trigger_data["phrases"][0] if trigger_data.get("phrases") else str(trigger_id)
         
-        if info_text and reply_markup:
-            await self.inline.form(
-                message=message,
-                text=info_text,
-                reply_markup=reply_markup,
-                silent=True
-            )
+        target_user_ids = trigger_data.get("target_user_ids", [])
+        
+        info_lines = [
+            f"<emoji document_id=5771887475421090729>👤</emoji> <b>Целевые пользователи для триггера <code>{display_trigger_name}</code> в чате <b>{chat_name}</b>:</b>"
+        ]
+        if target_user_ids:
+            for uid in target_user_ids:
+                user_name = await self.get_user_name(uid)
+                info_lines.append(f"  • {user_name} (<code>{uid}</code>)")
         else:
-            chat_name = await self._get_chat_name(target_chat_id_str)
-            await utils.answer(message, self.strings["trigger_not_found"].format(trigger_id, chat_name), link_preview=False)
+            info_lines.append(f"  • {self.strings['target_user_none'].split(': ')[1]}") # "Всех"
+        
+        chat_id_arg_for_command = chat_id_str if chat_id_str != str(call.chat_id) else ""
 
-    async def manage_target_user_inline(self, call, chat_id_str, trigger_id, is_target_set):
-        """Обработка нажатий на кнопки управления целевым пользователем."""
+        reply_markup = [
+            [{
+                "text": self.strings["add_phrase_btn"].replace("Фразу", "Пользователя"), # Reusing button text
+                "callback": self.show_add_target_user_instructions,
+                "args": (chat_id_str, trigger_id),
+            }],
+            [{
+                "text": self.strings["remove_phrase_btn"].replace("Фразу", "Пользователя"),
+                "callback": self.show_remove_target_user_instructions,
+                "args": (chat_id_str, trigger_id),
+            }],
+            [{
+                "text": "🚫 Очистить всех",
+                "callback": self.show_clear_target_users_instructions,
+                "args": (chat_id_str, trigger_id),
+            }],
+            [{
+                "text": self.strings["back_to_trigger"],
+                "callback": self.back_to_trigger_info,
+                "args": (chat_id_str, trigger_id),
+            }]
+        ]
+        await call.edit("\n".join(info_lines), reply_markup=reply_markup)
+
+    async def show_add_target_user_instructions(self, call, chat_id_str, trigger_id):
+        chat_name = await self._get_chat_name(chat_id_str)
+        chat_id_arg_for_command = chat_id_str if chat_id_str != str(call.chat_id) else ""
+        await call.edit(
+            self.strings["add_target_user_instructions"].format(trigger_id, chat_name, trigger_id, chat_id_arg_for_command),
+            reply_markup=[
+                [{
+                    "text": self.strings["back_to_trigger"],
+                    "callback": self.show_manage_target_users_menu,
+                    "args": (chat_id_str, trigger_id),
+                }]
+            ]
+        )
+
+    async def show_remove_target_user_instructions(self, call, chat_id_str, trigger_id):
+        chat_name = await self._get_chat_name(chat_id_str)
+        chat_id_arg_for_command = chat_id_str if chat_id_str != str(call.chat_id) else ""
+        await call.edit(
+            self.strings["remove_target_user_instructions"].format(trigger_id, chat_name, trigger_id, chat_id_arg_for_command),
+            reply_markup=[
+                [{
+                    "text": self.strings["back_to_trigger"],
+                    "callback": self.show_manage_target_users_menu,
+                    "args": (chat_id_str, trigger_id),
+                }]
+            ]
+        )
+    
+    async def show_clear_target_users_instructions(self, call, chat_id_str, trigger_id):
+        chat_name = await self._get_chat_name(chat_id_str)
+        chat_id_arg_for_command = chat_id_str if chat_id_str != str(call.chat_id) else ""
+        await call.edit(
+            self.strings["clear_target_users_instructions"].format(trigger_id, chat_name, trigger_id, chat_id_arg_for_command),
+            reply_markup=[
+                [{
+                    "text": self.strings["back_to_trigger"],
+                    "callback": self.show_manage_target_users_menu,
+                    "args": (chat_id_str, trigger_id),
+                }]
+            ]
+        )
+
+    async def show_manage_stop_words_menu(self, call, chat_id_str, trigger_id):
+        """Показывает меню управления стоп-словами триггера."""
         chat_name = await self._get_chat_name(chat_id_str)
         trigger_data = self.triggers[chat_id_str][trigger_id]
         display_trigger_name = trigger_data["phrases"][0] if trigger_data.get("phrases") else str(trigger_id)
 
-        if is_target_set:
-            await call.edit(
-                self.strings["confirm_remove_target_user"].format(display_trigger_name),
-                reply_markup=[
-                    [{
-                        "text": self.strings["confirm_delete_yes"],
-                        "callback": self.remove_target_user_confirmed,
-                        "args": (chat_id_str, trigger_id),
-                    }],
-                    [{
-                        "text": self.strings["confirm_delete_no"],
-                        "callback": self.back_to_trigger_info,
-                        "args": (chat_id_str, trigger_id),
-                    }]
-                ]
-            )
+        stop_words_list = trigger_data.get("stop_words", [])
+        
+        info_lines = [
+            f"<emoji document_id=5872829476143894491>🚫</emoji> <b>Стоп-слова для триггера <code>{display_trigger_name}</code> в чате <b>{chat_name}</b>:</b>"
+        ]
+        if stop_words_list:
+            for sw_entry in stop_words_list:
+                word = sw_entry["word"]
+                sw_target_uids = sw_entry.get("target_user_ids", [])
+                
+                user_list_str = "всех"
+                if sw_target_uids:
+                    user_names = []
+                    for uid in sw_target_uids:
+                        user_names.append(await self.get_user_name(uid))
+                    user_list_str = ", ".join(user_names) + f" (ID: <code>{', '.join(map(str, sw_target_uids))}</code>)"
+                
+                info_lines.append(f"  • <b>{word}</b> (от: {user_list_str})")
         else:
-            chat_id_arg_for_command = chat_id_str if chat_id_str != str(call.chat_id) else ""
-            
-            await call.edit(
-                self.strings["set_target_user_instructions"].format(trigger_id, chat_name, trigger_id, chat_id_arg_for_command),
-                reply_markup=[
-                    [{
-                        "text": self.strings["back_to_trigger"],
-                        "callback": self.back_to_trigger_info,
-                        "args": (chat_id_str, trigger_id),
-                    }]
-                ]
-            )
+            info_lines.append(f"  • {self.strings['stop_word_info_none'].split(': ')[1]}") # "Нет"
+        
+        chat_id_arg_for_command = chat_id_str if chat_id_str != str(call.chat_id) else ""
+        
+        reply_markup = [
+            [{
+                "text": self.strings["add_phrase_btn"].replace("Фразу", "Стоп-слово"),
+                "callback": self.show_add_stop_word_instructions,
+                "args": (chat_id_str, trigger_id),
+            }],
+            [{
+                "text": self.strings["remove_phrase_btn"].replace("Фразу", "Стоп-слово"),
+                "callback": self.show_remove_stop_word_instructions,
+                "args": (chat_id_str, trigger_id),
+            }],
+            [{
+                "text": "🚫 Очистить все",
+                "callback": self.show_clear_stop_words_instructions,
+                "args": (chat_id_str, trigger_id),
+            }],
+            # Dynamically add buttons for managing users for each stop word
+            *([[{
+                "text": self.strings["manage_sw_target_users_btn"].format(sw_entry["word"]),
+                "callback": self.show_manage_stop_word_target_users_menu,
+                "args": (chat_id_str, trigger_id, sw_entry["word"]),
+            }] for sw_entry in stop_words_list] if stop_words_list else []),
+            [{
+                "text": self.strings["back_to_trigger"],
+                "callback": self.back_to_trigger_info,
+                "args": (chat_id_str, trigger_id),
+            }]
+        ]
+        await call.edit("\n".join(info_lines), reply_markup=reply_markup)
+
+    async def show_add_stop_word_instructions(self, call, chat_id_str, trigger_id):
+        chat_name = await self._get_chat_name(chat_id_str)
+        chat_id_arg_for_command = chat_id_str if chat_id_str != str(call.chat_id) else ""
+        await call.edit(
+            self.strings["add_stop_word_instructions"].format(trigger_id, chat_name, trigger_id, chat_id_arg_for_command),
+            reply_markup=[
+                [{
+                    "text": self.strings["back_to_trigger"],
+                    "callback": self.show_manage_stop_words_menu,
+                    "args": (chat_id_str, trigger_id),
+                }]
+            ]
+        )
+
+    async def show_remove_stop_word_instructions(self, call, chat_id_str, trigger_id):
+        chat_name = await self._get_chat_name(chat_id_str)
+        chat_id_arg_for_command = chat_id_str if chat_id_str != str(call.chat_id) else ""
+        await call.edit(
+            self.strings["remove_stop_word_instructions"].format(trigger_id, chat_name, trigger_id, chat_id_arg_for_command),
+            reply_markup=[
+                [{
+                    "text": self.strings["back_to_trigger"],
+                    "callback": self.show_manage_stop_words_menu,
+                    "args": (chat_id_str, trigger_id),
+                }]
+            ]
+        )
+
+    async def show_clear_stop_words_instructions(self, call, chat_id_str, trigger_id):
+        chat_name = await self._get_chat_name(chat_id_str)
+        chat_id_arg_for_command = chat_id_str if chat_id_str != str(call.chat_id) else ""
+        await call.edit(
+            self.strings["clear_stop_words_instructions"].format(trigger_id, chat_name, trigger_id, chat_id_arg_for_command),
+            reply_markup=[
+                [{
+                    "text": self.strings["back_to_trigger"],
+                    "callback": self.show_manage_stop_words_menu,
+                    "args": (chat_id_str, trigger_id),
+                }]
+            ]
+        )
+
+    async def show_manage_stop_word_target_users_menu(self, call, chat_id_str, trigger_id, stop_word_text):
+        """Показывает меню управления целевыми пользователями для конкретного стоп-слова."""
+        chat_name = await self._get_chat_name(chat_id_str)
+        trigger_data = self.triggers[chat_id_str][trigger_id]
+        display_trigger_name = trigger_data["phrases"][0] if trigger_data.get("phrases") else str(trigger_id)
+
+        sw_entry_found = next((sw for sw in trigger_data["stop_words"] if sw["word"] == stop_word_text), None)
+
+        if not sw_entry_found:
+            await call.edit(self.strings["stop_word_not_found_for_user_management"].format(stop_word_text, display_trigger_name, chat_name), reply_markup=[])
+            return
+
+        target_user_ids = sw_entry_found.get("target_user_ids", [])
+        
+        info_lines = [
+            f"<emoji document_id=5771887475421090729>👤</emoji> <b>Целевые пользователи для стоп-слова <code>{stop_word_text}</code> триггера <code>{display_trigger_name}</code> в чате <b>{chat_name}</b>:</b>"
+        ]
+        if target_user_ids:
+            for uid in target_user_ids:
+                user_name = await self.get_user_name(uid)
+                info_lines.append(f"  • {user_name} (<code>{uid}</code>)")
+        else:
+            info_lines.append(f"  • {self.strings['target_user_none'].split(': ')[1]}") # "Всех"
+        
+        chat_id_arg_for_command = chat_id_str if chat_id_str != str(call.chat_id) else ""
+
+        reply_markup = [
+            [{
+                "text": self.strings["add_phrase_btn"].replace("Фразу", "Пользователя"),
+                "callback": self.show_add_sw_target_user_instructions,
+                "args": (chat_id_str, trigger_id, stop_word_text),
+            }],
+            [{
+                "text": self.strings["remove_phrase_btn"].replace("Фразу", "Пользователя"),
+                "callback": self.show_remove_sw_target_user_instructions,
+                "args": (chat_id_str, trigger_id, stop_word_text),
+            }],
+            [{
+                "text": "🚫 Очистить всех",
+                "callback": self.show_clear_sw_target_users_instructions,
+                "args": (chat_id_str, trigger_id, stop_word_text),
+            }],
+            [{
+                "text": self.strings["back_to_trigger"],
+                "callback": self.show_manage_stop_words_menu,
+                "args": (chat_id_str, trigger_id),
+            }]
+        ]
+        await call.edit("\n".join(info_lines), reply_markup=reply_markup)
+
+    async def show_add_sw_target_user_instructions(self, call, chat_id_str, trigger_id, stop_word_text):
+        chat_name = await self._get_chat_name(chat_id_str)
+        chat_id_arg_for_command = chat_id_str if chat_id_str != str(call.chat_id) else ""
+        await call.edit(
+            self.strings["add_sw_target_user_instructions"].format(stop_word_text, trigger_id, chat_name, trigger_id, chat_id_arg_for_command, stop_word_text),
+            reply_markup=[
+                [{
+                    "text": self.strings["back_to_trigger"],
+                    "callback": self.show_manage_stop_word_target_users_menu,
+                    "args": (chat_id_str, trigger_id, stop_word_text),
+                }]
+            ]
+        )
+
+    async def show_remove_sw_target_user_instructions(self, call, chat_id_str, trigger_id, stop_word_text):
+        chat_name = await self._get_chat_name(chat_id_str)
+        chat_id_arg_for_command = chat_id_str if chat_id_str != str(call.chat_id) else ""
+        await call.edit(
+            self.strings["remove_sw_target_user_instructions"].format(stop_word_text, trigger_id, chat_name, trigger_id, chat_id_arg_for_command, stop_word_text),
+            reply_markup=[
+                [{
+                    "text": self.strings["back_to_trigger"],
+                    "callback": self.show_manage_stop_word_target_users_menu,
+                    "args": (chat_id_str, trigger_id, stop_word_text),
+                }]
+            ]
+        )
+    
+    async def show_clear_sw_target_users_instructions(self, call, chat_id_str, trigger_id, stop_word_text):
+        chat_name = await self._get_chat_name(chat_id_str)
+        chat_id_arg_for_command = chat_id_str if chat_id_str != str(call.chat_id) else ""
+        await call.edit(
+            self.strings["clear_sw_target_users_instructions"].format(stop_word_text, trigger_id, chat_name, trigger_id, chat_id_arg_for_command, stop_word_text),
+            reply_markup=[
+                [{
+                    "text": self.strings["back_to_trigger"],
+                    "callback": self.show_manage_stop_word_target_users_menu,
+                    "args": (chat_id_str, trigger_id, stop_word_text),
+                }]
+            ]
+        )
+
+    # --- End of new inline menu handlers ---
+
+    async def manage_target_user_inline(self, call, chat_id_str, trigger_id, is_target_set):
+        """DEPRECATED: Replaced by show_manage_target_users_menu, kept for backward compatibility if needed in old UIs."""
+        await self.show_manage_target_users_menu(call, chat_id_str, trigger_id)
 
     async def remove_target_user_confirmed(self, call, chat_id_str, trigger_id):
-        """Подтвержденное удаление целевого пользователя."""
+        """DEPRECATED: Will be replaced by direct commands for target users. Kept for continuity."""
         chat_name = await self._get_chat_name(chat_id_str)
         if chat_id_str in self.triggers and trigger_id in self.triggers[chat_id_str]:
             trigger_data = self.triggers[chat_id_str][trigger_id]
             display_trigger_name = trigger_data["phrases"][0] if trigger_data.get("phrases") else str(trigger_id)
             
-            trigger_data["target_user_id"] = None
+            # This logic will need to change for multiple users. For now, this is a fallback.
+            # Ideally, this callback should not be directly reachable or should prompt for a user.
+            trigger_data["target_user_ids"] = [] # Clear all if triggered this way (fallback for single user removal intent)
             self.db.set("Triggers", "triggers", self.triggers)
-            await call.answer(self.strings["target_user_removed"].format(display_trigger_name, chat_name), show_alert=True)
-            await self.back_to_trigger_info(call, chat_id_str, trigger_id)
+            await call.answer(self.strings["all_target_users_cleared"].format(display_trigger_name, chat_name), show_alert=True)
+            await self.show_manage_target_users_menu(call, chat_id_str, trigger_id) # Redirect to new menu
         else:
             await call.edit(self.strings["trigger_not_found"].format(trigger_id, chat_name), link_preview=False)
 
@@ -1153,102 +1534,46 @@ class TriggersMod(loader.Module):
         )
 
     async def manage_stop_word_inline(self, call, chat_id_str, trigger_id, is_stop_word_set):
-        """Обработка нажатий на кнопки управления стоп-словом."""
-        chat_name = await self._get_chat_name(chat_id_str)
-        trigger_data = self.triggers[chat_id_str][trigger_id]
-        display_trigger_name = trigger_data["phrases"][0] if trigger_data.get("phrases") else str(trigger_id)
-
-        if is_stop_word_set:
-            await call.edit(
-                self.strings["confirm_remove_target_user"].format(display_trigger_name),
-                reply_markup=[
-                    [{
-                        "text": self.strings["confirm_delete_yes"],
-                        "callback": self.remove_stop_word_confirmed,
-                        "args": (chat_id_str, trigger_id),
-                    }],
-                    [{
-                        "text": self.strings["confirm_delete_no"],
-                        "callback": self.back_to_trigger_info,
-                        "args": (chat_id_str, trigger_id),
-                    }]
-                ]
-            )
-        else:
-            chat_id_arg_for_command = chat_id_str if chat_id_str != str(call.chat_id) else ""
-            
-            await call.edit(
-                self.strings["set_stop_word_instructions"].format(trigger_id, chat_name, trigger_id, chat_id_arg_for_command),
-                reply_markup=[
-                    [{
-                        "text": self.strings["back_to_trigger"],
-                        "callback": self.back_to_trigger_info,
-                        "args": (chat_id_str, trigger_id),
-                    }]
-                ]
-            )
+        """DEPRECATED: Replaced by show_manage_stop_words_menu, kept for backward compatibility if needed in old UIs."""
+        await self.show_manage_stop_words_menu(call, chat_id_str, trigger_id)
 
     async def remove_stop_word_confirmed(self, call, chat_id_str, trigger_id):
-        """Подтвержденное удаление стоп-слова."""
+        """DEPRECATED: Will be replaced by direct commands for stop words. Kept for continuity."""
         chat_name = await self._get_chat_name(chat_id_str)
         if chat_id_str in self.triggers and trigger_id in self.triggers[chat_id_str]:
             trigger_data = self.triggers[chat_id_str][trigger_id]
             display_trigger_name = trigger_data["phrases"][0] if trigger_data.get("phrases") else str(trigger_id)
 
-            trigger_data["stop_word"] = None
+            trigger_data["stop_words"] = [] # Clear all if triggered this way (fallback for single stop word removal intent)
             self.db.set("Triggers", "triggers", self.triggers)
-            await call.answer(self.strings["stop_word_removed"].format(display_trigger_name, chat_name), show_alert=True)
-            await self.back_to_trigger_info(call, chat_id_str, trigger_id)
+            await call.answer(self.strings["all_stop_words_cleared"].format(display_trigger_name, chat_name), show_alert=True)
+            await self.show_manage_stop_words_menu(call, chat_id_str, trigger_id) # Redirect to new menu
         else:
             await call.edit(self.strings["trigger_not_found"].format(trigger_id, chat_name), link_preview=False)
 
     async def manage_stop_word_target_user_inline(self, call, chat_id_str, trigger_id, is_target_set):
-        """Обработка нажатий на кнопки управления целевым пользователем для стоп-слова."""
-        chat_name = await self._get_chat_name(chat_id_str)
-        trigger_data = self.triggers[chat_id_str][trigger_id]
-        display_trigger_name = trigger_data["phrases"][0] if trigger_data.get("phrases") else str(trigger_id)
-
-        if is_target_set:
-            await call.edit(
-                self.strings["confirm_remove_stop_word_target_user"].format(display_trigger_name),
-                reply_markup=[
-                    [{
-                        "text": self.strings["confirm_delete_yes"],
-                        "callback": self.remove_stop_word_target_user_confirmed,
-                        "args": (chat_id_str, trigger_id),
-                    }],
-                    [{
-                        "text": self.strings["confirm_delete_no"],
-                        "callback": self.back_to_trigger_info,
-                        "args": (chat_id_str, trigger_id),
-                    }]
-                ]
-            )
-        else:
-            chat_id_arg_for_command = chat_id_str if chat_id_str != str(call.chat_id) else ""
-            
-            await call.edit(
-                self.strings["set_stop_word_target_user_instructions"].format(trigger_id, chat_name, trigger_id, chat_id_arg_for_command),
-                reply_markup=[
-                    [{
-                        "text": self.strings["back_to_trigger"],
-                        "callback": self.back_to_trigger_info,
-                        "args": (chat_id_str, trigger_id),
-                    }]
-                ]
-            )
+        """DEPRECATED: Will be replaced by show_manage_stop_word_target_users_menu."""
+        # This old button would only exist if there was one stop_word. Let's redirect to general stop word management
+        # or the specific stop word if we can infer it. For simplicity, redirect to general stop word menu.
+        await self.show_manage_stop_words_menu(call, chat_id_str, trigger_id)
 
     async def remove_stop_word_target_user_confirmed(self, call, chat_id_str, trigger_id):
-        """Подтвержденное удаление целевого пользователя для стоп-слова."""
+        """DEPRECATED: Will be replaced by direct commands for stop word target users. Kept for continuity."""
         chat_name = await self._get_chat_name(chat_id_str)
         if chat_id_str in self.triggers and trigger_id in self.triggers[chat_id_str]:
             trigger_data = self.triggers[chat_id_str][trigger_id]
             display_trigger_name = trigger_data["phrases"][0] if trigger_data.get("phrases") else str(trigger_id)
 
-            trigger_data["stop_word_target_user_id"] = None
-            self.db.set("Triggers", "triggers", self.triggers)
-            await call.answer(self.strings["stop_word_target_user_removed"].format(display_trigger_name, chat_name), show_alert=True)
-            await self.back_to_trigger_info(call, chat_id_str, trigger_id)
+            # This logic assumes there was only one stop word previously and clears its target users.
+            # In the new structure, it's safer to just point to the new UI.
+            if trigger_data["stop_words"]:
+                trigger_data["stop_words"][0]["target_user_ids"] = [] # Clear for the first stop word found
+                self.db.set("Triggers", "triggers", self.triggers)
+                await call.answer(self.strings["all_sw_target_users_cleared"].format(trigger_data["stop_words"][0]["word"], display_trigger_name, chat_name), show_alert=True)
+            else:
+                 await call.answer(self.strings["stop_word_info_none"], show_alert=True)
+            
+            await self.show_manage_stop_words_menu(call, chat_id_str, trigger_id)
         else:
             await call.edit(self.strings["trigger_not_found"].format(trigger_id, chat_name), link_preview=False)
 
@@ -1279,7 +1604,6 @@ class TriggersMod(loader.Module):
         chat_name = await self._get_chat_name(chat_id_str)
         if chat_id_str in self.triggers and trigger_id in self.triggers[chat_id_str]:
             trigger_data = self.triggers[chat_id_str][trigger_id]
-            # Remove all associated phrases from phrase_map
             for phrase in trigger_data["phrases"]:
                 if phrase in self.phrase_map.get(chat_id_str, {}):
                     del self.phrase_map[chat_id_str][phrase]
@@ -1487,7 +1811,6 @@ class TriggersMod(loader.Module):
             return
         
         trigger_data = self.triggers[target_chat_id_str][trigger_id_to_delete]
-        # Remove all associated phrases from phrase_map
         for phrase in trigger_data["phrases"]:
             if phrase in self.phrase_map.get(target_chat_id_str, {}):
                 del self.phrase_map[target_chat_id_str][phrase]
@@ -1496,10 +1819,10 @@ class TriggersMod(loader.Module):
         if not self.triggers[target_chat_id_str]:
             del self.triggers[target_chat_id_str]
             if target_chat_id_str in self.phrase_map:
-                del self.phrase_map[target_chat_id_str] # Also remove the chat entry from phrase_map if no triggers are left
+                del self.phrase_map[target_chat_id_str]
 
         self.db.set("Triggers", "triggers", self.triggers)
-        self.db.set("Triggers", "phrase_map", self.phrase_map) # Save phrase map
+        self.db.set("Triggers", "phrase_map", self.phrase_map)
         await utils.answer(message, self.strings["trigger_deleted"].format(trigger_id_to_delete, chat_name), link_preview=False)
 
     def get_media_emoji(self, media):
@@ -1567,12 +1890,11 @@ class TriggersMod(loader.Module):
             await message.respond(self.strings["no_triggers_in_chat"].format(chat_name), parse_mode='html', link_preview=False)
             return
         
-        # Sort by trigger ID
         triggers_sorted = sorted(self.triggers[target_chat_id_str].values(), key=lambda item: item.get("id", 0))
         
         count = len(triggers_sorted)
         trigger_list = []
-        for data in triggers_sorted: # Iterate through trigger_data directly
+        for data in triggers_sorted:
             mode_emoji = {
                 "strict": "🔒",
                 "partial": "🔍", 
@@ -1580,7 +1902,7 @@ class TriggersMod(loader.Module):
             }.get(data["mode"], "🔒")
 
             target_user_emoji = ""
-            if data.get("target_user_id"):
+            if data.get("target_user_ids"): # Check for list of target users
                 target_user_emoji = "🎯 "
             
             delay_emoji = ""
@@ -1589,11 +1911,12 @@ class TriggersMod(loader.Module):
                 delay_emoji = "⏱ "
 
             stop_word_emoji = ""
-            if data.get("stop_word"):
+            stop_words_list = data.get("stop_words", [])
+            if stop_words_list: # Check for list of stop words
                 stop_word_emoji = "🛑 "
 
             stop_word_target_user_emoji = ""
-            if data.get("stop_word_target_user_id"):
+            if any(sw_entry.get("target_user_ids") for sw_entry in stop_words_list): # Check if any stop word has specific target users
                 stop_word_target_user_emoji = "👤🛑 "
 
             preview_parts = []
@@ -1614,7 +1937,7 @@ class TriggersMod(loader.Module):
                     
                     if not preview_parts and not msg.raw_text and not msg.media: 
                         preview_parts.append("[пустое сообщение]")
-                    elif not preview_parts and (msg.raw_text or msg.media): # If media is there but no text, still indicate content
+                    elif not preview_parts and (msg.raw_text or msg.media):
                         preview_parts.append("[сообщение с контентом]")
                 else:
                     preview_parts.append("[сообщение удалено или недоступно]")
@@ -1623,7 +1946,6 @@ class TriggersMod(loader.Module):
             
             preview = " ".join(preview_parts).strip()
             
-            # Display primary phrase or first few phrases
             phrases_for_display = data.get("phrases", [f"unknown_trigger_{data['id']}"])
             if len(phrases_for_display) > 2:
                 phrase_display_str = f"{phrases_for_display[0]} | ... | {phrases_for_display[-1]}"
@@ -1705,14 +2027,13 @@ class TriggersMod(loader.Module):
         status_text = self.strings["reply_mode_enabled"] if new_status else self.strings["reply_mode_disabled"]
         await utils.answer(message, self.strings["reply_mode_status"].format(status_text), link_preview=False)
 
-    async def _send_response(self, message, data, trigger_id, reply_to_id=None): # Changed trigger_name to trigger_id
+    async def _send_response(self, message, data, trigger_id, reply_to_id=None):
         """Вспомогательная функция для отправки ответа на триггер."""
         reply_to_id = reply_to_id if reply_to_id is not None else (message.id if self.reply_mode else None)
         source_chat_id_for_get_messages = data.get("chat_id")
         source_message_id = data.get("message_id")
         source_chat_name = await self._get_chat_name(source_chat_id_for_get_messages)
 
-        # For error messages, use the primary phrase or ID
         display_trigger_name_or_id = data["phrases"][0] if data.get("phrases") else str(trigger_id)
 
         try:
@@ -1770,21 +2091,17 @@ class TriggersMod(loader.Module):
                 link_preview=False
             )
 
-    async def _send_delayed_response(self, original_message, trigger_data, trigger_id, activation_id, cancel_event): # Changed trigger_name to trigger_id
+    async def _send_delayed_response(self, original_message, trigger_data, trigger_id, activation_id, cancel_event):
         """Отправляет ответ на триггер после задержки, если он не был отменен."""
         delay_list = trigger_data.get("delay", [0])
         selected_delay = 0
         
         if len(delay_list) == 2 and delay_list[0] >= 0 and delay_list[1] >= 0 and delay_list[0] < delay_list[1]:
-            # Range delay: random integer between min and max (inclusive)
             selected_delay = random.randint(delay_list[0], delay_list[1])
         elif len(delay_list) >= 1 and delay_list[0] > 0:
-            # Single fixed delay or multiple discrete delays
             positive_delays = [d for d in delay_list if d > 0]
             if positive_delays:
                 selected_delay = random.choice(positive_delays)
-            # else: selected_delay remains 0 (no positive delays found)
-        # else: selected_delay remains 0 (delay_list is [0] or empty/invalid)
         
         if selected_delay > 0:
             await asyncio.sleep(selected_delay)
@@ -1803,38 +2120,40 @@ class TriggersMod(loader.Module):
             return
         
         chat_id_str = str(message.chat_id)
-        incoming_text_lower = message.text.lower()
+        
+        normalized_incoming_text = self._clean_text_from_formatting(message.text).lower()
 
-        # Check for pending trigger cancellations first
-        # Use a copy of items to avoid RuntimeError: dictionary changed size during iteration
         for activation_id, pending_info in list(self.pending_triggers.items()):
             pending_chat_id_str, trigger_id_for_cancel, _ = activation_id
             
             if pending_chat_id_str == chat_id_str:
-                stop_word = pending_info.get('stop_word')
-                stop_word_target_user_id = pending_info.get('stop_word_target_user_id')
+                stop_words_for_pending_trigger = pending_info.get('stop_words', [])
 
-                if stop_word and stop_word.lower() in incoming_text_lower:
-                    if stop_word_target_user_id is None or message.sender_id == stop_word_target_user_id:
-                        pending_info['cancel_event'].set()
-                        # print(f"Trigger {trigger_id_for_cancel} cancelled by stop word '{stop_word}' from user {message.sender_id}") # Debug
-                        # Removed the self.client.send_message for stop_word_detected to avoid spam
-                        if activation_id in self.pending_triggers:
-                            del self.pending_triggers[activation_id]
+                for sw_entry in stop_words_for_pending_trigger:
+                    stop_word = sw_entry["word"]
+                    stop_word_target_user_ids = sw_entry.get("target_user_ids", [])
+
+                    if stop_word and stop_word.lower() in normalized_incoming_text:
+                        # If stop_word_target_user_ids is empty, it means it applies to all.
+                        # If not empty, check if sender is in the list.
+                        if not stop_word_target_user_ids or message.sender_id in stop_word_target_user_ids:
+                            pending_info['cancel_event'].set()
+                            if activation_id in self.pending_triggers:
+                                del self.pending_triggers[activation_id]
+                            # Break inner loop as this stop word cancelled the trigger
+                            # and outer loop for this pending trigger since it's cancelled.
+                            break 
         
         chats = self.db.get("Triggers", "chats", {})
         chat_status_data = chats.get(chat_id_str, {"enabled": False, "expires_at": None})
         
-        # Check for timed activation expiration
         if chat_status_data["enabled"] and chat_status_data["expires_at"] is not None:
             if time.time() > chat_status_data["expires_at"]:
                 chat_status_data["enabled"] = False
                 chat_status_data["expires_at"] = None
                 chats[chat_id_str] = chat_status_data
                 self.db.set("Triggers", "chats", chats)
-                # Optionally notify chat about expiration, but for now just disable quietly
-                # await self.client.send_message(message.chat_id, self.strings["chat_disabled_expired"], link_preview=False)
-                return # Triggers are now disabled for this chat
+                return
 
         if not chat_status_data["enabled"]:
             return
@@ -1846,11 +2165,9 @@ class TriggersMod(loader.Module):
         if message.sender_id in blacklist:
             return
         
-        # New watcher logic: check phrase_map first
         if chat_id_str in self.phrase_map:
             for phrase_in_map, trigger_id_from_map in self.phrase_map[chat_id_str].items():
                 if trigger_id_from_map not in self.triggers[chat_id_str]:
-                    # Inconsistency detected, try to clean up phrase_map
                     del self.phrase_map[chat_id_str][phrase_in_map]
                     self.db.set("Triggers", "phrase_map", self.phrase_map)
                     continue
@@ -1858,31 +2175,29 @@ class TriggersMod(loader.Module):
                 data = self.triggers[chat_id_str][trigger_id_from_map]
                 match = False
                 
-                trigger_target_user_id = data.get("target_user_id")
-                if trigger_target_user_id is not None and message.sender_id != trigger_target_user_id:
+                trigger_target_user_ids = data.get("target_user_ids", [])
+                if trigger_target_user_ids and message.sender_id not in trigger_target_user_ids:
                     continue
                 
-                # Check match against all phrases in data["phrases"]
                 phrases_for_this_trigger = data.get("phrases", [])
                 
-                if not phrases_for_this_trigger: # Should ideally not happen after migration
+                if not phrases_for_this_trigger:
                     continue
 
-                # The `phrase_in_map` is the one that matched `incoming_text_lower` directly or partially
                 if data["mode"] == "private":
                     if message.sender_id != self.client.me.id: 
                         continue
-                    if incoming_text_lower.strip() == phrase_in_map: # Check actual phrase that was matched
+                    if normalized_incoming_text == phrase_in_map:
                         match = True
                 elif data["mode"] == "strict":
-                    if incoming_text_lower.strip() == phrase_in_map: # Check actual phrase that was matched
+                    if normalized_incoming_text == phrase_in_map:
                         match = True
                 else: # Partial mode
-                    if phrase_in_map in incoming_text_lower: # Check actual phrase that was matched
+                    if phrase_in_map in normalized_incoming_text:
                         match = True
                         
                 if match:
-                    spam_check = self.check_spam(message.sender_id, phrase_in_map) # Pass the specific phrase that caused match
+                    spam_check = self.check_spam(message.sender_id, phrase_in_map)
                     
                     if spam_check == "warn":
                         user_name = await self.get_user_name(message.sender_id)
@@ -1907,20 +2222,18 @@ class TriggersMod(loader.Module):
                         return
                     
                     delay_list = data.get("delay", [0])
-                    stop_word_for_this_trigger = data.get("stop_word")
-                    stop_word_target_user_id_for_this_trigger = data.get("stop_word_target_user_id")
+                    stop_words_for_this_trigger = data.get("stop_words", [])
 
                     if any(d > 0 for d in delay_list):
                         trigger_activation_id = (chat_id_str, data['id'], time.time())
                         cancel_event = asyncio.Event()
                         self.pending_triggers[trigger_activation_id] = {
                             'cancel_event': cancel_event,
-                            'stop_word': stop_word_for_this_trigger,
-                            'stop_word_target_user_id': stop_word_target_user_id_for_this_trigger,
-                            'trigger_id': data['id'], # Store trigger_id, not name
+                            'stop_words': stop_words_for_this_trigger, # Store the list of stop words
+                            'trigger_id': data['id'],
                         }
                         asyncio.create_task(self._send_delayed_response(message, data, trigger_id_from_map, trigger_activation_id, cancel_event))
                     else:
                         await self._send_response(message, data, trigger_id_from_map)
                     
-                    break # Only one trigger should fire per message
+                    break
