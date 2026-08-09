@@ -1524,33 +1524,40 @@ class Gemini(loader.Module):
             return await utils.answer(message, f"Файл слишком большой (>{MAX_IMPORT_SIZE // (1024*1024)} МБ).")
         import json
         try:
-            hist = json.load(file)
-            if not isinstance(hist, list): raise ValueError("Файл не содержит список истории.")
-            new_hist =[]
-            for e in hist:
+            hist_from_file = json.load(file) # Renamed 'hist' to 'hist_from_file' for clarity
+            if not isinstance(hist_from_file, list): raise ValueError("Файл не содержит список истории.") #
+            new_hist_entries =[] # Renamed 'new_hist' to 'new_hist_entries'
+            for e in hist_from_file: #
                 if not isinstance(e, dict) or "role" not in e or "content" not in e: 
-                    raise ValueError("Некорректная структура памяти.")
+                    raise ValueError("Некорректная структура памяти.") #
                 entry = {
                     "role": e["role"], 
                     "type": e.get("type", "text"), 
                     "content": e["content"], 
                     "date": e.get("date")
-                }
-                if e["role"] == "user":
-                    entry["user_id"] = e.get("user_id")
-                    entry["message_id"] = e.get("message_id")
-                new_hist.append(entry)
-            chat_id = str(utils.get_chat_id(message))
-            if gauto_mode:
-                self.gauto_conversations[chat_id] = new_hist
-                self._save_history_sync(gauto=True)
-            else:
-                self.conversations[chat_id] = new_hist
-                self._save_history_sync(gauto=False)
-            mem_type = "Gauto память" if gauto_mode else "Память"
-            await utils.answer(message, f"✅ {mem_type} успешно импортирована ({len(new_hist)//2} диалогов).")
-        except Exception as e:
-            await utils.answer(message, f"❌ Ошибка импорта: {e}")
+                } #
+                if e["role"] == "user": #
+                    entry["user_id"] = e.get("user_id") #
+                    entry["message_id"] = e.get("message_id") #
+                new_hist_entries.append(entry) #
+            
+            chat_id_str = str(utils.get_chat_id(message)) # Use chat_id_str for dictionary keys
+
+            if gauto_mode: #
+                current_gauto_hist = self.gauto_conversations.get(chat_id_str, []) #
+                self.gauto_conversations[chat_id_str] = current_gauto_hist + new_hist_entries #
+                self._save_history_sync(gauto=True) #
+                total_dialogs = len(self.gauto_conversations[chat_id_str]) // 2 #
+            else: #
+                current_conv_hist = self.conversations.get(chat_id_str, []) #
+                self.conversations[chat_id_str] = current_conv_hist + new_hist_entries #
+                self._save_history_sync(gauto=False) #
+                total_dialogs = len(self.conversations[chat_id_str]) // 2 #
+            
+            mem_type = "Gauto память" if gauto_mode else "Память" #
+            await utils.answer(message, f"✅ {mem_type} успешно импортирована. Добавлено {len(new_hist_entries)//2} диалогов. Всего {total_dialogs} диалогов.") #
+        except Exception as e: #
+            await utils.answer(message, f"❌ Ошибка импорта: {e}") #
 
     @loader.command()
     async def gmemfind(self, message: Message):
@@ -2013,7 +2020,7 @@ class Gemini(loader.Module):
 
     def _markdown_to_html(self, text):
         text = re.sub(r"^(#+)\s+(.*)", lambda m: f"<b>{m.group(2)}</b>", text, flags=re.M)
-        text = re.sub(r"^([ \t]*)[-*+]\s+", r"\1• ", text, flags=re.M)
+        text = re.sub(r"^([ \t]*)[-*+]\s+", r"\1• ", text, re.M)
         md = MarkdownIt("commonmark", {"html": True, "linkify": True}).enable("strikethrough")
         html = md.render(text)
         def fmt_code(m):
