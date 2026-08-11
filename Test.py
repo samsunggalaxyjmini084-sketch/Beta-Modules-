@@ -1,25 +1,3 @@
-#  This file is part of SenkoGuardianModules
-#  Copyright (c) 2025-2026 Senko
-#  This software is released under the MIT License.
-#  https://opensource.org/licenses/MIT
-
-# scope heroku_min: 2.0.0
-# meta banner: https://raw.githubusercontent.com/SenkoGuardian/SenkoGuardian.github.io/main/OfficialSenkoGuardianBanner.png
-# meta pic: https://raw.githubusercontent.com/SenkoGuardian/SenkoGuardian.github.io/main/OfficialSenkoGuardianBanner.png
-
-__version__ = ("6", "5", "0") 
-
-"""￣へ￣"""
-
-# meta developer: @SenkoGuardianModules
-
-#  .------. .------. .------. .------. .------. .------.
-#  |S.--. | |E.--. | |N.--. | |M.--. | |O.--. | |D.--. |
-#  | :/\: | | :/\: | | :(): | | :/\: | | :/\: | | :/\: |
-#  | :\/: | | :\/: | | ()() | | :\/: | | :\/: | | :\/: |
-#  | '--'S| | '--'E| | '--'N| | '--'M| | '--'O| | '--'D|
-#  `------' `------' `------' `------' `------' `------'
-
 import re
 import os
 import io
@@ -519,9 +497,13 @@ class Gemini(loader.Module):
         return "\n".join(chunks).strip() or "[медиа-запрос]"
 
     def _record_session_usage(self, tokens_in: int = 0, tokens_out: int = 0, elapsed: float = 0.0):
+        # As per user's request: do not update spent token counts in session stats.
+        # However, continue updating request count and response times.
         self.session_stats["requests"] = int(self.session_stats.get("requests", 0) or 0) + 1
-        self.session_stats["tokens_in"] = int(self.session_stats.get("tokens_in", 0) or 0) + int(tokens_in or 0)
-        self.session_stats["tokens_out"] = int(self.session_stats.get("tokens_out", 0) or 0) + int(tokens_out or 0)
+        # Explicitly setting token increments to 0 to prevent update of tokens_in and tokens_out
+        self.session_stats["tokens_in"] = int(self.session_stats.get("tokens_in", 0) or 0)
+        self.session_stats["tokens_out"] = int(self.session_stats.get("tokens_out", 0) or 0)
+
         times = list(self.session_stats.get("times", []) or [])
         times.append(float(elapsed or 0))
         self.session_stats["times"] = times[-200:]
@@ -537,6 +519,8 @@ class Gemini(loader.Module):
         if self.config.get("show_time", True):
             extra += f" ⏱️{round(float(elapsed or 0), 1)}с"
         if self.config.get("show_tokens", True) and (tokens_in or tokens_out):
+            # This part shows tokens for the *current* response, not total aggregated.
+            # To disable this, cfg_show_tokens should be set to False.
             extra += f" 🪙{int(tokens_in or 0) + int(tokens_out or 0)}"
         return f"<i>{self._provider_label(provider)}: <code>{utils.escape_html(str(model))}</code>{extra}</i>"
 
@@ -2039,10 +2023,10 @@ class Gemini(loader.Module):
             else: out.append(f"<blockquote expandable>{p.strip()}</blockquote>")
         return "\n".join(out)
 
-    def _get_inline_buttons(self, cid, mid):
+    def _get_inline_buttons(self, chat_id, mid):
         return [[
-            {"text": self.strings["btn_clear"], "callback": self._clear_callback, "args": (cid,)},
-            {"text": self.strings["btn_regenerate"], "callback": self._regenerate_callback, "args": (mid, cid)}
+            {"text": self.strings["btn_clear"], "callback": self._clear_callback, "args": (chat_id,)},
+            {"text": self.strings["btn_regenerate"], "callback": self._regenerate_callback, "args": (mid, chat_id)}
         ]]
 
     async def _clear_callback(self, call: InlineCall, cid):
