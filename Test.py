@@ -1,3 +1,25 @@
+#  This file is part of SenkoGuardianModules
+#  Copyright (c) 2025-2026 Senko
+#  This software is released under the MIT License.
+#  https://opensource.org/licenses/MIT
+
+# scope heroku_min: 2.0.0
+# meta banner: https://raw.githubusercontent.com/SenkoGuardian/SenkoGuardian.github.io/main/OfficialSenkoGuardianBanner.png
+# meta pic: https://raw.githubusercontent.com/SenkoGuardian/SenkoGuardian.github.io/main/OfficialSenkoGuardianBanner.png
+
+__version__ = ("6", "5", "0") 
+
+"""￣へ￣"""
+
+# meta developer: @SenkoGuardianModules
+
+#  .------. .------. .------. .------. .------. .------.
+#  |S.--. | |E.--. | |N.--. | |M.--. | |O.--. | |D.--. |
+#  | :/\: | | :/\: | | :(): | | :/\: | | :/\: | | :/\: |
+#  | :\/: | | :\/: | | ()() | | :\/: | | :\/: | | :\/: |
+#  | '--'S| | '--'E| | '--'N| | '--'M| | '--'O| | '--'D|
+#  `------' `------' `------' `------' `------' `------'
+
 import re
 import os
 import io
@@ -75,7 +97,7 @@ DB_PRESETS_KEY = "gemini_prompt_presets"
 DB_PAGER_CACHE_KEY = "gemini_pager_cache"
 DB_KEY_MAP_KEY = "gemini_key_model_map"
 DB_MEMORY_DISABLED_KEY = "gemini_memory_disabled_chats"
-DB_SESSION_STATS_KEY = "gemini_session_stats_v1"
+DB_SESSION_STATS_KEY = "gemini_session_stats_v1" # This key is kept but will no longer store token stats
 DB_PROVIDER_MODELS_KEY = "gemini_provider_models_v1"
 GEMINI_TIMEOUT = 840
 MAX_FFMPEG_SIZE = 90 * 1024 * 1024
@@ -103,7 +125,7 @@ class Gemini(loader.Module):
         "cfg_image_model_doc": "Модель Gemini для генерации изображений (например: gemini-2.5-flash-image).",
         "cfg_inline_pagination_doc": "Использовать инлайн-кнопки для длинных ответов.",
         "cfg_global_memory_doc": "Включить ОБЩУЮ память для всех чатов.",
-        "cfg_show_tokens_doc": "Показывать токены в ответе, если провайдер их вернул.",
+        # "cfg_show_tokens_doc": "Показывать токены в ответе, если провайдер их вернул.", # Removed token config doc
         "cfg_show_time_doc": "Показывать время выполнения запроса.",
         "cfg_auto_model_doc": "Автоматически подбирать модель по профилю и запросу.",
         "cfg_model_profile_doc": "Профиль модели: auto, balanced, fast, reasoning, coding, vision, manual.",
@@ -267,7 +289,7 @@ class Gemini(loader.Module):
             loader.ConfigValue("system_instruction", "", self.strings["cfg_system_instruction_doc"], validator=loader.validators.String()),
             loader.ConfigValue("max_history_length", 800, self.strings["cfg_max_history_length_doc"], validator=loader.validators.Integer(minimum=0)),
             loader.ConfigValue("global_memory", False, self.strings["cfg_global_memory_doc"], validator=loader.validators.Boolean()),
-            loader.ConfigValue("show_tokens", True, self.strings["cfg_show_tokens_doc"], validator=loader.validators.Boolean()),
+            # loader.ConfigValue("show_tokens", True, self.strings["cfg_show_tokens_doc"], validator=loader.validators.Boolean()), # Removed show_tokens config
             loader.ConfigValue("show_time", True, self.strings["cfg_show_time_doc"], validator=loader.validators.Boolean()),
             loader.ConfigValue("auto_model", False, self.strings["cfg_auto_model_doc"], validator=loader.validators.Boolean()),
             loader.ConfigValue("model_profile", "manual", self.strings["cfg_model_profile_doc"], validator=loader.validators.Choice(list(MODEL_PROFILE_CHOICES))),
@@ -303,7 +325,8 @@ class Gemini(loader.Module):
         self.key_model_map = {}
         self.provider_models = {}
         self.key_cooldowns = {}
-        self.session_stats = {"requests": 0, "tokens_in": 0, "tokens_out": 0, "times": [], "start_time": time.time()}
+        # Reinitialized session_stats to remove token-related fields
+        self.session_stats = {"requests": 0, "times": [], "start_time": time.time()}
         self.api_keys =[] 
 
     async def client_ready(self, client, db):
@@ -317,15 +340,16 @@ class Gemini(loader.Module):
         if not isinstance(self.provider_models, dict):
             self.provider_models = {}
         self.memory_disabled_chats = set(self.db.get(self.strings["name"], DB_MEMORY_DISABLED_KEY, []))
+        
+        # Load session_stats without token-specific keys
         saved_stats = self.db.get(self.strings["name"], DB_SESSION_STATS_KEY, {})
         if isinstance(saved_stats, dict):
             self.session_stats.update({
                 "requests": int(saved_stats.get("requests", 0) or 0),
-                "tokens_in": int(saved_stats.get("tokens_in", 0) or 0),
-                "tokens_out": int(saved_stats.get("tokens_out", 0) or 0),
                 "times": list(saved_stats.get("times", []) or [])[-200:],
                 "start_time": time.time(),
             })
+
         keys_to_remove =[k for k in self.key_model_map if k not in self.api_keys]
         if keys_to_remove:
             for k in keys_to_remove: del self.key_model_map[k]
@@ -496,32 +520,29 @@ class Gemini(loader.Module):
                 chunks.append(str(text))
         return "\n".join(chunks).strip() or "[медиа-запрос]"
 
+    # Modified: _record_session_usage no longer records tokens
     def _record_session_usage(self, tokens_in: int = 0, tokens_out: int = 0, elapsed: float = 0.0):
-        # As per user's request: do not update spent token counts in session stats.
-        # However, continue updating request count and response times.
         self.session_stats["requests"] = int(self.session_stats.get("requests", 0) or 0) + 1
-        # Explicitly setting token increments to 0 to prevent update of tokens_in and tokens_out
-        self.session_stats["tokens_in"] = int(self.session_stats.get("tokens_in", 0) or 0)
-        self.session_stats["tokens_out"] = int(self.session_stats.get("tokens_out", 0) or 0)
-
+        # self.session_stats["tokens_in"] = int(self.session_stats.get("tokens_in", 0) or 0) + int(tokens_in or 0) # Removed token tracking
+        # self.session_stats["tokens_out"] = int(self.session_stats.get("tokens_out", 0) or 0) + int(tokens_out or 0) # Removed token tracking
         times = list(self.session_stats.get("times", []) or [])
         times.append(float(elapsed or 0))
         self.session_stats["times"] = times[-200:]
         self.db.set(self.strings["name"], DB_SESSION_STATS_KEY, {
             "requests": self.session_stats["requests"],
-            "tokens_in": self.session_stats["tokens_in"],
-            "tokens_out": self.session_stats["tokens_out"],
+            # "tokens_in": self.session_stats["tokens_in"], # Removed token tracking
+            # "tokens_out": self.session_stats["tokens_out"], # Removed token tracking
             "times": self.session_stats["times"],
         })
 
+    # Modified: _model_info_line no longer displays token count
     def _model_info_line(self, provider: str, model: str, elapsed: float = 0.0, tokens_in: int = 0, tokens_out: int = 0) -> str:
         extra = ""
         if self.config.get("show_time", True):
             extra += f" ⏱️{round(float(elapsed or 0), 1)}с"
-        if self.config.get("show_tokens", True) and (tokens_in or tokens_out):
-            # This part shows tokens for the *current* response, not total aggregated.
-            # To disable this, cfg_show_tokens should be set to False.
-            extra += f" 🪙{int(tokens_in or 0) + int(tokens_out or 0)}"
+        # Removed token display
+        # if self.config.get("show_tokens", True) and (tokens_in or tokens_out):
+        #    extra += f" 🪙{int(tokens_in or 0) + int(tokens_out or 0)}"
         return f"<i>{self._provider_label(provider)}: <code>{utils.escape_html(str(model))}</code>{extra}</i>"
 
     def _extract_retry_delay_seconds(self, text: str, default: int = 3600) -> int:
@@ -719,16 +740,21 @@ class Gemini(loader.Module):
                 _t_start = time.time()
                 result_text, usage = await self._send_to_Openrouter_api(target_model, openai_messages, self.config["temperature"])
                 _elapsed = round(time.time() - _t_start, 1)
+                
+                # These lines are kept but will always be 0 now due to _send_to_Openrouter_api modification
                 _tokens_in = int(usage.get("prompt_tokens") or usage.get("input_tokens") or 0)
                 _tokens_out = int(usage.get("completion_tokens") or usage.get("output_tokens") or 0)
                 if not (_tokens_in or _tokens_out) and usage.get("total_tokens"):
                     _tokens_out = int(usage.get("total_tokens") or 0)
+
+                if not impersonation_mode:
+                    self._record_session_usage(0, 0, _elapsed) # Call with 0 tokens
+
                 result_text = result_text.strip()
                 result_text = re.sub(r"^\[System Info:.*?\]\s*", "", result_text, flags=re.IGNORECASE)
                 result_text = re.sub(r"^\[\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}\]\s*(?:Gemini:|Model:|Ассистент:|AI:)?\s*", "", result_text, flags=re.IGNORECASE)
                 result_text = re.sub(r"^\[\d{2}:\d{2}\]\s*(?:Gemini:|Model:|Ассистент:|AI:)?\s*", "", result_text, flags=re.IGNORECASE)
-                if not impersonation_mode:
-                    self._record_session_usage(_tokens_in, _tokens_out, _elapsed)
+                
                 if self._is_memory_enabled(str(chat_id)) and not ephemeral:
                     self._update_history(history_key, current_turn_parts, result_text, regeneration, msg_obj, gauto=impersonation_mode)
                 if impersonation_mode: return result_text
@@ -740,7 +766,7 @@ class Gemini(loader.Module):
                     mem_indicator = self.strings["memory_status_unlimited"].format(hist_len)
                 else:
                     mem_indicator = self.strings["memory_status"].format(hist_len, max_hist)
-                model_info = self._model_info_line("openrouter", target_model, _elapsed, _tokens_in, _tokens_out)
+                model_info = self._model_info_line("openrouter", target_model, _elapsed) # Removed token args
                 if attempt > 1:
                     model_info += f" <i>(Успешно с {attempt}-й попытки)</i>"
                 response_html = self._markdown_to_html(result_text)
@@ -790,8 +816,8 @@ class Gemini(loader.Module):
         was_successful = False
         search_icon = ""
         max_retries = len(api_keys_to_use)
-        _tokens_in = 0
-        _tokens_out = 0
+        _tokens_in = 0 # Tokens tracking removed, but kept to avoid errors in calls below
+        _tokens_out = 0 # Tokens tracking removed, but kept to avoid errors in calls below
         if impersonation_mode:
             my_name = get_display_name(self.me)
             chat_history_text = await self._get_recent_chat_text(chat_id)
@@ -851,9 +877,8 @@ class Gemini(loader.Module):
                 )
                 if response.text:
                     result_text = response.text
-                    if getattr(response, "usage_metadata", None):
-                        _tokens_in = getattr(response.usage_metadata, "prompt_token_count", 0) or 0
-                        _tokens_out = getattr(response.usage_metadata, "candidates_token_count", 0) or 0
+                    # _tokens_in = getattr(response.usage_metadata, "prompt_token_count", 0) or 0 # Removed token tracking
+                    # _tokens_out = getattr(response.usage_metadata, "candidates_token_count", 0) or 0 # Removed token tracking
                     result_text = result_text.strip()
                     result_text = re.sub(r"^\[System Info:.*?\]\s*", "", result_text, flags=re.IGNORECASE)
                     result_text = re.sub(r"^\[\d{2}\.\d{2}\.\d{4} \d{2}:\d{2}\]\s*(?:Gemini:|Model:|Ассистент:|AI:)?\s*", "", result_text, flags=re.IGNORECASE)
@@ -889,7 +914,7 @@ class Gemini(loader.Module):
         try:
             if not was_successful: raise last_error or RuntimeError("Unknown generation error")
             if not impersonation_mode:
-                self._record_session_usage(_tokens_in, _tokens_out, _elapsed)
+                self._record_session_usage(0, 0, _elapsed) # Call with 0 tokens
             if self._is_memory_enabled(str(chat_id)) and not ephemeral:
                 self._update_history(history_key, current_turn_parts, result_text, regeneration, msg_obj, gauto=impersonation_mode)
             if impersonation_mode: return result_text
@@ -901,7 +926,7 @@ class Gemini(loader.Module):
                 mem_indicator = self.strings["memory_status_unlimited"].format(hist_len_pairs)
             else:
                 mem_indicator = self.strings["memory_status"].format(hist_len_pairs, max_hist)
-            model_info = self._model_info_line("google", target_model, _elapsed, _tokens_in, _tokens_out)
+            model_info = self._model_info_line("google", target_model, _elapsed) # Removed token args
             if attempt > 1:
                 model_info += f" <i>(Успешно с {attempt}-й попытки)</i>"
             is_long_text = len(result_text) > 3500
@@ -2023,16 +2048,18 @@ class Gemini(loader.Module):
             else: out.append(f"<blockquote expandable>{p.strip()}</blockquote>")
         return "\n".join(out)
 
-    def _get_inline_buttons(self, chat_id, mid):
+    def _get_inline_buttons(self, cid, mid):
         return [[
-            {"text": self.strings["btn_clear"], "callback": self._clear_callback, "args": (chat_id,)},
-            {"text": self.strings["btn_regenerate"], "callback": self._regenerate_callback, "args": (mid, chat_id)}
+            {"text": self.strings["btn_clear"], "callback": self._clear_callback, "args": (cid,)},
+            {"text": self.strings["btn_regenerate"], "callback": self._regenerate_callback, "args": (mid, cid)}
         ]]
 
+    # Re-adding helper function
     async def _clear_callback(self, call: InlineCall, cid):
         self._clear_history(cid, gauto=False)
         await call.edit(self.strings["memory_cleared"], reply_markup=None)
 
+    # Re-adding helper function
     async def _regenerate_callback(self, call: InlineCall, mid, cid):
         key = f"{cid}:{mid}"
         if key not in self.last_requests: return await call.answer(self.strings["no_last_request"], show_alert=True)
@@ -2359,6 +2386,9 @@ class Gemini(loader.Module):
         url = "https://openrouter.ai/api/v1/chat/completions"
         now = time.time()
         last_error = None
+        # Returning dummy usage since token system is removed
+        dummy_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0} 
+
         async with aiohttp.ClientSession() as session:
             for api_key in keys:
                 cd_key = f"openrouter:{api_key}"
@@ -2428,7 +2458,7 @@ class Gemini(loader.Module):
                             content = str(content or "").strip()
                             if not content:
                                 raise ValueError(f"Пустой ответ OpenRouter. Raw: {text[:200]}")
-                            return content, (result.get("usage") or {})
+                            return content, dummy_usage # Always return dummy usage
                     except (aiohttp.ClientError, asyncio.TimeoutError) as e:
                         last_error = e
                         break
